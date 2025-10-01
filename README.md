@@ -195,25 +195,27 @@ See [`cmd/examples/`](cmd/examples/) for complete examples:
 - [x] Types package (100% coverage ⭐)
 - [x] Example programs
 
-### 🟢 M2: Extensions (Week 3-4) - 70% COMPLETE
+### ✅ M2: Extensions (Week 3-4) - 100% COMPLETE
 - [x] Team (4 coordination modes, 92.3% coverage)
 - [x] Workflow (5 primitives, 80.4% coverage)
 - [x] Anthropic Claude integration (50.9% coverage)
 - [x] Ollama local model support (43.8% coverage)
+- [x] DuckDuckGo search tool (92.1% coverage)
 - [x] Performance benchmarks ([details](docs/PERFORMANCE.md))
-- [x] Documentation simplification
-- [ ] DuckDuckGo search tool (in progress)
-- [ ] Model provider code refactoring
+- [x] Model provider refactoring (common utilities, 84.8% coverage)
+- [x] Documentation (README, CLAUDE.md, models/README.md)
 
 **Performance Achieved**:
 - ⚡ Agent instantiation: **180ns** (5x better than 1μs target)
 - 💾 Memory per agent: **1.2KB** (60% better than 3KB target)
 - 🚀 16x faster than Python version
 
-### ⏰ M3: Knowledge & Storage (Week 5-6) - PLANNED
-- [ ] ChromaDB vector database integration
-- [ ] Knowledge package (document loading, chunking)
-- [ ] Basic RAG workflow example
+### 🟢 M3: Knowledge & Storage (Week 5-6) - 60% COMPLETE
+- [x] VectorDB interface design
+- [x] Knowledge package - Document loaders (Text, Directory, Reader)
+- [x] Knowledge package - Chunkers (Character, Sentence, Paragraph)
+- [ ] Vector DB implementation (ChromaDB or alternative)
+- [ ] RAG workflow example
 
 ### ⏰ M4: Production Ready (Week 7-8) - PLANNED
 - [ ] Performance optimization
