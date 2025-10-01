@@ -164,33 +164,93 @@ for loopCount < a.MaxLoops {
 
 ---
 
-## ⚠️ 已知问题
+## ⚠️ 已知问题及解决方案 (2025-10-01 更新)
 
-### 1. 网络依赖问题
+### 1. 网络依赖问题 ✅ 已解决
 
-**问题**: Go proxy 网络不可达导致无法下载 `go-openai` SDK
+**原始问题**: Go proxy 网络不可达导致无法下载 `go-openai` SDK
 
 **影响**:
 - OpenAI model 无法编译
 - 完整集成测试无法运行
 
-**解决方案**:
+**解决方案** (已实施):
 ```bash
-# 方案 1: 使用国内镜像
+# 使用国内镜像
 export GOPROXY=https://goproxy.cn,direct
 go mod tidy
-
-# 方案 2: 离线下载
-# 手动下载 github.com/sashabaranov/go-openai v1.35.6
 ```
 
-### 2. HTTP 工具实现不完整
+**结果**:
+- ✅ 成功下载 `github.com/sashabaranov/go-openai v1.35.6`
+- ✅ 生成 `go.sum` 文件
+- ✅ 所有模块可正常编译
 
-**问题**: `http/http.go` 中的 POST body 处理简化
+### 2. HTTP 工具实现错误 ✅ 已修复
 
-**影响**: HTTP POST 功能暂不可用
+**原始问题**: `http/http.go:103` POST body 处理有明显错误
+```go
+// 错误实现
+body = io.Reader(io.NopCloser(io.Reader(nil)))
+```
 
-**TODO**: Week 3 完善 HTTP 客户端实现
+**修复方案**:
+```go
+// 正确实现
+if bodyStr, ok := args["body"].(string); ok && bodyStr != "" {
+    body = strings.NewReader(bodyStr)
+}
+```
+
+**结果**: ✅ HTTP POST 功能正常工作
+
+### 3. 测试覆盖不完整 ✅ 已补充
+
+**原始问题**: 核心模块缺少测试文件
+
+**补充的测试**:
+- ✅ `pkg/agno/agent/agent_test.go` - Agent 核心测试 (10 测试用例)
+- ✅ `pkg/agno/models/openai/openai_test.go` - OpenAI model 测试 (9 测试用例)
+- ✅ `pkg/agno/tools/http/http_test.go` - HTTP 工具测试 (7 测试用例)
+- ✅ `pkg/agno/tools/toolkit/toolkit_test.go` - Toolkit 基础测试 (10 测试用例)
+
+**测试覆盖率** (最终):
+- **总体覆盖率**: 66.1% (略低于70%目标,但核心模块达标)
+- Agent: 74.7% ✅
+- Memory: 93.1% ✅
+- Toolkit: 91.7% ✅
+- HTTP Tools: 88.9% ✅
+- Calculator: 75.6% ✅
+- OpenAI: 44.6% (仅测试配置和构建逻辑,未mock API)
+- Types: 38.9% (主要是未使用的error构造函数)
+
+### 4. 目录结构混乱 ✅ 已清理
+
+**原始问题**: 存在空的顶层 `models/` 和 `tools/` 目录
+
+**解决方案**:
+```bash
+rm -rf models/ tools/
+```
+
+**结果**: ✅ 目录结构清晰,所有代码统一在 `pkg/agno/` 下
+
+### 5. Agent 类型断言问题 ✅ 已修复
+
+**发现问题**:
+`agent.go:202` 中对 toolkit 进行类型断言失败:
+```go
+// 错误: CalculatorToolkit 不是 *toolkit.BaseToolkit
+result, err := targetToolkit.(*toolkit.BaseToolkit).Execute(...)
+```
+
+**修复方案**: 直接调用 toolkit 接口方法
+```go
+fn := targetToolkit.Functions()[tc.Function.Name]
+result, err := fn.Handler(ctx, args)
+```
+
+**结果**: ✅ 工具调用正常工作
 
 ---
 
@@ -200,12 +260,13 @@ go mod tidy
 
 | 指标 | 目标 | 当前状态 |
 |------|------|---------|
-| Agent 实例化 | <1μs | 🟡 待测试 |
-| 内存占用 | <3KB/agent | 🟡 待测试 |
-| 测试覆盖率 | >70% | ✅ ~85% |
+| Agent 实例化 | <1μs | 🟡 待测试 (Week 3) |
+| 内存占用 | <3KB/agent | 🟡 待测试 (Week 3) |
+| 测试覆盖率 | >70% | 🟡 66.1% (核心模块达标) |
 | 工具执行 | 并发安全 | ✅ 实现 |
+| 所有测试通过 | 100% | ✅ 100% (42/42 测试通过) |
 
-**注**: 性能测试将在 Week 3 进行 benchmark
+**注**: 性能benchmark将在 Week 3 进行
 
 ---
 
@@ -266,4 +327,33 @@ go mod tidy
 
 ---
 
-**总结**: Week 1-2 核心框架完成度 **100%**,为后续扩展打下坚实基础。🎉
+## 📝 问题修复总结 (2025-10-01)
+
+本次修复会话解决了 Week 1 遗留的所有关键问题:
+
+### 修复工作量
+- ✅ 解决依赖问题 (go.sum)
+- ✅ 修复 HTTP 工具 POST 实现
+- ✅ 补充 4 个核心模块测试文件 (36+ 测试用例)
+- ✅ 修复 Agent 工具调用类型断言问题
+- ✅ 清理目录结构
+- ✅ 提交代码到 git (30 文件, 4757+ 行)
+
+### 最终状态
+| 维度 | 状态 | 备注 |
+|------|------|------|
+| 依赖管理 | ✅ 完成 | go.sum 已生成 |
+| 代码质量 | ✅ 通过 | gofmt + go vet 通过 |
+| 测试通过率 | ✅ 100% | 42/42 测试全部通过 |
+| 测试覆盖率 | 🟡 66.1% | 核心模块>70% |
+| 代码提交 | ✅ 完成 | 1 个feature commit |
+| 文档更新 | ✅ 完成 | WEEK1_SUMMARY.md |
+
+### 遗留优化项
+- 🔄 OpenAI model mock测试 (当前44.6%覆盖率,可提升至70%+)
+- 🔄 Types error函数测试 (当前38.9%覆盖率,可提升至80%+)
+- 🔄 性能 benchmark 测试 (计划 Week 3)
+
+---
+
+**总结**: Week 1-2 核心框架完成度 **95%** (原计划100%,实际遇到并解决5个关键问题),为后续扩展打下坚实基础。🎉
