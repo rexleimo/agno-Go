@@ -10,6 +10,24 @@ import (
 	"github.com/yourusername/agno-go/pkg/agno/vectordb"
 )
 
+// Helper functions for embedding conversion
+
+// convertToChromaEmbeddings converts [][]float32 to []*types.Embedding
+func convertToChromaEmbeddings(embeddings [][]float32) []*types.Embedding {
+	return types.NewEmbeddingsFromFloat32(embeddings)
+}
+
+// convertFromChromaEmbeddings converts []*types.Embedding to [][]float32
+func convertFromChromaEmbeddings(embeddings []*types.Embedding) [][]float32 {
+	result := make([][]float32, len(embeddings))
+	for i, emb := range embeddings {
+		if emb != nil && emb.ArrayOfFloat32 != nil {
+			result[i] = *emb.ArrayOfFloat32
+		}
+	}
+	return result
+}
+
 // ChromaDB implements the VectorDB interface using ChromaDB
 type ChromaDB struct {
 	client         *chroma.Client
@@ -74,7 +92,7 @@ func New(config Config) (*ChromaDB, error) {
 
 	// Add cloud API key if provided
 	if config.CloudAPIKey != "" {
-		clientOpts = append(clientOpts, chroma.WithAuth(types.NewTokenAuthCredentialsProvider(config.CloudAPIKey)))
+		clientOpts = append(clientOpts, chroma.WithAuth(types.NewTokenAuthCredentialsProvider(config.CloudAPIKey, types.XChromaTokenHeader)))
 	}
 
 	// Create ChromaDB client
@@ -123,12 +141,12 @@ func (c *ChromaDB) CreateCollection(ctx context.Context, name string, metadata m
 		}
 	}
 
-	// Create or get collection
-	collection, err := c.client.GetOrCreateCollection(
+	// Create or get collection (createOrGet = true means get if exists)
+	collection, err := c.client.CreateCollection(
 		ctx,
 		c.collectionName,
 		chromaMetadata,
-		true, // get or create
+		true, // createOrGet = true
 		nil,  // embedding function (we handle it ourselves)
 		distanceFunc,
 	)
@@ -209,8 +227,11 @@ func (c *ChromaDB) Add(ctx context.Context, documents []vectordb.Document) error
 		}
 	}
 
+	// Convert embeddings to ChromaDB format
+	chromaEmbeddings := convertToChromaEmbeddings(embeddings)
+
 	// Add to ChromaDB
-	_, err := c.collection.Add(ctx, embeddings, metadatas, contents, ids)
+	_, err := c.collection.Add(ctx, chromaEmbeddings, metadatas, contents, ids)
 	if err != nil {
 		return fmt.Errorf("failed to add documents: %w", err)
 	}
@@ -265,8 +286,11 @@ func (c *ChromaDB) Update(ctx context.Context, documents []vectordb.Document) er
 		}
 	}
 
-	// Update in ChromaDB
-	_, err := c.collection.Update(ctx, ids, embeddings, metadatas, contents)
+	// Convert embeddings to ChromaDB format
+	chromaEmbeddings := convertToChromaEmbeddings(embeddings)
+
+	// Modify in ChromaDB (Update is for collection metadata, Modify is for documents)
+	_, err := c.collection.Modify(ctx, chromaEmbeddings, metadatas, contents, ids)
 	if err != nil {
 		return fmt.Errorf("failed to update documents: %w", err)
 	}
@@ -321,15 +345,23 @@ func (c *ChromaDB) QueryWithEmbedding(ctx context.Context, embedding []float32, 
 		limit = 10
 	}
 
-	// Query ChromaDB
-	queryResult, err := c.collection.Query(
-		ctx,
-		[][]float32{embedding},
-		int32(limit),
-		filter,
-		nil, // include (default: all)
-		nil, // query texts
-	)
+	// Convert embedding to ChromaDB format
+	chromaEmb := types.NewEmbeddingFromFloat32(embedding)
+
+	// Build query options
+	queryOpts := []types.CollectionQueryOption{
+		types.WithQueryEmbedding(chromaEmb),
+		types.WithNResults(int32(limit)),
+		types.WithInclude("documents", "metadatas", "distances"),
+	}
+
+	// Add filter if provided
+	if filter != nil {
+		queryOpts = append(queryOpts, types.WithWhereMap(filter))
+	}
+
+	// Query ChromaDB using QueryWithOptions
+	queryResult, err := c.collection.QueryWithOptions(ctx, queryOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query: %w", err)
 	}
@@ -374,7 +406,13 @@ func (c *ChromaDB) Get(ctx context.Context, ids []string) ([]vectordb.Document, 
 	}
 
 	// Get documents from ChromaDB
-	result, err := c.collection.Get(ctx, types.WithWhereDocument(types.WhereDocument{}), types.WithIDs(ids))
+	result, err := c.collection.Get(
+		ctx,
+		nil, // where
+		nil, // whereDocuments
+		ids,
+		[]types.QueryEnum{"documents", "metadatas", "embeddings"},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get documents: %w", err)
 	}
@@ -395,8 +433,10 @@ func (c *ChromaDB) Get(ctx context.Context, ids []string) ([]vectordb.Document, 
 				doc.Metadata = result.Metadatas[i]
 			}
 
-			if result.Embeddings != nil && len(result.Embeddings) > i {
-				doc.Embedding = result.Embeddings[i]
+			if result.Embeddings != nil && len(result.Embeddings) > i && result.Embeddings[i] != nil {
+				if result.Embeddings[i].ArrayOfFloat32 != nil {
+					doc.Embedding = *result.Embeddings[i].ArrayOfFloat32
+				}
 			}
 
 			documents = append(documents, doc)

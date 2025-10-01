@@ -7,9 +7,9 @@ import (
 	"os"
 
 	"github.com/yourusername/agno-go/pkg/agno/agent"
-	"github.com/yourusername/agno-go/pkg/agno/embeddings/openai"
+	openaiembed "github.com/yourusername/agno-go/pkg/agno/embeddings/openai"
 	"github.com/yourusername/agno-go/pkg/agno/knowledge"
-	"github.com/yourusername/agno-go/pkg/agno/models/openai"
+	openaimodel "github.com/yourusername/agno-go/pkg/agno/models/openai"
 	"github.com/yourusername/agno-go/pkg/agno/tools/toolkit"
 	"github.com/yourusername/agno-go/pkg/agno/vectordb"
 	"github.com/yourusername/agno-go/pkg/agno/vectordb/chromadb"
@@ -50,7 +50,7 @@ func NewRAGToolkit(db vectordb.VectorDB) *RAGToolkit {
 	return t
 }
 
-func (t *RAGToolkit) searchKnowledge(args map[string]interface{}) (interface{}, error) {
+func (t *RAGToolkit) searchKnowledge(ctx context.Context, args map[string]interface{}) (interface{}, error) {
 	query, ok := args["query"].(string)
 	if !ok {
 		return nil, fmt.Errorf("query must be a string")
@@ -61,7 +61,6 @@ func (t *RAGToolkit) searchKnowledge(args map[string]interface{}) (interface{}, 
 		limit = int(l)
 	}
 
-	ctx := context.Background()
 	results, err := t.vectorDB.Query(ctx, query, limit, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search knowledge base: %w", err)
@@ -286,14 +285,6 @@ Always be helpful, accurate, and concise.`,
 		}
 
 		fmt.Printf("Assistant: %s\n", output.Content)
-
-		// Show tool calls
-		if len(output.ToolCalls) > 0 {
-			fmt.Printf("\n[Debug] Tools used:\n")
-			for _, tc := range output.ToolCalls {
-				fmt.Printf("  - %s\n", tc.Name)
-			}
-		}
 	}
 
 	fmt.Println("\n" + string(make([]byte, 60)) + "=")

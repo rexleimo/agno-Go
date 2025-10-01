@@ -260,3 +260,290 @@ func TestOpenAI_GetID(t *testing.T) {
 		t.Errorf("GetID() = %v, want %v", model.GetID(), modelID)
 	}
 }
+
+// Additional tests for error handling and edge cases
+
+func TestNew_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		modelID string
+		config  Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "empty model ID",
+			modelID: "",
+			config:  Config{APIKey: "test-key"},
+			wantErr: false, // Model ID can be empty, validated by API
+		},
+		{
+			name:    "with temperature config",
+			modelID: "gpt-4",
+			config: Config{
+				APIKey:      "test-key",
+				Temperature: 0.7,
+			},
+			wantErr: false,
+		},
+		{
+			name:    "with max tokens config",
+			modelID: "gpt-4",
+			config: Config{
+				APIKey:    "test-key",
+				MaxTokens: 1000,
+			},
+			wantErr: false,
+		},
+		{
+			name:    "with all configs",
+			modelID: "gpt-4",
+			config: Config{
+				APIKey:      "test-key",
+				BaseURL:     "https://custom.openai.com",
+				Temperature: 0.8,
+				MaxTokens:   2000,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model, err := New(tt.modelID, tt.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				if model == nil {
+					t.Error("New() returned nil model")
+				}
+				if model.config.Temperature != tt.config.Temperature {
+					t.Errorf("Temperature = %v, want %v", model.config.Temperature, tt.config.Temperature)
+				}
+				if model.config.MaxTokens != tt.config.MaxTokens {
+					t.Errorf("MaxTokens = %v, want %v", model.config.MaxTokens, tt.config.MaxTokens)
+				}
+			}
+		})
+	}
+}
+
+func TestOpenAI_buildChatRequest_EmptyMessages(t *testing.T) {
+	model, err := New("gpt-4o-mini", Config{APIKey: "test-key"})
+	if err != nil {
+		t.Fatalf("Failed to create model: %v", err)
+	}
+
+	req := &models.InvokeRequest{
+		Messages: []*types.Message{},
+	}
+
+	chatReq := model.buildChatRequest(req)
+	if len(chatReq.Messages) != 0 {
+		t.Errorf("buildChatRequest() with empty messages should return empty messages")
+	}
+}
+
+func TestOpenAI_buildChatRequest_SystemMessage(t *testing.T) {
+	model, err := New("gpt-4o-mini", Config{APIKey: "test-key"})
+	if err != nil {
+		t.Fatalf("Failed to create model: %v", err)
+	}
+
+	req := &models.InvokeRequest{
+		Messages: []*types.Message{
+			types.NewSystemMessage("You are a helpful assistant"),
+			types.NewUserMessage("Hello"),
+		},
+	}
+
+	chatReq := model.buildChatRequest(req)
+	if len(chatReq.Messages) != 2 {
+		t.Errorf("buildChatRequest() messages count = %v, want 2", len(chatReq.Messages))
+	}
+	if chatReq.Messages[0].Role != "system" {
+		t.Errorf("First message role = %v, want system", chatReq.Messages[0].Role)
+	}
+}
+
+func TestOpenAI_buildChatRequest_ConfigTemperature(t *testing.T) {
+	model, err := New("gpt-4o-mini", Config{
+		APIKey:      "test-key",
+		Temperature: 0.5,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create model: %v", err)
+	}
+
+	req := &models.InvokeRequest{
+		Messages: []*types.Message{
+			types.NewUserMessage("Hello"),
+		},
+	}
+
+	chatReq := model.buildChatRequest(req)
+	// Config temperature should be used if request doesn't specify
+	if req.Temperature == 0 && model.config.Temperature > 0 {
+		if chatReq.Temperature != float32(model.config.Temperature) {
+			t.Errorf("buildChatRequest() temperature = %v, want %v", chatReq.Temperature, model.config.Temperature)
+		}
+	}
+}
+
+func TestOpenAI_buildChatRequest_ConfigMaxTokens(t *testing.T) {
+	model, err := New("gpt-4o-mini", Config{
+		APIKey:    "test-key",
+		MaxTokens: 500,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create model: %v", err)
+	}
+
+	req := &models.InvokeRequest{
+		Messages: []*types.Message{
+			types.NewUserMessage("Hello"),
+		},
+	}
+
+	chatReq := model.buildChatRequest(req)
+	// Config max tokens should be used if request doesn't specify
+	if req.MaxTokens == 0 && model.config.MaxTokens > 0 {
+		if chatReq.MaxTokens != model.config.MaxTokens {
+			t.Errorf("buildChatRequest() max_tokens = %v, want %v", chatReq.MaxTokens, model.config.MaxTokens)
+		}
+	}
+}
+
+func TestOpenAI_buildChatRequest_RequestOverridesConfig(t *testing.T) {
+	model, err := New("gpt-4o-mini", Config{
+		APIKey:      "test-key",
+		Temperature: 0.5,
+		MaxTokens:   500,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create model: %v", err)
+	}
+
+	req := &models.InvokeRequest{
+		Messages: []*types.Message{
+			types.NewUserMessage("Hello"),
+		},
+		Temperature: 0.9,
+		MaxTokens:   1000,
+	}
+
+	chatReq := model.buildChatRequest(req)
+
+	// Request parameters should override config
+	if chatReq.Temperature != float32(req.Temperature) {
+		t.Errorf("buildChatRequest() temperature = %v, want %v (request should override config)", chatReq.Temperature, req.Temperature)
+	}
+	if chatReq.MaxTokens != req.MaxTokens {
+		t.Errorf("buildChatRequest() max_tokens = %v, want %v (request should override config)", chatReq.MaxTokens, req.MaxTokens)
+	}
+}
+
+func TestOpenAI_buildChatRequest_MultipleTools(t *testing.T) {
+	model, err := New("gpt-4o-mini", Config{APIKey: "test-key"})
+	if err != nil {
+		t.Fatalf("Failed to create model: %v", err)
+	}
+
+	req := &models.InvokeRequest{
+		Messages: []*types.Message{
+			types.NewUserMessage("Calculate something"),
+		},
+		Tools: []models.ToolDefinition{
+			{
+				Type: "function",
+				Function: models.FunctionSchema{
+					Name:        "add",
+					Description: "Add two numbers",
+				},
+			},
+			{
+				Type: "function",
+				Function: models.FunctionSchema{
+					Name:        "multiply",
+					Description: "Multiply two numbers",
+				},
+			},
+		},
+	}
+
+	chatReq := model.buildChatRequest(req)
+
+	if len(chatReq.Tools) != 2 {
+		t.Errorf("buildChatRequest() tools count = %v, want 2", len(chatReq.Tools))
+	}
+}
+
+func TestOpenAI_buildChatRequest_AssistantMessage(t *testing.T) {
+	model, err := New("gpt-4o-mini", Config{APIKey: "test-key"})
+	if err != nil {
+		t.Fatalf("Failed to create model: %v", err)
+	}
+
+	req := &models.InvokeRequest{
+		Messages: []*types.Message{
+			types.NewUserMessage("Hello"),
+			{
+				Role:    types.RoleAssistant,
+				Content: "Hi! How can I help you?",
+			},
+			types.NewUserMessage("Tell me about AI"),
+		},
+	}
+
+	chatReq := model.buildChatRequest(req)
+
+	if len(chatReq.Messages) != 3 {
+		t.Errorf("buildChatRequest() messages count = %v, want 3", len(chatReq.Messages))
+	}
+	if chatReq.Messages[1].Role != "assistant" {
+		t.Errorf("Second message role = %v, want assistant", chatReq.Messages[1].Role)
+	}
+}
+
+func TestValidateConfig_DetailedErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+	}{
+		{
+			name: "API key with whitespace",
+			config: Config{
+				APIKey: "  sk-test  ",
+			},
+			wantErr: false, // Whitespace is allowed, API will handle it
+		},
+		{
+			name: "negative temperature",
+			config: Config{
+				APIKey:      "sk-test",
+				Temperature: -0.5,
+			},
+			wantErr: false, // Validation doesn't check temperature range
+		},
+		{
+			name: "negative max tokens",
+			config: Config{
+				APIKey:    "sk-test",
+				MaxTokens: -100,
+			},
+			wantErr: false, // Validation doesn't check max tokens range
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConfig(tt.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
