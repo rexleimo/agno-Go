@@ -128,6 +128,12 @@ func (m *MyModel) Invoke(ctx context.Context, req *models.InvokeRequest) (*types
   - Features: Claude 3 Opus, Sonnet, Haiku, streaming
   - Can benefit from HTTPClient refactoring
 
+- **Gemini** (`gemini/gemini.go`): Custom HTTP implementation with SSE streaming
+  - Coverage: 100% (all tests passing)
+  - Features: Gemini Pro, Gemini Ultra, function calling, SSE streaming
+  - Supports system instructions, tool calls, and function responses
+  - Example: `cmd/examples/gemini_agent/`
+
 - **Ollama** (`ollama/ollama.go`): Custom HTTP implementation
   - Coverage: 43.8%
   - Features: All Ollama models (Llama 2, Mistral, etc.), streaming
