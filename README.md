@@ -6,8 +6,9 @@ Agno-Go: A High-Performance Multi-Agent System Framework Based on Golang. Inheri
 
 - **Simple & Powerful**: Clean API design following KISS principle
 - **High Performance**: ⚡ **180ns** agent instantiation, **1.2KB** memory per agent ([16x faster than Python](docs/PERFORMANCE.md))
+- **RAG Support**: Built-in vector database (ChromaDB) and embeddings (OpenAI) for retrieval-augmented generation
 - **Flexible Tools**: Easy-to-extend toolkit system
-- **Multi-Model Support**: OpenAI, Anthropic Claude, Ollama (local models)
+- **Multi-Model Support**: OpenAI, Anthropic Claude, Ollama, DeepSeek, Gemini, ModelScope
 - **Production Ready**: Built-in error handling, logging, and comprehensive testing (>70% coverage)
 
 ## 📦 Installation
@@ -66,10 +67,13 @@ agent, err := agent.New(agent.Config{
 ```
 
 ### Models
-Abstraction over different LLM providers. Following KISS principle, we focus on 3 core providers:
+Abstraction over different LLM providers. We support 6 major providers:
 - ✅ **OpenAI** (GPT-4, GPT-3.5, etc.) - 44.6% test coverage
 - ✅ **Anthropic Claude** (Claude 3 Opus, Sonnet, Haiku) - 50.9% test coverage
 - ✅ **Ollama** (Llama 2, Mistral, CodeLlama, all local models) - 43.8% test coverage
+- ✅ **DeepSeek** (DeepSeek-V2, DeepSeek-Coder)
+- ✅ **Google Gemini** (Gemini Pro, Flash)
+- ✅ **ModelScope** (Qwen, Yi models)
 
 ```go
 model, err := openai.New("gpt-4o-mini", openai.Config{
@@ -118,7 +122,47 @@ Following KISS principle, we provide essential tools with high quality:
 - **Calculator**: Basic math operations (75.6% coverage)
 - **HTTP**: Make HTTP GET/POST requests (88.9% coverage)
 - **File Operations**: Read, write, list, delete files with security controls (76.2% coverage)
-- **Search**: DuckDuckGo web search (coming soon)
+- **Search**: DuckDuckGo web search (92.1% coverage)
+
+## 🧠 Knowledge & RAG
+
+Build intelligent agents with knowledge bases and semantic search:
+
+### Vector Database
+- **ChromaDB**: Full integration with local and cloud instances
+- Automatic embedding generation
+- Metadata filtering and semantic search
+
+### Embeddings
+- **OpenAI**: text-embedding-3-small/large support
+- Automatic batch processing
+- 1536/3072 dimensional embeddings
+
+### Example RAG Application
+
+```go
+// Create embedding function
+embedFunc, _ := openai.New(openai.Config{
+    APIKey: os.Getenv("OPENAI_API_KEY"),
+    Model:  "text-embedding-3-small",
+})
+
+// Create vector database
+db, _ := chromadb.New(chromadb.Config{
+    CollectionName:    "knowledge_base",
+    EmbeddingFunction: embedFunc,
+})
+
+// Add documents (embeddings generated automatically)
+db.Add(ctx, []vectordb.Document{
+    {ID: "doc1", Content: "AI is the future..."},
+})
+
+// Query with natural language
+results, _ := db.Query(ctx, "What is AI?", 5, nil)
+```
+
+See [RAG Demo](cmd/examples/rag_demo/) for a complete example.
 
 ## 📁 Project Structure
 
@@ -128,19 +172,33 @@ agno-go/
 │   ├── agent/          # Agent core (74.7% coverage)
 │   ├── team/           # Multi-agent collaboration (92.3% coverage)
 │   ├── workflow/       # Workflow engine (80.4% coverage)
-│   ├── models/         # LLM providers
+│   ├── models/         # LLM providers (6 providers)
 │   │   ├── openai/     # OpenAI (44.6% coverage)
 │   │   ├── anthropic/  # Claude (50.9% coverage)
 │   │   ├── ollama/     # Ollama (43.8% coverage)
+│   │   ├── deepseek/   # DeepSeek
+│   │   ├── gemini/     # Google Gemini
+│   │   ├── modelscope/ # ModelScope
 │   │   └── base.go     # Model interface
 │   ├── tools/          # Tool system
 │   │   ├── toolkit/    # Toolkit interface (91.7% coverage)
 │   │   ├── calculator/ # Math tools (75.6% coverage)
 │   │   ├── http/       # HTTP tools (88.9% coverage)
-│   │   └── file/       # File operations (76.2% coverage)
+│   │   ├── file/       # File operations (76.2% coverage)
+│   │   └── search/     # Web search (92.1% coverage)
+│   ├── vectordb/       # Vector database
+│   │   ├── base.go     # VectorDB interface
+│   │   └── chromadb/   # ChromaDB implementation
+│   ├── embeddings/     # Embedding functions
+│   │   └── openai/     # OpenAI embeddings
+│   ├── knowledge/      # Knowledge management
 │   ├── memory/         # Memory management (93.1% coverage)
 │   └── types/          # Core types (100% coverage ⭐)
 ├── cmd/examples/       # Example programs
+│   ├── simple_agent/   # Basic agent example
+│   ├── team_demo/      # Multi-agent collaboration
+│   ├── workflow_demo/  # Workflow example
+│   └── rag_demo/       # RAG pipeline example
 ├── docs/               # Documentation
 │   ├── PERFORMANCE.md  # Performance benchmarks
 │   └── PROGRESS.md     # Development progress
