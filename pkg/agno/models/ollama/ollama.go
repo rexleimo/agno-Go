@@ -32,9 +32,8 @@ type Config struct {
 
 // New creates a new Ollama model instance
 func New(modelID string, config Config) (*Ollama, error) {
-	baseURL := config.BaseURL
-	if baseURL == "" {
-		baseURL = defaultBaseURL
+	if config.BaseURL == "" {
+		config.BaseURL = defaultBaseURL
 	}
 
 	if config.MaxTokens == 0 {
