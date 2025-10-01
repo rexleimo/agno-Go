@@ -160,6 +160,8 @@ make lint
 
 See [`cmd/examples/`](cmd/examples/) for complete examples:
 - `simple_agent`: Basic agent with calculator tools
+- `team_demo`: Multi-agent collaboration with 4 coordination modes
+- `workflow_demo`: Workflow engine with 5 control flow primitives
 
 ## 🎯 Roadmap
 
@@ -172,9 +174,9 @@ See [`cmd/examples/`](cmd/examples/) for complete examples:
 - [x] Unit tests
 - [x] Example programs
 
-### Week 3-4: Extensions (In Progress)
-- [ ] Team (multi-agent collaboration)
-- [ ] Workflow engine
+### Week 3-4: Extensions (🟡 40% Complete)
+- [x] Team (multi-agent collaboration) - 4 modes, 92.3% test coverage
+- [x] Workflow engine - 5 primitives, 80.4% test coverage
 - [ ] More LLM providers (Anthropic, Google, Groq, Ollama)
 - [ ] More tools (10+ tools)
 
