@@ -129,10 +129,24 @@ func (m *MyModel) Invoke(ctx context.Context, req *models.InvokeRequest) (*types
   - Can benefit from HTTPClient refactoring
 
 - **Gemini** (`gemini/gemini.go`): Custom HTTP implementation with SSE streaming
-  - Coverage: 100% (all tests passing)
+  - Coverage: 77.0%
   - Features: Gemini Pro, Gemini Ultra, function calling, SSE streaming
   - Supports system instructions, tool calls, and function responses
   - Example: `cmd/examples/gemini_agent/`
+
+- **DeepSeek** (`deepseek/deepseek.go`): OpenAI-compatible SDK integration
+  - Coverage: 81.6%
+  - Features: DeepSeek-V3 (deepseek-chat), DeepSeek-R1 (deepseek-reasoner)
+  - Full OpenAI API compatibility, function calling, streaming
+  - Cost-effective with context caching
+  - Example: `cmd/examples/deepseek_agent/`
+
+- **ModelScope** (`modelscope/modelscope.go`): OpenAI-compatible SDK via DashScope
+  - Coverage: 78.9%
+  - Features: Qwen models (qwen-plus, qwen-turbo, qwen-max), Chinese-optimized
+  - Full OpenAI API compatibility through Alibaba Cloud DashScope
+  - Excellent Chinese language support
+  - Example: `cmd/examples/modelscope_agent/`
 
 - **Ollama** (`ollama/ollama.go`): Custom HTTP implementation
   - Coverage: 43.8%
