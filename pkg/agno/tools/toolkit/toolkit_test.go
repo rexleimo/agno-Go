@@ -155,7 +155,7 @@ func TestFormatResult(t *testing.T) {
 		{
 			name:    "string result",
 			input:   "hello",
-			want:    `"hello"`,  // JSON encoding adds quotes
+			want:    `"hello"`, // JSON encoding adds quotes
 			wantErr: false,
 		},
 		{

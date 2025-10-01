@@ -68,8 +68,9 @@ agent, err := agent.New(agent.Config{
 ### Models
 Abstraction over different LLM providers. Currently supports:
 - ✅ OpenAI (GPT-4, GPT-3.5, etc.)
-- 🚧 Anthropic (Coming soon)
-- 🚧 Google (Coming soon)
+- ✅ Anthropic Claude (Claude 3 Opus, Sonnet, Haiku)
+- ✅ Ollama (Llama 2, Mistral, CodeLlama, and all local models)
+- 🚧 Google Gemini (Coming soon)
 
 ```go
 model, err := openai.New("gpt-4o-mini", openai.Config{
@@ -116,6 +117,7 @@ memory := memory.NewInMemory(100) // Keep last 100 messages
 
 - **Calculator**: Basic math operations (add, subtract, multiply, divide)
 - **HTTP**: Make HTTP GET/POST requests
+- **File Operations**: Read, write, list, delete files with security controls
 - More coming soon...
 
 ## 📁 Project Structure
@@ -159,7 +161,9 @@ make lint
 ## 📚 Examples
 
 See [`cmd/examples/`](cmd/examples/) for complete examples:
-- `simple_agent`: Basic agent with calculator tools
+- `simple_agent`: Basic agent with OpenAI and calculator tools
+- `claude_agent`: Anthropic Claude integration with tools
+- `ollama_agent`: Local model support with Ollama
 - `team_demo`: Multi-agent collaboration with 4 coordination modes
 - `workflow_demo`: Workflow engine with 5 control flow primitives
 
@@ -174,11 +178,14 @@ See [`cmd/examples/`](cmd/examples/) for complete examples:
 - [x] Unit tests
 - [x] Example programs
 
-### Week 3-4: Extensions (🟡 40% Complete)
+### Week 3-4: Extensions (🟢 60% Complete)
 - [x] Team (multi-agent collaboration) - 4 modes, 92.3% test coverage
 - [x] Workflow engine - 5 primitives, 80.4% test coverage
-- [ ] More LLM providers (Anthropic, Google, Groq, Ollama)
-- [ ] More tools (10+ tools)
+- [x] Anthropic Claude integration (Opus, Sonnet, Haiku)
+- [x] Ollama local model support (all models)
+- [x] File operations toolkit
+- [ ] More LLM providers (Google Gemini, Groq)
+- [ ] More tools (search, database, shell, etc.)
 
 ### Week 5-6: Storage & Knowledge
 - [ ] Vector database integrations

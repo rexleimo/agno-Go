@@ -54,8 +54,8 @@ func TestHTTPToolkit_Get(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "missing URL",
-			args: map[string]interface{}{},
+			name:    "missing URL",
+			args:    map[string]interface{}{},
 			wantErr: true,
 		},
 		{
