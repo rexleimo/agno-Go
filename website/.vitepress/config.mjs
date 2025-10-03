@@ -5,6 +5,7 @@ export default defineConfig({
   title: "Agno-Go",
   description: "High-performance multi-agent system framework built with Go",
   base: '/agno-Go/',
+  ignoreDeadLinks: true,
 
   head: [
     ['link', { rel: 'icon', href: '/agno-Go/favicon.ico' }],
