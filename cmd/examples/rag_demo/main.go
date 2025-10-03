@@ -129,7 +129,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create collection: %v", err)
 	}
-	fmt.Println("   ✅ Connected to ChromaDB and created collection\n")
+	fmt.Println("   ✅ Connected to ChromaDB and created collection")
 
 	// Step 3: Load and process documents
 	fmt.Println("📚 Step 3: Loading and processing documents...")
@@ -262,7 +262,7 @@ Always be helpful, accurate, and concise.`,
 	if err != nil {
 		log.Fatalf("Failed to create agent: %v", err)
 	}
-	fmt.Println("   ✅ Agent created with RAG capabilities\n")
+	fmt.Println("   ✅ Agent created with RAG capabilities")
 
 	// Step 7: Interactive Q&A
 	fmt.Println("💬 Step 7: Interactive Q&A (RAG in action)")

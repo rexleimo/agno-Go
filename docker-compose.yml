@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # AgentOS API Server
+  agentos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentos
+    ports:
+      - "8080:8080"
+    environment:
+      # Server configuration
+      - AGENTOS_ADDRESS=:8080
+      - AGENTOS_DEBUG=true
+
+      # OpenAI API Key (required)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+      # Optional: Anthropic API Key
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+      # Optional: Ollama base URL (if using local Ollama)
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - agno-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # PostgreSQL Database (for persistent session storage)
+  postgres:
+    image: postgres:15-alpine
+    container_name: agentos-postgres
+    environment:
+      - POSTGRES_USER=agno
+      - POSTGRES_PASSWORD=agno_password
+      - POSTGRES_DB=agentos
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    networks:
+      - agno-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agno"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (for caching and session management)
+  redis:
+    image: redis:7-alpine
+    container_name: agentos-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - agno-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Ollama (optional - for local LLM models)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: agentos-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - agno-network
+    profiles:
+      - with-ollama
+
+  # ChromaDB (optional - for vector storage)
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: agentos-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadb-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    restart: unless-stopped
+    networks:
+      - agno-network
+    profiles:
+      - with-vectordb
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  ollama-data:
+    driver: local
+  chromadb-data:
+    driver: local
+
+networks:
+  agno-network:
+    driver: bridge

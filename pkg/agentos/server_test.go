@@ -302,6 +302,7 @@ func TestListSessions_WithFilter(t *testing.T) {
 func TestAgentRun(t *testing.T) {
 	server, _ := NewServer(nil)
 
+	// Agent needs to be registered first (will return 404 if not registered)
 	runReq := AgentRunRequest{
 		Input: "Hello, agent!",
 	}
@@ -313,17 +314,9 @@ func TestAgentRun(t *testing.T) {
 	w := httptest.NewRecorder()
 	server.router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Errorf("Status = %v, want %v", w.Code, http.StatusOK)
-	}
-
-	var response AgentRunResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	if response.Content == "" {
-		t.Error("Content should not be empty")
+	// Expect 404 since agent is not registered
+	if w.Code != http.StatusNotFound {
+		t.Errorf("Status = %v, want %v (agent not registered)", w.Code, http.StatusNotFound)
 	}
 }
 
@@ -346,13 +339,8 @@ func TestAgentRun_WithSession(t *testing.T) {
 	w := httptest.NewRecorder()
 	server.router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Errorf("Status = %v, want %v", w.Code, http.StatusOK)
-	}
-
-	// Verify session was updated
-	updatedSess, _ := server.sessionStorage.Get(context.Background(), "test-session")
-	if updatedSess.GetRunCount() != 1 {
-		t.Errorf("RunCount = %v, want 1", updatedSess.GetRunCount())
+	// Expect 404 since agent is not registered
+	if w.Code != http.StatusNotFound {
+		t.Errorf("Status = %v, want %v (agent not registered)", w.Code, http.StatusNotFound)
 	}
 }

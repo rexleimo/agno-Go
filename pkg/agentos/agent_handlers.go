@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/agno-go/pkg/agno/agent"
 	"github.com/yourusername/agno-go/pkg/agno/session"
 )
 
@@ -44,48 +43,82 @@ func (s *Server) handleAgentRun(c *gin.Context) {
 		return
 	}
 
-	// TODO: Get agent from registry
-	// For now, return a placeholder response
+	// Get agent from registry
+	ag, err := s.agentRegistry.Get(agentID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Error:   "agent not found",
+			Message: err.Error(),
+			Code:    "AGENT_NOT_FOUND",
+		})
+		return
+	}
+
 	s.logger.Info("agent run requested",
 		"agent_id", agentID,
 		"input", req.Input,
 		"session_id", req.SessionID,
 	)
 
-	// If session_id provided, update the session
+	// Get session if provided
 	var sess *session.Session
 	if req.SessionID != "" {
-		var err error
 		sess, err = s.sessionStorage.Get(c.Request.Context(), req.SessionID)
 		if err != nil {
 			s.logger.Warn("failed to get session", "error", err, "session_id", req.SessionID)
 		}
 	}
 
-	// Placeholder response (actual agent execution to be implemented)
+	// Run the agent
+	output, err := ag.Run(c.Request.Context(), req.Input)
+	if err != nil {
+		s.logger.Error("agent run failed", "error", err, "agent_id", agentID)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "agent execution failed",
+			Message: err.Error(),
+			Code:    "EXECUTION_ERROR",
+		})
+		return
+	}
+
 	response := AgentRunResponse{
-		Content:   "This is a placeholder response. Agent execution will be implemented next.",
+		Content:   output.Content,
 		SessionID: req.SessionID,
 		Metadata: map[string]interface{}{
 			"agent_id": agentID,
-			"input":    req.Input,
 		},
 	}
 
 	// If we have a session, add the run to it
 	if sess != nil {
-		run := &agent.RunOutput{
-			Content: response.Content,
-			Metadata: map[string]interface{}{
-				"agent_id": agentID,
-			},
-		}
-		sess.AddRun(run)
+		sess.AddRun(output)
 
 		if err := s.sessionStorage.Update(c.Request.Context(), sess); err != nil {
 			s.logger.Warn("failed to update session with run", "error", err, "session_id", req.SessionID)
 		}
 	}
 
+	s.logger.Info("agent run completed", "agent_id", agentID, "content_length", len(output.Content))
+
 	c.JSON(http.StatusOK, response)
+}
+
+// handleListAgents lists all registered agents
+// GET /api/v1/agents
+func (s *Server) handleListAgents(c *gin.Context) {
+	agents := s.agentRegistry.List()
+
+	// Convert to response format
+	agentList := make([]map[string]interface{}, 0, len(agents))
+	for id, ag := range agents {
+		agentList = append(agentList, map[string]interface{}{
+			"id":   id,
+			"name": ag.Name,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"agents": agentList,
+		"count":  len(agentList),
+	})
 }

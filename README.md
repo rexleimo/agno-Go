@@ -1,15 +1,23 @@
-# agno-Go
+# Agno-Go
 
-Agno-Go: A High-Performance Multi-Agent System Framework Based on Golang. Inheriting the Agno design philosophy, it leverages Golang's concurrency model and performance advantages to build efficient, scalable AI agent systems.
+[![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Test Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen.svg)](docs/TEST_REPORT.md)
+[![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg)](CHANGELOG.md)
 
-## 🚀 Features
+**Agno-Go** is a high-performance multi-agent system framework built with Go. Inheriting the Agno design philosophy, it leverages Go's concurrency model and performance advantages to build efficient, scalable AI agent systems.
 
-- **Simple & Powerful**: Clean API design following KISS principle
-- **High Performance**: ⚡ **180ns** agent instantiation, **1.2KB** memory per agent ([16x faster than Python](docs/PERFORMANCE.md))
-- **RAG Support**: Built-in vector database (ChromaDB) and embeddings (OpenAI) for retrieval-augmented generation
-- **Flexible Tools**: Easy-to-extend toolkit system
-- **Multi-Model Support**: OpenAI, Anthropic Claude, Ollama, DeepSeek, Gemini, ModelScope
-- **Production Ready**: Built-in error handling, logging, and comprehensive testing (>70% coverage)
+## ✨ Highlights
+
+- **🚀 High Performance**: 180ns agent instantiation, 1.2KB memory per agent ([16x faster than Python](docs/PERFORMANCE.md))
+- **🤖 Production-Ready**: AgentOS HTTP server with RESTful API, session management, and agent registry
+- **🧩 Flexible Architecture**: Agent, Team (4 modes), Workflow (5 primitives)
+- **🔧 Extensible Tools**: Easy-to-extend toolkit system with built-in tools
+- **🔌 Multi-Model Support**: OpenAI, Anthropic Claude, Ollama (local models)
+- **💾 RAG Support**: ChromaDB integration and OpenAI embeddings
+- **✅ Well-Tested**: 80.8% test coverage, 85+ test cases, 100% pass rate
+- **📦 Easy Deployment**: Docker, Docker Compose, Kubernetes manifests included
+- **📚 Complete Documentation**: API docs (OpenAPI 3.0), deployment guides, examples
 
 ## 📦 Installation
 

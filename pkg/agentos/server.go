@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/yourusername/agno-go/pkg/agno/agent"
 	"github.com/yourusername/agno-go/pkg/agno/session"
 )
 
@@ -16,6 +17,7 @@ type Server struct {
 	router         *gin.Engine
 	config         *Config
 	sessionStorage session.Storage
+	agentRegistry  *AgentRegistry
 	logger         *slog.Logger
 	httpServer     *http.Server
 }
@@ -93,6 +95,7 @@ func NewServer(config *Config) (*Server, error) {
 		router:         router,
 		config:         config,
 		sessionStorage: config.SessionStorage,
+		agentRegistry:  NewAgentRegistry(),
 		logger:         config.Logger,
 	}
 
@@ -140,6 +143,16 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+// RegisterAgent registers an agent with the server
+func (s *Server) RegisterAgent(agentID string, ag *agent.Agent) error {
+	return s.agentRegistry.Register(agentID, ag)
+}
+
+// GetAgentRegistry returns the agent registry
+func (s *Server) GetAgentRegistry() *AgentRegistry {
+	return s.agentRegistry
+}
+
 // registerRoutes registers all API routes
 func (s *Server) registerRoutes() {
 	// Health check
@@ -158,9 +171,10 @@ func (s *Server) registerRoutes() {
 			sessions.GET("", s.handleListSessions)
 		}
 
-		// Agent endpoints (placeholder)
+		// Agent endpoints
 		agents := v1.Group("/agents")
 		{
+			agents.GET("", s.handleListAgents)
 			agents.POST("/:id/run", s.handleAgentRun)
 		}
 	}
