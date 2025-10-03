@@ -52,17 +52,24 @@ agno-Go/
 ### Local Development
 
 ```bash
-# 1. Fix npm cache permissions (if needed)
-sudo chown -R $(whoami) ~/.npm
-
-# 2. Install dependencies
+# 1. Install dependencies
 npm install
 
-# 3. Start dev server
+# 2. Start dev server
 npm run docs:dev
 ```
 
 The site will be available at **http://localhost:5173** with hot reload.
+
+**注意**: 如果遇到 npm 权限错误:
+```bash
+# 修复 npm 缓存权限
+sudo chown -R $(whoami) ~/.npm
+
+# 清理并重新安装
+npm cache clean --force
+npm install
+```
 
 ### Build for Production
 

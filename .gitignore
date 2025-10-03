@@ -40,4 +40,3 @@ Thumbs.db
 node_modules/
 website/.vitepress/dist/
 website/.vitepress/cache/
-package-lock.json
