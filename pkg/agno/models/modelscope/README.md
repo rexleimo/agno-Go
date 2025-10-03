@@ -25,13 +25,13 @@ ModelScope provides access to various models through Alibaba Cloud's DashScope s
 ## Installation
 
 ```bash
-go get github.com/yourusername/agno-go
+go get github.com/rexleimo/agno-go
 ```
 
 ## Configuration
 
 ```go
-import "github.com/yourusername/agno-go/pkg/agno/models/modelscope"
+import "github.com/rexleimo/agno-go/pkg/agno/models/modelscope"
 
 model, err := modelscope.New("qwen-plus", modelscope.Config{
     APIKey:      "your-dashscope-api-key", // Required
@@ -61,9 +61,9 @@ import (
     "fmt"
     "log"
 
-    "github.com/yourusername/agno-go/pkg/agno/models"
-    "github.com/yourusername/agno-go/pkg/agno/models/modelscope"
-    "github.com/yourusername/agno-go/pkg/agno/types"
+    "github.com/rexleimo/agno-go/pkg/agno/models"
+    "github.com/rexleimo/agno-go/pkg/agno/models/modelscope"
+    "github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 func main() {
@@ -127,9 +127,9 @@ See the complete example: [`cmd/examples/modelscope_agent/main.go`](../../../../
 
 ```go
 import (
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/modelscope"
-    "github.com/yourusername/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/modelscope"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
 )
 
 // Create model

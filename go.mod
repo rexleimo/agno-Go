@@ -1,4 +1,4 @@
-module github.com/yourusername/agno-go
+module github.com/rexleimo/agno-go
 
 go 1.23.0
 

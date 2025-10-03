@@ -217,8 +217,8 @@ response = agent.run("Hello!")
 **Go:**
 ```go
 import (
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
 )
 
 model, _ := openai.New("gpt-4", openai.Config{...})
@@ -233,13 +233,13 @@ output, _ := ag.Run(ctx, "Hello!")
 
 **Installation:**
 ```bash
-go get github.com/yourusername/agno-go
+go get github.com/rexleimo/agno-go
 ```
 
 **Quick Start:**
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/agno-go
+git clone https://github.com/rexleimo/agno-go
 cd agno-Go
 
 # Run example
@@ -271,11 +271,11 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 ### 🔗 Links
 
-- **GitHub:** https://github.com/yourusername/agno-go
+- **GitHub:** https://github.com/rexleimo/agno-go
 - **Documentation:** https://docs.agno.com
-- **Issues:** https://github.com/yourusername/agno-go/issues
-- **Discussions:** https://github.com/yourusername/agno-go/discussions
+- **Issues:** https://github.com/rexleimo/agno-go/issues
+- **Discussions:** https://github.com/rexleimo/agno-go/discussions
 
 ---
 
-**Full Changelog:** https://github.com/yourusername/agno-go/commits/v1.0.0
+**Full Changelog:** https://github.com/rexleimo/agno-go/commits/v1.0.0

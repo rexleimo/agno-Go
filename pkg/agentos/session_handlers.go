@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/yourusername/agno-go/pkg/agno/session"
+	"github.com/rexleimo/agno-go/pkg/agno/session"
 )
 
 // CreateSessionRequest represents the request to create a new session

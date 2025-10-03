@@ -21,13 +21,13 @@ Google Gemini API integration for Agno-Go.
 ## Installation
 
 ```bash
-go get github.com/yourusername/agno-go
+go get github.com/rexleimo/agno-go
 ```
 
 ## Configuration
 
 ```go
-import "github.com/yourusername/agno-go/pkg/agno/models/gemini"
+import "github.com/rexleimo/agno-go/pkg/agno/models/gemini"
 
 model, err := gemini.New("gemini-pro", gemini.Config{
     APIKey:      "your-api-key",           // Required
@@ -57,9 +57,9 @@ import (
     "fmt"
     "log"
 
-    "github.com/yourusername/agno-go/pkg/agno/models"
-    "github.com/yourusername/agno-go/pkg/agno/models/gemini"
-    "github.com/yourusername/agno-go/pkg/agno/types"
+    "github.com/rexleimo/agno-go/pkg/agno/models"
+    "github.com/rexleimo/agno-go/pkg/agno/models/gemini"
+    "github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 func main() {
@@ -188,9 +188,9 @@ See the complete example: [`cmd/examples/gemini_agent/main.go`](../../../../cmd/
 
 ```go
 import (
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/gemini"
-    "github.com/yourusername/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/gemini"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
 )
 
 // Create model

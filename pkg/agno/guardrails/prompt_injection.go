@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // PromptInjectionGuardrail detects potential prompt injection attempts.

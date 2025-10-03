@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // HTTPClient provides common HTTP functionality for model providers

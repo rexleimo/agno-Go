@@ -3,7 +3,7 @@ package models
 import (
 	"context"
 
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // InvokeRequest contains parameters for model invocation

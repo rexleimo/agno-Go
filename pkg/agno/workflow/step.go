@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yourusername/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/agent"
 )
 
 // Step represents a basic workflow step that executes an agent

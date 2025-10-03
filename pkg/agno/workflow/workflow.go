@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // Workflow represents a multi-step process

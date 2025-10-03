@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/yourusername/agno-go/pkg/agno/session"
+	"github.com/rexleimo/agno-go/pkg/agno/session"
 )
 
 func TestNewServer(t *testing.T) {

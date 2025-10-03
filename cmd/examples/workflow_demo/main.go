@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/yourusername/agno-go/pkg/agno/agent"
-	"github.com/yourusername/agno-go/pkg/agno/models/openai"
-	"github.com/yourusername/agno-go/pkg/agno/tools/calculator"
-	"github.com/yourusername/agno-go/pkg/agno/tools/toolkit"
-	"github.com/yourusername/agno-go/pkg/agno/workflow"
+	"github.com/rexleimo/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/models/openai"
+	"github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/agno/workflow"
 )
 
 func main() {

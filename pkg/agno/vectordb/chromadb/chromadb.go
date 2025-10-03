@@ -7,7 +7,7 @@ import (
 	chroma "github.com/amikos-tech/chroma-go"
 	"github.com/amikos-tech/chroma-go/types"
 
-	"github.com/yourusername/agno-go/pkg/agno/vectordb"
+	"github.com/rexleimo/agno-go/pkg/agno/vectordb"
 )
 
 // Helper functions for embedding conversion

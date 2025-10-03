@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/yourusername/agno-go/pkg/agno/guardrails"
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/guardrails"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // MockGuardrail is a mock guardrail for testing

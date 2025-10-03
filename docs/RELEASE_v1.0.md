@@ -326,10 +326,10 @@ Week 8:    Agent Registry, Documentation, v1.0 (100% complete)
 
 ```bash
 # Go package
-go get github.com/yourusername/agno-go
+go get github.com/rexleimo/agno-go
 
 # Or clone repository
-git clone https://github.com/yourusername/agno-go
+git clone https://github.com/rexleimo/agno-go
 cd agno-Go
 ```
 
@@ -362,8 +362,8 @@ curl http://localhost:8080/health
 
 We welcome contributions! Please see:
 - [CLAUDE.md](../CLAUDE.md) - Development guide
-- [GitHub Issues](https://github.com/yourusername/agno-go/issues)
-- [GitHub Discussions](https://github.com/yourusername/agno-go/discussions)
+- [GitHub Issues](https://github.com/rexleimo/agno-go/issues)
+- [GitHub Discussions](https://github.com/rexleimo/agno-go/discussions)
 
 ### 📄 License
 
@@ -379,7 +379,7 @@ Agno-Go v1.0 represents a significant milestone in building production-ready mul
 
 ---
 
-**Download:** [GitHub Releases](https://github.com/yourusername/agno-go/releases/tag/v1.0.0)
+**Download:** [GitHub Releases](https://github.com/rexleimo/agno-go/releases/tag/v1.0.0)
 **Documentation:** [https://docs.agno.com](https://docs.agno.com)
 **Website:** [https://agno.com](https://agno.com)
 

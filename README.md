@@ -23,7 +23,7 @@
 ## 📦 Installation
 
 ```bash
-go get github.com/yourusername/agno-go
+go get github.com/rexleimo/agno-go
 ```
 
 ## 🎯 Quick Start
@@ -36,9 +36,9 @@ import (
     "fmt"
     "log"
 
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/openai"
-    "github.com/yourusername/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
 )
 
 func main() {
@@ -339,5 +339,5 @@ Inspired by [Agno Python](https://github.com/agno-agi/agno) framework.
 
 ## 📞 Contact
 
-- Issues: [GitHub Issues](https://github.com/yourusername/agno-go/issues)
-- Discussions: [GitHub Discussions](https://github.com/yourusername/agno-go/discussions)
+- Issues: [GitHub Issues](https://github.com/rexleimo/agno-go/issues)
+- Discussions: [GitHub Discussions](https://github.com/rexleimo/agno-go/discussions)

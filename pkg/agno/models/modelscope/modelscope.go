@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 	"github.com/sashabaranov/go-openai"
-	"github.com/yourusername/agno-go/pkg/agno/models"
-	"github.com/yourusername/agno-go/pkg/agno/types"
 )
 
 const (

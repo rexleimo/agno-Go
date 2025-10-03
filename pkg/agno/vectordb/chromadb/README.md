@@ -47,8 +47,8 @@ import (
     "fmt"
     "log"
 
-    "github.com/yourusername/agno-go/pkg/agno/vectordb/chromadb"
-    "github.com/yourusername/agno-go/pkg/agno/vectordb"
+    "github.com/rexleimo/agno-go/pkg/agno/vectordb/chromadb"
+    "github.com/rexleimo/agno-go/pkg/agno/vectordb"
 )
 
 func main() {
@@ -109,7 +109,7 @@ func main() {
 
 ```go
 import (
-    "github.com/yourusername/agno-go/pkg/agno/embeddings/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/embeddings/openai"
 )
 
 // Create embedding function

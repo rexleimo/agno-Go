@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yourusername/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/agent"
 )
 
 // MemoryStorage implements in-memory session storage

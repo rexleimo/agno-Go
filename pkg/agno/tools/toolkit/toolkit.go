@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/yourusername/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/models"
 )
 
 // Function represents a callable tool function

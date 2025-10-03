@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yourusername/agno-go/pkg/agno/models"
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 func TestNew(t *testing.T) {

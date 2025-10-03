@@ -3,7 +3,7 @@ package memory
 import (
 	"testing"
 
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 func TestInMemory_Add(t *testing.T) {

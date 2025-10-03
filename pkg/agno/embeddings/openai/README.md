@@ -21,7 +21,7 @@ OpenAI embeddings implementation for Agno-Go.
 ## Installation
 
 ```bash
-go get github.com/yourusername/agno-go
+go get github.com/rexleimo/agno-go
 ```
 
 ## Usage
@@ -37,7 +37,7 @@ import (
     "log"
     "os"
 
-    "github.com/yourusername/agno-go/pkg/agno/embeddings/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/embeddings/openai"
 )
 
 func main() {
@@ -87,8 +87,8 @@ for i, emb := range embeddings {
 
 ```go
 import (
-    "github.com/yourusername/agno-go/pkg/agno/vectordb/chromadb"
-    "github.com/yourusername/agno-go/pkg/agno/embeddings/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/vectordb/chromadb"
+    "github.com/rexleimo/agno-go/pkg/agno/embeddings/openai"
 )
 
 // Create embedding function

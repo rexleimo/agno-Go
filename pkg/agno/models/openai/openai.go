@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 	"github.com/sashabaranov/go-openai"
-	"github.com/yourusername/agno-go/pkg/agno/models"
-	"github.com/yourusername/agno-go/pkg/agno/types"
 )
 
 // OpenAI wraps the OpenAI client

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/agno-go/pkg/agno/agent"
-	"github.com/yourusername/agno-go/pkg/agno/session"
+	"github.com/rexleimo/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/session"
 )
 
 // Server represents the AgentOS HTTP server

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/yourusername/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/agent"
 )
 
 // AgentRegistry manages registered agents

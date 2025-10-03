@@ -13,13 +13,13 @@ Get started with Agno-Go in less than 5 minutes!
 ### Option 1: Using Go Get
 
 ```bash
-go get github.com/yourusername/agno-go
+go get github.com/rexleimo/agno-go
 ```
 
 ### Option 2: Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/agno-go.git
+git clone https://github.com/rexleimo/agno-go.git
 cd agno-Go
 go mod download
 ```
@@ -39,8 +39,8 @@ import (
     "log"
     "os"
 
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
 )
 
 func main() {
@@ -104,10 +104,10 @@ import (
     "log"
     "os"
 
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/openai"
-    "github.com/yourusername/agno-go/pkg/agno/tools/calculator"
-    "github.com/yourusername/agno-go/pkg/agno/tools/toolkit"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
 )
 
 func main() {
@@ -167,8 +167,8 @@ import (
     "os"
     "strings"
 
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
 )
 
 func main() {
@@ -278,9 +278,9 @@ import (
     "syscall"
     "time"
 
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/openai"
-    "github.com/yourusername/agno-go/pkg/agentos"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agentos"
 )
 
 func main() {
@@ -461,9 +461,9 @@ import (
     "log"
     "os"
 
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/openai"
-    "github.com/yourusername/agno-go/pkg/agno/team"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/team"
 )
 
 func main() {
@@ -513,9 +513,9 @@ import (
     "log"
     "os"
 
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/openai"
-    "github.com/yourusername/agno-go/pkg/agno/workflow"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/workflow"
 )
 
 func main() {
@@ -584,8 +584,8 @@ func main() {
 ### Get Help
 
 - 📖 [Full Documentation](https://docs.agno.com)
-- 💬 [GitHub Discussions](https://github.com/yourusername/agno-go/discussions)
-- 🐛 [Report Issues](https://github.com/yourusername/agno-go/issues)
+- 💬 [GitHub Discussions](https://github.com/rexleimo/agno-go/discussions)
+- 🐛 [Report Issues](https://github.com/rexleimo/agno-go/issues)
 
 ## Troubleshooting
 
@@ -681,12 +681,12 @@ ag, _ := agent.New(agent.Config{
 
 ```go
 import (
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/openai"
-    "github.com/yourusername/agno-go/pkg/agno/tools/calculator"
-    "github.com/yourusername/agno-go/pkg/agno/team"
-    "github.com/yourusername/agno-go/pkg/agno/workflow"
-    "github.com/yourusername/agno-go/pkg/agentos"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/agno/team"
+    "github.com/rexleimo/agno-go/pkg/agno/workflow"
+    "github.com/rexleimo/agno-go/pkg/agentos"
 )
 ```
 

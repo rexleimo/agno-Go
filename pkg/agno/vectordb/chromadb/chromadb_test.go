@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/yourusername/agno-go/pkg/agno/vectordb"
+	"github.com/rexleimo/agno-go/pkg/agno/vectordb"
 )
 
 // MockEmbeddingFunction is a mock embedding function for testing

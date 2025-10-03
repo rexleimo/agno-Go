@@ -7,9 +7,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/yourusername/agno-go/pkg/agno/agent"
-	"github.com/yourusername/agno-go/pkg/agno/hooks"
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/hooks"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // Team represents a group of agents working together

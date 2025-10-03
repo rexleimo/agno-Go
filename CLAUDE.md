@@ -429,6 +429,6 @@ export OLLAMA_BASE_URL=http://localhost:11434
 
 ## 快速链接
 
-- [GitHub Issues](https://github.com/yourusername/agno-go/issues)
-- [GitHub Discussions](https://github.com/yourusername/agno-go/discussions)
+- [GitHub Issues](https://github.com/rexleimo/agno-go/issues)
+- [GitHub Discussions](https://github.com/rexleimo/agno-go/discussions)
 - [Python Agno 框架](https://github.com/agno-agi/agno) (灵感来源)

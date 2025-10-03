@@ -3,7 +3,7 @@ package hooks
 import (
 	"context"
 
-	"github.com/yourusername/agno-go/pkg/agno/guardrails"
+	"github.com/rexleimo/agno-go/pkg/agno/guardrails"
 )
 
 // Hook represents a function that can be called before or after agent/team execution.

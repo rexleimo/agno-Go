@@ -26,7 +26,7 @@ This guide provides comprehensive instructions for deploying AgentOS in various 
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/agno-go.git
+git clone https://github.com/rexleimo/agno-go.git
 cd agno-Go
 ```
 
@@ -953,8 +953,8 @@ spec:
 ## Support
 
 - 📚 [Full Documentation](https://docs.agno.com)
-- 💬 [GitHub Discussions](https://github.com/yourusername/agno-go/discussions)
-- 🐛 [Report Issues](https://github.com/yourusername/agno-go/issues)
+- 💬 [GitHub Discussions](https://github.com/rexleimo/agno-go/discussions)
+- 🐛 [Report Issues](https://github.com/rexleimo/agno-go/issues)
 
 ## License
 

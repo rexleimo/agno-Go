@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yourusername/agno-go/pkg/agno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
 )
 
 const (

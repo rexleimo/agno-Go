@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yourusername/agno-go/pkg/agno/agent"
-	"github.com/yourusername/agno-go/pkg/agno/models"
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // MockModel for testing

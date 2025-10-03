@@ -3,7 +3,7 @@ package session
 import (
 	"time"
 
-	"github.com/yourusername/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/agent"
 )
 
 // Session represents a conversation session with an agent

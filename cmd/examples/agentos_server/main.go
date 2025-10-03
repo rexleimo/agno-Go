@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yourusername/agno-go/pkg/agentos"
+	"github.com/rexleimo/agno-go/pkg/agentos"
 )
 
 func main() {

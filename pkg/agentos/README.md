@@ -28,9 +28,9 @@ import (
     "syscall"
     "time"
 
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/openai"
-    "github.com/yourusername/agno-go/pkg/agentos"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agentos"
 )
 
 func main() {
@@ -260,8 +260,8 @@ server.RegisterAgent("technical-support", techSupportAgent)
 
 ```go
 import (
-    "github.com/yourusername/agno-go/pkg/agno/tools/calculator"
-    "github.com/yourusername/agno-go/pkg/agno/tools/http"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/http"
 )
 
 // Create agent with tools
@@ -281,7 +281,7 @@ server.RegisterAgent("tool-agent", ag)
 ### With Custom Session Storage
 
 ```go
-import "github.com/yourusername/agno-go/pkg/agno/session"
+import "github.com/rexleimo/agno-go/pkg/agno/session"
 
 // Use custom storage (e.g., PostgreSQL, Redis)
 storage := session.NewPostgresStorage(connString)
@@ -471,11 +471,11 @@ MIT License - See [LICENSE](../../LICENSE) for details.
 
 ## Related Projects
 
-- [Agno-Go](https://github.com/yourusername/agno-go) - Core agent framework
+- [Agno-Go](https://github.com/rexleimo/agno-go) - Core agent framework
 - [Agno](https://github.com/agno-agi/agno) - Python implementation
 
 ## Support
 
 - 📚 [Documentation](https://docs.agno.com)
-- 💬 [Discussions](https://github.com/yourusername/agno-go/discussions)
-- 🐛 [Issues](https://github.com/yourusername/agno-go/issues)
+- 💬 [Discussions](https://github.com/rexleimo/agno-go/discussions)
+- 🐛 [Issues](https://github.com/rexleimo/agno-go/issues)

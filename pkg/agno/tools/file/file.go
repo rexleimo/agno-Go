@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/yourusername/agno-go/pkg/agno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
 )
 
 // FileTools provides file operation capabilities

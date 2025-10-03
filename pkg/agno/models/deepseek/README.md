@@ -27,13 +27,13 @@ DeepSeek API integration for Agno-Go, providing access to DeepSeek-V3 and DeepSe
 ## Installation
 
 ```bash
-go get github.com/yourusername/agno-go
+go get github.com/rexleimo/agno-go
 ```
 
 ## Configuration
 
 ```go
-import "github.com/yourusername/agno-go/pkg/agno/models/deepseek"
+import "github.com/rexleimo/agno-go/pkg/agno/models/deepseek"
 
 model, err := deepseek.New("deepseek-chat", deepseek.Config{
     APIKey:      "your-api-key",           // Required
@@ -63,9 +63,9 @@ import (
     "fmt"
     "log"
 
-    "github.com/yourusername/agno-go/pkg/agno/models"
-    "github.com/yourusername/agno-go/pkg/agno/models/deepseek"
-    "github.com/yourusername/agno-go/pkg/agno/types"
+    "github.com/rexleimo/agno-go/pkg/agno/models"
+    "github.com/rexleimo/agno-go/pkg/agno/models/deepseek"
+    "github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 func main() {
@@ -194,9 +194,9 @@ See the complete example: [`cmd/examples/deepseek_agent/main.go`](../../../../cm
 
 ```go
 import (
-    "github.com/yourusername/agno-go/pkg/agno/agent"
-    "github.com/yourusername/agno-go/pkg/agno/models/deepseek"
-    "github.com/yourusername/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/deepseek"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
 )
 
 // Create model

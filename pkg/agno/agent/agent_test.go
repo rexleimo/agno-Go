@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/yourusername/agno-go/pkg/agno/memory"
-	"github.com/yourusername/agno-go/pkg/agno/models"
-	"github.com/yourusername/agno-go/pkg/agno/tools/calculator"
-	"github.com/yourusername/agno-go/pkg/agno/tools/toolkit"
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/memory"
+	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // MockModel is a simple mock for testing

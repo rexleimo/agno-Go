@@ -6,11 +6,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/yourusername/agno-go/pkg/agno/hooks"
-	"github.com/yourusername/agno-go/pkg/agno/memory"
-	"github.com/yourusername/agno-go/pkg/agno/models"
-	"github.com/yourusername/agno-go/pkg/agno/tools/toolkit"
-	"github.com/yourusername/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/agno/hooks"
+	"github.com/rexleimo/agno-go/pkg/agno/memory"
+	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // Agent represents an AI agent
