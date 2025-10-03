@@ -1,0 +1,22 @@
+{
+  "name": "agno-go-docs",
+  "version": "1.0.0",
+  "description": "Documentation for Agno-Go - High-performance multi-agent framework in Go",
+  "scripts": {
+    "docs:dev": "vitepress dev website",
+    "docs:build": "vitepress build website",
+    "docs:preview": "vitepress preview website"
+  },
+  "devDependencies": {
+    "vitepress": "^1.0.0"
+  },
+  "keywords": [
+    "agno",
+    "multi-agent",
+    "ai",
+    "go",
+    "documentation"
+  ],
+  "author": "Agno-Go Team",
+  "license": "MIT"
+}

@@ -112,7 +112,7 @@ func TestEmbed(t *testing.T) {
 		resp := embeddingResponse{
 			Object: "list",
 			Model:  req.Model,
-			Data:   make([]struct {
+			Data: make([]struct {
 				Object    string    `json:"object"`
 				Index     int       `json:"index"`
 				Embedding []float32 `json:"embedding"`
@@ -125,7 +125,7 @@ func TestEmbed(t *testing.T) {
 			// Generate mock embedding (1536 dimensions)
 			resp.Data[i].Embedding = make([]float32, 1536)
 			for j := range resp.Data[i].Embedding {
-				resp.Data[i].Embedding[j] = float32(i*1536 + j) * 0.001
+				resp.Data[i].Embedding[j] = float32(i*1536+j) * 0.001
 			}
 		}
 

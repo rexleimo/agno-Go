@@ -6,13 +6,18 @@ import "fmt"
 type ErrorCode string
 
 const (
-	ErrCodeModelTimeout   ErrorCode = "MODEL_TIMEOUT"
-	ErrCodeToolExecution  ErrorCode = "TOOL_ERROR"
-	ErrCodeInvalidInput   ErrorCode = "INVALID_INPUT"
-	ErrCodeInvalidConfig  ErrorCode = "INVALID_CONFIG"
-	ErrCodeAPIError       ErrorCode = "API_ERROR"
-	ErrCodeRateLimitError ErrorCode = "RATE_LIMIT"
-	ErrCodeUnknown        ErrorCode = "UNKNOWN"
+	ErrCodeModelTimeout      ErrorCode = "MODEL_TIMEOUT"
+	ErrCodeToolExecution     ErrorCode = "TOOL_ERROR"
+	ErrCodeInvalidInput      ErrorCode = "INVALID_INPUT"
+	ErrCodeInvalidConfig     ErrorCode = "INVALID_CONFIG"
+	ErrCodeAPIError          ErrorCode = "API_ERROR"
+	ErrCodeRateLimitError    ErrorCode = "RATE_LIMIT"
+	ErrCodeInputCheck        ErrorCode = "INPUT_CHECK"
+	ErrCodeOutputCheck       ErrorCode = "OUTPUT_CHECK"
+	ErrCodePromptInjection   ErrorCode = "PROMPT_INJECTION"
+	ErrCodePIIDetected       ErrorCode = "PII_DETECTED"
+	ErrCodeContentModeration ErrorCode = "CONTENT_MODERATION"
+	ErrCodeUnknown           ErrorCode = "UNKNOWN"
 )
 
 // AgnoError represents a structured error in the Agno system
@@ -72,4 +77,29 @@ func NewAPIError(message string, cause error) *AgnoError {
 // NewRateLimitError creates a rate limit error
 func NewRateLimitError(message string, cause error) *AgnoError {
 	return NewError(ErrCodeRateLimitError, message, cause)
+}
+
+// NewInputCheckError creates an input validation check error
+func NewInputCheckError(message string, cause error) *AgnoError {
+	return NewError(ErrCodeInputCheck, message, cause)
+}
+
+// NewOutputCheckError creates an output validation check error
+func NewOutputCheckError(message string, cause error) *AgnoError {
+	return NewError(ErrCodeOutputCheck, message, cause)
+}
+
+// NewPromptInjectionError creates a prompt injection detection error
+func NewPromptInjectionError(message string, cause error) *AgnoError {
+	return NewError(ErrCodePromptInjection, message, cause)
+}
+
+// NewPIIDetectedError creates a PII detection error
+func NewPIIDetectedError(message string, cause error) *AgnoError {
+	return NewError(ErrCodePIIDetected, message, cause)
+}
+
+// NewContentModerationError creates a content moderation error
+func NewContentModerationError(message string, cause error) *AgnoError {
+	return NewError(ErrCodeContentModeration, message, cause)
 }

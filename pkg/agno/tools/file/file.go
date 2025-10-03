@@ -179,9 +179,9 @@ func (ft *FileTools) listFiles(ctx context.Context, args map[string]interface{})
 		}
 
 		files = append(files, map[string]interface{}{
-			"name":  entry.Name(),
+			"name":   entry.Name(),
 			"is_dir": entry.IsDir(),
-			"size":  info.Size(),
+			"size":   info.Size(),
 		})
 	}
 

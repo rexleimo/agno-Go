@@ -354,10 +354,10 @@ func TestBuildClaudeRequest_WithTemperature(t *testing.T) {
 	})
 
 	tests := []struct {
-		name        string
-		req         *models.InvokeRequest
-		wantTemp    float64
-		wantTokens  int
+		name       string
+		req        *models.InvokeRequest
+		wantTemp   float64
+		wantTokens int
 	}{
 		{
 			name: "use request temperature",

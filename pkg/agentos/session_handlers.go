@@ -96,8 +96,8 @@ func (s *Server) handleGetSession(c *gin.Context) {
 	sessionID := c.Param("id")
 	if sessionID == "" {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "session ID is required",
-			Code:    "INVALID_REQUEST",
+			Error: "session ID is required",
+			Code:  "INVALID_REQUEST",
 		})
 		return
 	}
@@ -105,8 +105,8 @@ func (s *Server) handleGetSession(c *gin.Context) {
 	sess, err := s.sessionStorage.Get(c.Request.Context(), sessionID)
 	if err == session.ErrSessionNotFound {
 		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "session not found",
-			Code:    "SESSION_NOT_FOUND",
+			Error: "session not found",
+			Code:  "SESSION_NOT_FOUND",
 		})
 		return
 	}
@@ -129,8 +129,8 @@ func (s *Server) handleUpdateSession(c *gin.Context) {
 	sessionID := c.Param("id")
 	if sessionID == "" {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "session ID is required",
-			Code:    "INVALID_REQUEST",
+			Error: "session ID is required",
+			Code:  "INVALID_REQUEST",
 		})
 		return
 	}
@@ -149,8 +149,8 @@ func (s *Server) handleUpdateSession(c *gin.Context) {
 	sess, err := s.sessionStorage.Get(c.Request.Context(), sessionID)
 	if err == session.ErrSessionNotFound {
 		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "session not found",
-			Code:    "SESSION_NOT_FOUND",
+			Error: "session not found",
+			Code:  "SESSION_NOT_FOUND",
 		})
 		return
 	}
@@ -197,8 +197,8 @@ func (s *Server) handleDeleteSession(c *gin.Context) {
 	sessionID := c.Param("id")
 	if sessionID == "" {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "session ID is required",
-			Code:    "INVALID_REQUEST",
+			Error: "session ID is required",
+			Code:  "INVALID_REQUEST",
 		})
 		return
 	}
@@ -206,8 +206,8 @@ func (s *Server) handleDeleteSession(c *gin.Context) {
 	err := s.sessionStorage.Delete(c.Request.Context(), sessionID)
 	if err == session.ErrSessionNotFound {
 		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "session not found",
-			Code:    "SESSION_NOT_FOUND",
+			Error: "session not found",
+			Code:  "SESSION_NOT_FOUND",
 		})
 		return
 	}

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/yourusername/agno-go/pkg/agno/hooks"
 	"github.com/yourusername/agno-go/pkg/agno/memory"
 	"github.com/yourusername/agno-go/pkg/agno/models"
 	"github.com/yourusername/agno-go/pkg/agno/tools/toolkit"
@@ -20,7 +21,9 @@ type Agent struct {
 	Toolkits     []toolkit.Toolkit
 	Memory       memory.Memory
 	Instructions string
-	MaxLoops     int // Maximum tool calling loops
+	MaxLoops     int          // Maximum tool calling loops
+	PreHooks     []hooks.Hook // Hooks executed before processing input
+	PostHooks    []hooks.Hook // Hooks executed after generating output
 	logger       *slog.Logger
 }
 
@@ -33,6 +36,8 @@ type Config struct {
 	Memory       memory.Memory
 	Instructions string
 	MaxLoops     int
+	PreHooks     []hooks.Hook // Hooks to execute before processing input
+	PostHooks    []hooks.Hook // Hooks to execute after generating output
 	Logger       *slog.Logger
 }
 
@@ -70,6 +75,8 @@ func New(config Config) (*Agent, error) {
 		Memory:       config.Memory,
 		Instructions: config.Instructions,
 		MaxLoops:     config.MaxLoops,
+		PreHooks:     config.PreHooks,
+		PostHooks:    config.PostHooks,
 		logger:       config.Logger,
 	}
 
@@ -95,6 +102,19 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	}
 
 	a.logger.Info("agent run started", "agent_id", a.ID, "input", input)
+
+	// Execute pre-hooks
+	if len(a.PreHooks) > 0 {
+		a.logger.Debug("executing pre-hooks", "count", len(a.PreHooks))
+		hookInput := hooks.NewHookInput(input).
+			WithAgentID(a.ID).
+			WithMessages([]interface{}{})
+
+		if err := hooks.ExecuteHooks(ctx, a.PreHooks, hookInput); err != nil {
+			a.logger.Error("pre-hook failed", "error", err)
+			return nil, types.NewInputCheckError("pre-hook validation failed", err)
+		}
+	}
 
 	// Add user message
 	userMsg := types.NewUserMessage(input)
@@ -155,6 +175,20 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 
 	if finalResponse == nil {
 		return nil, types.NewError(types.ErrCodeUnknown, "no response from model", nil)
+	}
+
+	// Execute post-hooks
+	if len(a.PostHooks) > 0 {
+		a.logger.Debug("executing post-hooks", "count", len(a.PostHooks))
+		hookInput := hooks.NewHookInput(input).
+			WithOutput(finalResponse.Content).
+			WithAgentID(a.ID).
+			WithMessages([]interface{}{})
+
+		if err := hooks.ExecuteHooks(ctx, a.PostHooks, hookInput); err != nil {
+			a.logger.Error("post-hook failed", "error", err)
+			return nil, types.NewOutputCheckError("post-hook validation failed", err)
+		}
 	}
 
 	a.logger.Info("agent run completed", "agent_id", a.ID)

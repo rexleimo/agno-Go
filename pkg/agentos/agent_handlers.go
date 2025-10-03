@@ -27,8 +27,8 @@ func (s *Server) handleAgentRun(c *gin.Context) {
 	agentID := c.Param("id")
 	if agentID == "" {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "agent ID is required",
-			Code:    "INVALID_REQUEST",
+			Error: "agent ID is required",
+			Code:  "INVALID_REQUEST",
 		})
 		return
 	}

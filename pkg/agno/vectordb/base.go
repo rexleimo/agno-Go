@@ -6,10 +6,10 @@ import (
 
 // Document represents a document to be stored in the vector database
 type Document struct {
-	ID       string                 `json:"id"`
-	Content  string                 `json:"content"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	Embedding []float32             `json:"embedding,omitempty"`
+	ID        string                 `json:"id"`
+	Content   string                 `json:"content"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Embedding []float32              `json:"embedding,omitempty"`
 }
 
 // SearchResult represents a search result from the vector database
@@ -17,7 +17,7 @@ type SearchResult struct {
 	ID       string                 `json:"id"`
 	Content  string                 `json:"content"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	Score    float32                `json:"score"` // Similarity score (higher is better)
+	Score    float32                `json:"score"`    // Similarity score (higher is better)
 	Distance float32                `json:"distance"` // Distance metric (lower is better)
 }
 

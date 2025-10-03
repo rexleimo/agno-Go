@@ -10,11 +10,12 @@
 ## ✨ Highlights
 
 - **🚀 High Performance**: 180ns agent instantiation, 1.2KB memory per agent ([16x faster than Python](docs/PERFORMANCE.md))
+- **🛡️ Security First**: Built-in hooks & guardrails for input/output validation and prompt injection protection
 - **🤖 Production-Ready**: AgentOS HTTP server with RESTful API, session management, and agent registry
 - **🧩 Flexible Architecture**: Agent, Team (4 modes), Workflow (5 primitives)
 - **🔧 Extensible Tools**: Easy-to-extend toolkit system with built-in tools
 - **🔌 Multi-Model Support**: OpenAI, Anthropic Claude, Ollama (local models)
-- **💾 RAG Support**: ChromaDB integration and OpenAI embeddings
+- **💾 RAG Support**: ChromaDB integration with batch embeddings support
 - **✅ Well-Tested**: 80.8% test coverage, 85+ test cases, 100% pass rate
 - **📦 Easy Deployment**: Docker, Docker Compose, Kubernetes manifests included
 - **📚 Complete Documentation**: API docs (OpenAPI 3.0), deployment guides, examples
@@ -62,7 +63,7 @@ func main() {
 ## 📖 Core Concepts
 
 ### Agent
-An autonomous AI agent that can use tools and maintain conversation context.
+An autonomous AI agent that can use tools, maintain conversation context, and validate inputs/outputs with hooks and guardrails.
 
 ```go
 agent, err := agent.New(agent.Config{
@@ -71,8 +72,39 @@ agent, err := agent.New(agent.Config{
     Toolkits:     []toolkit.Toolkit{httpTools, calcTools},
     Instructions: "You are a helpful assistant",
     MaxLoops:     10,
+    PreHooks:     []hooks.Hook{promptInjectionGuard}, // Input validation
+    PostHooks:    []hooks.Hook{customOutputHook},     // Output validation
 })
 ```
+
+### Hooks & Guardrails 🛡️
+
+Protect your agents with input/output validation hooks and built-in guardrails:
+
+```go
+// Built-in Guardrails
+promptGuard := guardrails.NewPromptInjectionGuardrail()
+
+// Custom Hooks
+customHook := func(ctx context.Context, input *hooks.HookInput) error {
+    if len(input.Input) < 5 {
+        return fmt.Errorf("input too short")
+    }
+    return nil
+}
+
+agent, _ := agent.New(agent.Config{
+    Model:     model,
+    PreHooks:  []hooks.Hook{customHook, promptGuard}, // Execute before processing
+    PostHooks: []hooks.Hook{outputValidator},         // Execute after response
+})
+```
+
+**Built-in Guardrails:**
+- `PromptInjectionGuardrail` - Detects jailbreak/prompt injection attempts
+- Custom guardrails - Implement the `Guardrail` interface
+
+See [examples/agent_with_guardrails](cmd/examples/agent_with_guardrails) for complete examples.
 
 ### Models
 Abstraction over different LLM providers. We support 6 major providers:

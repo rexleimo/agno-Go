@@ -263,9 +263,9 @@ type OllamaRequest struct {
 
 // OllamaMessage represents a message in the conversation
 type OllamaMessage struct {
-	Role      string              `json:"role"`
-	Content   string              `json:"content"`
-	ToolCalls []OllamaToolCall    `json:"tool_calls,omitempty"`
+	Role      string           `json:"role"`
+	Content   string           `json:"content"`
+	ToolCalls []OllamaToolCall `json:"tool_calls,omitempty"`
 }
 
 // OllamaToolCall represents a tool call

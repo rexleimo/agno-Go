@@ -187,13 +187,13 @@ func TestConvertMessages_Empty(t *testing.T) {
 
 func TestMergeConfig(t *testing.T) {
 	tests := []struct {
-		name             string
-		reqTemp          float64
-		modelTemp        float64
-		reqTokens        int
-		modelTokens      int
-		wantTemp         float64
-		wantTokens       int
+		name        string
+		reqTemp     float64
+		modelTemp   float64
+		reqTokens   int
+		modelTokens int
+		wantTemp    float64
+		wantTokens  int
 	}{
 		{
 			name:        "request overrides model",

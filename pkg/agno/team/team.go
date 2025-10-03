@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/yourusername/agno-go/pkg/agno/agent"
+	"github.com/yourusername/agno-go/pkg/agno/hooks"
 	"github.com/yourusername/agno-go/pkg/agno/types"
 )
 
@@ -18,7 +19,9 @@ type Team struct {
 	Agents      []*agent.Agent
 	Leader      *agent.Agent // Optional team leader
 	Mode        TeamMode
-	MaxRounds   int // Maximum coordination rounds
+	MaxRounds   int          // Maximum coordination rounds
+	PreHooks    []hooks.Hook // Hooks executed before processing input
+	PostHooks   []hooks.Hook // Hooks executed after generating output
 	logger      *slog.Logger
 	mu          sync.RWMutex
 	taskResults map[string]*TaskResult
@@ -46,6 +49,8 @@ type Config struct {
 	Leader    *agent.Agent
 	Mode      TeamMode
 	MaxRounds int
+	PreHooks  []hooks.Hook // Hooks to execute before processing input
+	PostHooks []hooks.Hook // Hooks to execute after generating output
 	Logger    *slog.Logger
 }
 
@@ -94,6 +99,8 @@ func New(config Config) (*Team, error) {
 		Leader:      config.Leader,
 		Mode:        config.Mode,
 		MaxRounds:   config.MaxRounds,
+		PreHooks:    config.PreHooks,
+		PostHooks:   config.PostHooks,
 		logger:      config.Logger,
 		taskResults: make(map[string]*TaskResult),
 	}, nil
@@ -120,6 +127,19 @@ func (t *Team) Run(ctx context.Context, input string) (*RunOutput, error) {
 
 	t.logger.Info("team run started", "team_id", t.ID, "mode", t.Mode, "agents", len(t.Agents))
 
+	// Execute pre-hooks
+	if len(t.PreHooks) > 0 {
+		t.logger.Debug("executing team pre-hooks", "count", len(t.PreHooks))
+		hookInput := hooks.NewHookInput(input).
+			WithAgentID(t.ID).
+			WithMessages([]interface{}{})
+
+		if err := hooks.ExecuteHooks(ctx, t.PreHooks, hookInput); err != nil {
+			t.logger.Error("team pre-hook failed", "error", err)
+			return nil, types.NewInputCheckError("team pre-hook validation failed", err)
+		}
+	}
+
 	var output *RunOutput
 	var err error
 
@@ -139,6 +159,20 @@ func (t *Team) Run(ctx context.Context, input string) (*RunOutput, error) {
 	if err != nil {
 		t.logger.Error("team run failed", "error", err)
 		return nil, err
+	}
+
+	// Execute post-hooks
+	if len(t.PostHooks) > 0 {
+		t.logger.Debug("executing team post-hooks", "count", len(t.PostHooks))
+		hookInput := hooks.NewHookInput(input).
+			WithOutput(output.Content).
+			WithAgentID(t.ID).
+			WithMessages([]interface{}{})
+
+		if err := hooks.ExecuteHooks(ctx, t.PostHooks, hookInput); err != nil {
+			t.logger.Error("team post-hook failed", "error", err)
+			return nil, types.NewOutputCheckError("team post-hook validation failed", err)
+		}
 	}
 
 	t.logger.Info("team run completed", "team_id", t.ID)
