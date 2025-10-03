@@ -18,7 +18,7 @@
 - **💾 RAG Support**: ChromaDB integration with batch embeddings support
 - **✅ Well-Tested**: 80.8% test coverage, 85+ test cases, 100% pass rate
 - **📦 Easy Deployment**: Docker, Docker Compose, Kubernetes manifests included
-- **📚 Complete Documentation**: API docs (OpenAPI 3.0), deployment guides, examples
+- **📚 Complete Documentation**: API docs (OpenAPI 3.0), deployment guides, VitePress website, examples
 
 ## 📦 Installation
 
@@ -326,6 +326,7 @@ Contributions are welcome! Please read:
 - [DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development guide and code standards
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture and design
 - [PERFORMANCE.md](docs/PERFORMANCE.md) - Performance benchmarks
+- [VITEPRESS.md](docs/VITEPRESS.md) - Documentation website setup and deployment
 - [CLAUDE.md](CLAUDE.md) - Project overview and quick reference
 
 ## 📄 License
