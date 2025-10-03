@@ -1,24 +1,24 @@
-# Agno-Go Performance Benchmarks
+# Agno-Go Performance Benchmarks | Agno-Go 性能基准测试
 
-**测试日期**: 2025-10-01
-**硬件**: Apple M3
-**Go版本**: go1.21+
-**测试方法**: `go test -bench=. -benchmem`
-
----
-
-## Executive Summary
-
-✅ **性能目标达成**:
-- ✅ Agent 实例化: **~180ns** (<1μs, 目标<1μs)
-- ✅ 内存占用: **~1.2KB/agent** (<3KB, 目标<3KB)
-- ✅ 并发性能: 线性扩展,无性能衰减
+**Test Date | 测试日期**: 2025-10-02
+**Hardware | 硬件**: Apple M3 (or similar | 或类似)
+**Go Version | Go 版本**: go1.21+
+**Test Method | 测试方法**: `go test -bench=. -benchmem`
 
 ---
 
-## Benchmark Results
+## Executive Summary | 执行摘要
 
-### 1. Agent Creation (实例化性能)
+✅ **Performance Targets Achieved | 性能目标达成**:
+- ✅ Agent Instantiation | Agent 实例化: **~180ns** (Target: <1μs | 目标: <1μs) - **5.5x better**
+- ✅ Memory Footprint | 内存占用: **~1.2KB/agent** (Target: <3KB | 目标: <3KB) - **2.5x better**
+- ✅ Concurrency Performance | 并发性能: Linear scaling, no degradation | 线性扩展,无性能衰减
+
+---
+
+## Benchmark Results | 基准测试结果
+
+### 1. Agent Creation Performance | Agent 实例化性能
 
 | Benchmark | Time/op | Memory/op | Allocs/op |
 |-----------|---------|-----------|-----------|
@@ -26,15 +26,15 @@
 | **With Tools** | 193.0 ns | 1288 B (~1.3 KB) | 9 |
 | **With Memory** | 111.9 ns | 312 B (~0.3 KB) | 6 |
 
-**关键发现**:
-- ⚡ Agent创建速度: **<200纳秒** (比目标1μs快5倍!)
-- 💾 内存占用: **1.2-1.3KB** (比目标3KB低60%)
-- 🎯 添加工具仅增加8.5ns开销
-- 🎯 Memory轻量级(仅312B)
+**Key Findings | 关键发现**:
+- ⚡ Agent creation speed | Agent 创建速度: **<200ns** (5x faster than target | 比目标快 5 倍!)
+- 💾 Memory usage | 内存占用: **1.2-1.3KB** (60% less than target | 比目标低 60%)
+- 🎯 Adding tools only increases overhead by 8.5ns | 添加工具仅增加 8.5ns 开销
+- 🎯 Lightweight memory (only 312B) | Memory 轻量级(仅 312B)
 
 ---
 
-### 2. Agent Run (执行性能)
+### 2. Agent Run Performance | Agent 执行性能
 
 | Benchmark | Throughput |
 |-----------|------------|
@@ -42,25 +42,26 @@
 | **With Tool Calls** | ~0.5M ops/sec |
 | **Memory Operations** | ~1M ops/sec |
 
-**注意**: 实际性能受LLM API延迟影响,以上是mock model测试结果
+**Note | 注意**: Actual performance affected by LLM API latency. Above results are from mock model tests.
+实际性能受 LLM API 延迟影响,以上是 mock model 测试结果。
 
 ---
 
-### 3. Concurrent Performance (并发性能)
+### 3. Concurrent Performance | 并发性能
 
 | Benchmark | Time/op | Memory/op | Scaling |
 |-----------|---------|-----------|---------|
 | **Parallel Creation** | 191.0 ns | 1272 B | ✅ Linear |
 | **Parallel Run** | Similar | Similar | ✅ Linear |
 
-**关键发现**:
-- ✅ 并发创建和单线程创建性能相同
-- ✅ 无竞争条件或锁竞争
-- ✅ 适合高并发场景
+**Key Findings | 关键发现**:
+- ✅ Concurrent creation same as single-threaded | 并发创建和单线程创建性能相同
+- ✅ No race conditions or lock contention | 无竞争条件或锁竞争
+- ✅ Suitable for high concurrency scenarios | 适合高并发场景
 
 ---
 
-## Performance Comparison
+## Performance Comparison | 性能对比
 
 ### vs Python Agno
 
@@ -72,38 +73,38 @@
 
 ---
 
-## Real-World Scenarios
+## Real-World Scenarios | 实际场景
 
-### Scenario 1: 批量Agent创建
+### Scenario 1: Batch Agent Creation | 批量 Agent 创建
 
-创建1000个agents:
-- **时间**: 1000 × 180ns = **0.18ms**
-- **内存**: 1000 × 1.2KB = **1.2MB**
+Creating 1000 agents | 创建 1000 个 agents:
+- **Time | 时间**: 1000 × 180ns = **0.18ms**
+- **Memory | 内存**: 1000 × 1.2KB = **1.2MB**
 
-### Scenario 2: 高并发API服务
+### Scenario 2: High Concurrency API Service | 高并发 API 服务
 
-处理10,000 req/s:
-- **每请求**: 1个agent实例
-- **内存开销**: 10,000 × 1.2KB = **12MB**
-- **延迟**: <1ms (不含LLM API调用)
+Handling 10,000 req/s | 处理 10,000 req/s:
+- **Per request | 每请求**: 1 agent instance | 1 个 agent 实例
+- **Memory overhead | 内存开销**: 10,000 × 1.2KB = **12MB**
+- **Latency | 延迟**: <1ms (excluding LLM API calls | 不含 LLM API 调用)
 
-### Scenario 3: Multi-Agent Workflow
+### Scenario 3: Multi-Agent Workflow | 多智能体工作流
 
-100个agents协作:
-- **总内存**: 100 × 1.2KB = **120KB**
-- **启动时间**: 100 × 180ns = **18μs**
+100 agents collaborating | 100 个 agents 协作:
+- **Total memory | 总内存**: 100 × 1.2KB = **120KB**
+- **Startup time | 启动时间**: 100 × 180ns = **18μs**
 
 ---
 
-## Optimization Details
+## Optimization Details | 优化细节
 
-### 1. Low Allocation Count
+### 1. Low Allocation Count | 低内存分配次数
 
-- 仅8-9次内存分配
-- 无额外的interface转换
-- 预分配slice容量
+- Only 8-9 memory allocations | 仅 8-9 次内存分配
+- No extra interface conversions | 无额外的 interface 转换
+- Pre-allocated slice capacity | 预分配 slice 容量
 
-### 2. Efficient Memory Layout
+### 2. Efficient Memory Layout | 高效内存布局
 
 ```go
 type Agent struct {
@@ -118,41 +119,41 @@ type Agent struct {
 }
 ```
 
-### 3. Zero-Copy Operations
+### 3. Zero-Copy Operations | 零拷贝操作
 
-- String references (不复制)
-- Interface pointers (不复制)
-- Slice views (不复制)
-
----
-
-## Bottleneck Analysis
-
-### Current Bottlenecks
-
-1. **LLM API Latency** (100-1000ms)
-   - 解决方案: Streaming, caching, batch requests
-
-2. **Tool Execution Time** (varies)
-   - 解决方案: Parallel execution, timeout controls
-
-3. **Not benchmarked yet**:
-   - Team coordination overhead
-   - Workflow execution overhead
-   - Vector DB queries
+- String references (no copy) | String 引用(不复制)
+- Interface pointers (no copy) | Interface 指针(不复制)
+- Slice views (no copy) | Slice 视图(不复制)
 
 ---
 
-## Recommendations
+## Bottleneck Analysis | 瓶颈分析
 
-### For Production Deployment
+### Current Bottlenecks | 当前瓶颈
 
-1. **Agent Pool**: 复用agent实例减少GC压力
-2. **Goroutine Limits**: 限制并发数避免资源耗尽
-3. **Caching**: Cache model responses降低API调用
-4. **Monitoring**: 监控内存和goroutine数量
+1. **LLM API Latency | LLM API 延迟** (100-1000ms)
+   - Solution | 解决方案: Streaming, caching, batch requests
 
-### Example: Agent Pool
+2. **Tool Execution Time | 工具执行时间** (varies | 不定)
+   - Solution | 解决方案: Parallel execution, timeout controls | 并行执行,超时控制
+
+3. **Not yet benchmarked | 尚未基准测试**:
+   - Team coordination overhead | Team 协作开销
+   - Workflow execution overhead | Workflow 执行开销
+   - Vector DB queries | 向量数据库查询
+
+---
+
+## Recommendations | 建议
+
+### For Production Deployment | 生产部署建议
+
+1. **Agent Pool | Agent 池**: Reuse agent instances to reduce GC pressure | 复用 agent 实例减少 GC 压力
+2. **Goroutine Limits | Goroutine 限制**: Limit concurrency to avoid resource exhaustion | 限制并发数避免资源耗尽
+3. **Caching | 缓存**: Cache model responses to reduce API calls | Cache model 响应降低 API 调用
+4. **Monitoring | 监控**: Monitor memory and goroutine count | 监控内存和 goroutine 数量
+
+### Example: Agent Pool | Agent 池示例
 
 ```go
 type AgentPool struct {
@@ -182,35 +183,41 @@ func (p *AgentPool) Put(agent *Agent) {
 
 ---
 
-## Next Steps
+## Next Steps | 后续步骤
 
-### Future Benchmarks
+### Future Benchmarks | 未来基准测试
 
-- [ ] Team coordination performance
-- [ ] Workflow execution overhead
-- [ ] Vector DB query performance
-- [ ] Knowledge base operations
-- [ ] Real LLM API integration benchmarks
+- [ ] Team coordination performance | Team 协作性能
+- [ ] Workflow execution overhead | Workflow 执行开销
+- [ ] Vector DB query performance | 向量数据库查询性能
+- [ ] Knowledge base operations | 知识库操作
+- [ ] Real LLM API integration benchmarks | 真实 LLM API 集成基准测试
 
-### Optimization Opportunities
+### Optimization Opportunities | 优化机会
 
-- [ ] String interning for repeated values
-- [ ] Sync.Pool for agent reuse
-- [ ] Batch tool execution
-- [ ] HTTP/2 connection pooling for LLM APIs
+- [ ] String interning for repeated values | 重复值的字符串驻留
+- [ ] Sync.Pool for agent reuse | 使用 Sync.Pool 复用 agent
+- [ ] Batch tool execution | 批量工具执行
+- [ ] HTTP/2 connection pooling for LLM APIs | LLM API 的 HTTP/2 连接池
 
 ---
 
-## Conclusion
+## Conclusion | 结论
 
-Agno-Go **超越性能目标**:
+Agno-Go **exceeds performance targets | 超越性能目标**:
 
-- ✅ Agent实例化比目标快5倍 (180ns vs 1μs)
-- ✅ 内存占用比目标低60% (1.2KB vs 3KB)
-- ✅ 比Python版本快16倍,内存少5倍
-- ✅ 完美的并发扩展性
+- ✅ Agent instantiation 5x faster than target | Agent 实例化比目标快 5 倍 (180ns vs 1μs)
+- ✅ Memory usage 60% less than target | 内存占用比目标低 60% (1.2KB vs 3KB)
+- ✅ 16x faster than Python, 5x less memory | 比 Python 版本快 16 倍,内存少 5 倍
+- ✅ Perfect concurrency scaling | 完美的并发扩展性
 
-**可以支持**:
-- 千级agents并发
-- 10K+ requests/秒
-- 低延迟实时应用
+**Can support | 可以支持**:
+- Thousands of concurrent agents | 千级 agents 并发
+- 10K+ requests/second | 10K+ requests/秒
+- Low-latency real-time applications | 低延迟实时应用
+
+---
+
+**For deployment optimization strategies, see [DEPLOYMENT.md](DEPLOYMENT.md)**
+
+**部署优化策略,请参阅 [DEPLOYMENT.md](DEPLOYMENT.md)**

@@ -2,8 +2,8 @@
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Test Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen.svg)](docs/TEST_REPORT.md)
-[![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg)](CHANGELOG.md)
+[![Test Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen.svg)](docs/DEVELOPMENT.md#testing-standards)
+[![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg)](docs/CHANGELOG.md)
 
 **Agno-Go** is a high-performance multi-agent system framework built with Go. Inheriting the Agno design philosophy, it leverages Go's concurrency model and performance advantages to build efficient, scalable AI agent systems.
 
@@ -320,14 +320,13 @@ See [`cmd/examples/`](cmd/examples/) for complete examples:
 - [ ] Complete documentation and examples
 - [ ] v1.0.0 release
 
-**See [PROGRESS.md](docs/PROGRESS.md) for detailed milestone tracking.**
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please read:
-- [CLAUDE.md](CLAUDE.md) - Development guide and architecture
-- [Team Guide](docs/TEAM_GUIDE.md) - Development workflow
-- [Performance Guide](docs/PERFORMANCE.md) - Benchmarking standards
+- [DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development guide and code standards
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture and design
+- [PERFORMANCE.md](docs/PERFORMANCE.md) - Performance benchmarks
+- [CLAUDE.md](CLAUDE.md) - Project overview and quick reference
 
 ## 📄 License
 

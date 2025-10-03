@@ -1,38 +1,39 @@
-# Agno-Go 架构设计
+# Agno-Go Architecture Design | Agno-Go 架构设计
 
-## 核心理念
-**简单、高效、可扩展**
+## Core Philosophy | 核心理念
 
----
-
-## 整体架构
-
-```
-┌─────────────────────────────────────────┐
-│          Application Layer              │
-│  (CLI Tools, Web API, Custom Apps)      │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│         Core Abstractions               │
-│  ┌─────────┐  ┌──────┐  ┌──────────┐   │
-│  │  Agent  │  │ Team │  │ Workflow │   │
-│  └─────────┘  └──────┘  └──────────┘   │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│        Foundation Layer                  │
-│  ┌────────┐ ┌───────┐ ┌──────┐         │
-│  │ Models │ │ Tools │ │Memory│ ...     │
-│  └────────┘ └───────┘ └──────┘         │
-└─────────────────────────────────────────┘
-```
+**Simple, Efficient, Extensible | 简单、高效、可扩展**
 
 ---
 
-## 核心接口设计
+## System Architecture | 整体架构
 
-### 1. Model Interface (模型)
+```
+┌──────────────────────────────────────────────┐
+│         Application Layer | 应用层           │
+│  (AgentOS API, CLI Tools, Custom Apps)       │
+└───────────────────┬──────────────────────────┘
+                    │
+┌───────────────────▼──────────────────────────┐
+│      Core Abstractions | 核心抽象            │
+│  ┌─────────┐  ┌──────┐  ┌──────────┐        │
+│  │  Agent  │  │ Team │  │ Workflow │        │
+│  └─────────┘  └──────┘  └──────────┘        │
+└───────────────────┬──────────────────────────┘
+                    │
+┌───────────────────▼──────────────────────────┐
+│     Foundation Layer | 基础层                │
+│  ┌────────┐ ┌───────┐ ┌────────┐ ┌───────┐ │
+│  │ Models │ │ Tools │ │ Memory │ │Storage│ │
+│  └────────┘ └───────┘ └────────┘ └───────┘ │
+└──────────────────────────────────────────────┘
+```
+
+---
+
+## Core Interface Design | 核心接口设计
+
+### 1. Model Interface | Model 接口
 ```go
 type Model interface {
     // 同步调用
@@ -60,7 +61,7 @@ type ModelResponse struct {
 }
 ```
 
-### 2. Agent (智能体)
+### 2. Agent Interface | Agent 接口
 ```go
 type Agent struct {
     ID          string
@@ -75,7 +76,7 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error)
 func (a *Agent) RunStream(ctx context.Context, input string) (<-chan RunEvent, error)
 ```
 
-### 3. Toolkit (工具包)
+### 3. Toolkit Interface | 工具包接口
 ```go
 type Toolkit interface {
     Name() string
@@ -90,7 +91,7 @@ type Function struct {
 }
 ```
 
-### 4. VectorDB (向量数据库)
+### 4. VectorDB Interface | 向量数据库接口
 ```go
 type VectorDB interface {
     Insert(ctx context.Context, docs []Document) error
@@ -108,9 +109,9 @@ type Document struct {
 
 ---
 
-## 数据流
+## Data Flow | 数据流
 
-### 单次对话流程
+### Single Conversation Flow | 单次对话流程
 ```
 User Input
     ↓
@@ -134,33 +135,33 @@ Memory.Store
 Output to User
 ```
 
-### 流式响应
+### Streaming Response | 流式响应
 ```go
-// 使用 channel 实现流式输出
+// Use channel for streaming output | 使用 channel 实现流式输出
 ch := agent.RunStream(ctx, "hello")
 for event := range ch {
     switch event.Type {
     case "content":
         fmt.Print(event.Data)
     case "tool_call":
-        // 处理工具调用
+        // Handle tool call | 处理工具调用
     case "completed":
-        // 完成
+        // Completed | 完成
     }
 }
 ```
 
 ---
 
-## 并发模型
+## Concurrency Model | 并发模型
 
-### Goroutine 使用原则
-1. **每个 Agent.Run 独立 goroutine** (用户控制)
-2. **Tool 执行可并行** (框架控制)
-3. **使用 context.Context 控制生命周期**
+### Goroutine Usage Principles | Goroutine 使用原则
+1. **Each Agent.Run in independent goroutine** (user-controlled) | **每个 Agent.Run 独立 goroutine**(用户控制)
+2. **Tool execution can be parallel** (framework-controlled) | **Tool 执行可并行**(框架控制)
+3. **Use context.Context to control lifecycle** | **使用 context.Context 控制生命周期**
 
 ```go
-// 示例: 并发运行多个 agent
+// Example: Run multiple agents concurrently | 示例: 并发运行多个 agent
 ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 defer cancel()
 
@@ -184,74 +185,46 @@ close(results)
 
 ---
 
-## 错误处理
+## Error Handling | 错误处理
 
-### 分层错误设计
+### Layered Error Design | 分层错误设计
 ```go
-// 基础错误类型
+// Base error type | 基础错误类型
 type AgnoError struct {
     Code    string
     Message string
     Cause   error
 }
 
-// 特定错误
+// Specific errors | 特定错误
 var (
     ErrModelTimeout    = &AgnoError{Code: "MODEL_TIMEOUT", ...}
     ErrToolExecution   = &AgnoError{Code: "TOOL_ERROR", ...}
     ErrInvalidInput    = &AgnoError{Code: "INVALID_INPUT", ...}
 )
 
-// 使用 errors.Is/As
+// Use errors.Is/As | 使用 errors.Is/As
 if errors.Is(err, ErrModelTimeout) {
-    // 重试逻辑
+    // Retry logic | 重试逻辑
 }
 ```
 
 ---
 
-## 配置管理
+## Extension Mechanisms | 扩展机制
 
-### 简单配置文件
-```yaml
-# agno.yaml
-agent:
-  model:
-    provider: openai
-    id: gpt-4
-    api_key: ${OPENAI_API_KEY}
-
-  tools:
-    - http_client
-    - file_ops
-
-  memory:
-    type: in_memory
-    max_messages: 100
-```
-
-```go
-// 加载配置
-config, err := LoadConfig("agno.yaml")
-agent := NewAgent(config)
-```
-
----
-
-## 扩展机制
-
-### 1. 自定义模型
+### Custom Model | 自定义模型
 ```go
 type MyModel struct {
-    // 实现 Model interface
+    // Implement Model interface | 实现 Model 接口
 }
 
 func (m *MyModel) Invoke(ctx context.Context, req *InvokeRequest) (*ModelResponse, error) {
-    // 自定义逻辑
+    // Custom logic | 自定义逻辑
 }
 ```
 
-### 2. 自定义工具
+### Custom Tool | 自定义工具
 ```go
 type MyToolkit struct{}
 
@@ -264,7 +237,7 @@ func (t *MyToolkit) Functions() map[string]*Function {
         "custom_tool": {
             Name: "custom_tool",
             Handler: func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-                // 工具逻辑
+                // Tool logic | 工具逻辑
                 return "result", nil
             },
         },
@@ -272,119 +245,46 @@ func (t *MyToolkit) Functions() map[string]*Function {
 }
 ```
 
-### 3. 中间件模式
-```go
-type Middleware func(next Handler) Handler
-type Handler func(context.Context, *Request) (*Response, error)
+---
 
-// 示例: 日志中间件
-func LoggingMiddleware(next Handler) Handler {
-    return func(ctx context.Context, req *Request) (*Response, error) {
-        log.Printf("Request: %+v", req)
-        resp, err := next(ctx, req)
-        log.Printf("Response: %+v", resp)
-        return resp, err
-    }
-}
-```
+## Design Principles | 设计原则
+
+1. **Interface over Implementation | 接口优于实现** - Depend on abstractions | 依赖抽象
+2. **Composition over Inheritance | 组合优于继承** - Use struct embedding | 使用结构体嵌入
+3. **Explicit over Implicit | 显式优于隐式** - No over-abstraction | 不过度抽象
+4. **Standard Library First | 标准库优先** - Minimize dependencies | 减少依赖
+5. **Fail Fast | 快速失败** - Early error checking | 早期错误检查
+6. **Concurrency Safe | 并发安全** - Thread-safe by default | 默认线程安全
 
 ---
 
-## 性能优化策略
+## Deployment Architecture | 部署架构
 
-### 1. 对象池
-```go
-var messagePool = sync.Pool{
-    New: func() interface{} {
-        return &Message{}
-    },
-}
-
-// 使用
-msg := messagePool.Get().(*Message)
-defer messagePool.Put(msg)
-```
-
-### 2. 减少内存分配
-- 使用 `strings.Builder` 代替字符串拼接
-- 预分配 slice 容量: `make([]T, 0, expectedSize)`
-- 避免不必要的拷贝
-
-### 3. 并发优化
-- 限制 goroutine 数量 (worker pool)
-- 使用 buffered channel
-- 合理使用 `sync.WaitGroup` 和 `errgroup`
-
----
-
-## 测试架构
-
-### 1. Mock 接口
-```go
-type MockModel struct {
-    InvokeFunc func(context.Context, *InvokeRequest) (*ModelResponse, error)
-}
-
-func (m *MockModel) Invoke(ctx context.Context, req *InvokeRequest) (*ModelResponse, error) {
-    if m.InvokeFunc != nil {
-        return m.InvokeFunc(ctx, req)
-    }
-    return &ModelResponse{Content: "mock response"}, nil
-}
-```
-
-### 2. 测试分层
-- **单元测试**: 每个函数/方法
-- **集成测试**: Agent + Model + Tool
-- **端到端测试**: 完整场景
-- **性能测试**: benchmark
-
----
-
-## 部署架构
-
-### 1. 单机部署
-```
-┌─────────────┐
-│  agno-go    │
-│  (binary)   │
-└─────────────┘
-```
-
-### 2. API 服务部署
+### Production Deployment | 生产部署
 ```
         ┌──────────┐
-        │ Load     │
+        │   Load   │
         │ Balancer │
         └────┬─────┘
              │
     ┌────────┴────────┐
     ▼                 ▼
 ┌────────┐       ┌────────┐
-│agno-go │       │agno-go │
+│AgentOS │       │AgentOS │
 │  API   │       │  API   │
 └───┬────┘       └───┬────┘
     │                │
     └────────┬───────┘
              ▼
       ┌──────────┐
-      │ Database │
-      │ & Vector │
-      │   DB     │
+      │PostgreSQL│
+      │  Redis   │
+      │ ChromaDB │
       └──────────┘
 ```
 
 ---
 
-## 设计原则总结
+**For detailed development guide, see [DEVELOPMENT.md](DEVELOPMENT.md)**
 
-1. **接口优于实现** - 依赖抽象
-2. **组合优于继承** - 使用 struct embedding
-3. **显式优于隐式** - 不过度抽象
-4. **标准库优先** - 减少依赖
-5. **失败快速** - 早期错误检查
-6. **并发安全** - 默认线程安全设计
-
----
-
-**保持简单,持续迭代**
+**详细开发指南,请参阅 [DEVELOPMENT.md](DEVELOPMENT.md)**
