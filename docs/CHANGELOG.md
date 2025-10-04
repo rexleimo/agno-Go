@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added | 新增
+- **JSON Serialization Utilities**: Added `pkg/agno/utils/serialize.go` for handling special types (time.Time, Stringer) in JSON serialization (92.3% test coverage)
+  - 新增 JSON 序列化工具 `pkg/agno/utils/serialize.go`,处理特殊类型 (time.Time, Stringer) 的 JSON 序列化 (测试覆盖率 92.3%)
+- **AgentOS Route Prefix Support**: Added `Prefix` field to `agentos.Config` to support custom route prefixes for multi-instance deployments
+  - AgentOS 路由前缀支持: 在 `agentos.Config` 中新增 `Prefix` 字段,支持多实例部署的自定义路由前缀
+- **Multi-Instance Example**: Added `cmd/examples/agentos_multi_instance` demonstrating how to run multiple AgentOS instances on same/different ports
+  - 多实例示例: 新增 `cmd/examples/agentos_multi_instance`,演示如何在相同/不同端口上运行多个 AgentOS 实例
+
+### Changed | 变更
+- **AgentOS Router**: Modified `registerRoutes()` to support configurable route prefix while keeping health check at root level
+  - AgentOS 路由器: 修改 `registerRoutes()` 支持可配置路由前缀,同时保持健康检查在根级别
+
+### Synced from Python Agno | 从 Python Agno 同步
+- Synced JSON serialization utilities from `agno/utils/serialize.py` (commit `aea0fc129`)
+  - 从 `agno/utils/serialize.py` 同步 JSON 序列化工具 (commit `aea0fc129`)
+- Synced route prefix support from AgentOS interfaces (commit `06baed104`)
+  - 从 AgentOS 接口同步路由前缀支持 (commit `06baed104`)
+
+---
+
 ## [1.0.0] - 2025-10-02
 
 ### 🎉 Initial Release | 首次发布

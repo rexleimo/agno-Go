@@ -23,28 +23,40 @@ type Server struct {
 }
 
 // Config holds server configuration
+// Config 持有服务器配置
 type Config struct {
 	// Server address (default: :8080)
+	// 服务器地址 (默认: :8080)
 	Address string
 
+	// API route prefix (e.g., "/api/v1", "/chat", empty for no prefix)
+	// API 路由前缀 (例如: "/api/v1", "/chat", 空字符串表示无前缀)
+	Prefix string
+
 	// Session storage
+	// Session 存储
 	SessionStorage session.Storage
 
 	// Logger
+	// 日志记录器
 	Logger *slog.Logger
 
 	// Enable debug mode
+	// 启用调试模式
 	Debug bool
 
 	// CORS settings
+	// CORS 设置
 	AllowOrigins []string
 	AllowMethods []string
 	AllowHeaders []string
 
 	// Request timeout
+	// 请求超时时间
 	RequestTimeout time.Duration
 
 	// Max request size (in bytes)
+	// 最大请求大小 (字节)
 	MaxRequestSize int64
 }
 
@@ -154,14 +166,27 @@ func (s *Server) GetAgentRegistry() *AgentRegistry {
 }
 
 // registerRoutes registers all API routes
+// registerRoutes 注册所有 API 路由
 func (s *Server) registerRoutes() {
-	// Health check
+	// Create base group with prefix (if specified)
+	// 使用前缀创建基础路由组 (如果指定了前缀)
+	var baseGroup *gin.RouterGroup
+	if s.config.Prefix != "" {
+		baseGroup = s.router.Group(s.config.Prefix)
+	} else {
+		baseGroup = &s.router.RouterGroup
+	}
+
+	// Health check (always at root level)
+	// 健康检查 (始终在根级别)
 	s.router.GET("/health", s.handleHealth)
 
-	// API v1
-	v1 := s.router.Group("/api/v1")
+	// API v1 under the prefix
+	// 前缀下的 API v1
+	v1 := baseGroup.Group("/api/v1")
 	{
 		// Session endpoints
+		// Session 端点
 		sessions := v1.Group("/sessions")
 		{
 			sessions.POST("", s.handleCreateSession)
@@ -172,6 +197,7 @@ func (s *Server) registerRoutes() {
 		}
 
 		// Agent endpoints
+		// Agent 端点
 		agents := v1.Group("/agents")
 		{
 			agents.GET("", s.handleListAgents)
