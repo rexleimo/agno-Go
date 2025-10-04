@@ -1,0 +1,436 @@
+# Tools - 扩展 Agent 能力
+
+通过工具为您的 Agent 提供外部功能访问。
+
+---
+
+## 什么是 Tools?
+
+Tools 是 Agent 可以调用的函数,用于与外部系统交互、执行计算、获取数据等。Agno-Go 提供了灵活的工具系统用于扩展 Agent 能力。
+
+### 内置工具
+
+- **Calculator**: 基础数学运算
+- **HTTP**: 发起网络请求
+- **File**: 带安全控制的读写文件
+
+---
+
+## 使用 Tools
+
+### 基础示例
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+)
+
+func main() {
+    model, _ := openai.New("gpt-4o-mini", openai.Config{
+        APIKey: os.Getenv("OPENAI_API_KEY"),
+    })
+
+    agent, _ := agent.New(agent.Config{
+        Name:     "Math Assistant",
+        Model:    model,
+        Toolkits: []toolkit.Toolkit{calculator.New()},
+    })
+
+    output, _ := agent.Run(context.Background(), "What is 23 * 47?")
+    fmt.Println(output.Content) // Agent uses calculator automatically
+}
+```
+
+---
+
+## Calculator 工具
+
+执行数学运算。
+
+### 操作
+
+- `add(a, b)` - 加法
+- `subtract(a, b)` - 减法
+- `multiply(a, b)` - 乘法
+- `divide(a, b)` - 除法
+
+### 示例
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+
+agent, _ := agent.New(agent.Config{
+    Model:    model,
+    Toolkits: []toolkit.Toolkit{calculator.New()},
+})
+
+// Agent will automatically use calculator
+output, _ := agent.Run(ctx, "Calculate 15% tip on $85")
+```
+
+---
+
+## HTTP 工具
+
+向外部 API 发起 HTTP 请求。
+
+### 方法
+
+- `get(url)` - HTTP GET 请求
+- `post(url, body)` - HTTP POST 请求
+
+### 示例
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/tools/http"
+
+agent, _ := agent.New(agent.Config{
+    Model:    model,
+    Toolkits: []toolkit.Toolkit{http.New()},
+})
+
+// Agent can fetch data from APIs
+output, _ := agent.Run(ctx, "Get the latest GitHub status from https://www.githubstatus.com/api/v2/status.json")
+```
+
+### 配置
+
+出于安全考虑控制允许的域名:
+
+```go
+httpTool := http.New(http.Config{
+    AllowedDomains: []string{"api.github.com", "api.weather.com"},
+    Timeout:        10 * time.Second,
+})
+```
+
+---
+
+## File 工具
+
+带内置安全控制的文件读写。
+
+### 操作
+
+- `read_file(path)` - 读取文件内容
+- `write_file(path, content)` - 写入内容到文件
+- `list_directory(path)` - 列出目录内容
+- `delete_file(path)` - 删除文件
+
+### 示例
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/tools/file"
+
+fileTool := file.New(file.Config{
+    AllowedPaths: []string{"/tmp", "./data"},  // Restrict access
+    MaxFileSize:  1024 * 1024,                 // 1MB limit
+})
+
+agent, _ := agent.New(agent.Config{
+    Model:    model,
+    Toolkits: []toolkit.Toolkit{fileTool},
+})
+
+output, _ := agent.Run(ctx, "Read the contents of ./data/report.txt")
+```
+
+### 安全特性
+
+- 路径限制 (白名单)
+- 文件大小限制
+- 只读模式选项
+- 自动路径清理
+
+---
+
+## 多个工具
+
+Agent 可以使用多个工具:
+
+```go
+agent, _ := agent.New(agent.Config{
+    Name:  "Multi-Tool Agent",
+    Model: model,
+    Toolkits: []toolkit.Toolkit{
+        calculator.New(),
+        http.New(),
+        file.New(file.Config{
+            AllowedPaths: []string{"./data"},
+        }),
+    },
+})
+
+// Agent can now calculate, fetch data, and read files
+output, _ := agent.Run(ctx,
+    "Fetch weather data, calculate average temperature, and save to file")
+```
+
+---
+
+## 创建自定义工具
+
+通过实现 Toolkit 接口构建您自己的工具。
+
+### 步骤 1: 创建 Toolkit 结构
+
+```go
+package mytool
+
+import "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+
+type MyToolkit struct {
+    *toolkit.BaseToolkit
+}
+
+func New() *MyToolkit {
+    t := &MyToolkit{
+        BaseToolkit: toolkit.NewBaseToolkit("my_tools"),
+    }
+
+    // Register functions
+    t.RegisterFunction(&toolkit.Function{
+        Name:        "greet",
+        Description: "Greet a person by name",
+        Parameters: map[string]toolkit.Parameter{
+            "name": {
+                Type:        "string",
+                Description: "Person's name",
+                Required:    true,
+            },
+        },
+        Handler: t.greet,
+    })
+
+    return t
+}
+```
+
+### 步骤 2: 实现 Handler
+
+```go
+func (t *MyToolkit) greet(args map[string]interface{}) (interface{}, error) {
+    name, ok := args["name"].(string)
+    if !ok {
+        return nil, fmt.Errorf("name must be a string")
+    }
+
+    return fmt.Sprintf("Hello, %s!", name), nil
+}
+```
+
+### 步骤 3: 使用您的工具
+
+```go
+agent, _ := agent.New(agent.Config{
+    Model:    model,
+    Toolkits: []toolkit.Toolkit{mytool.New()},
+})
+
+output, _ := agent.Run(ctx, "Greet Alice")
+// Agent calls greet("Alice") and responds with "Hello, Alice!"
+```
+
+---
+
+## 高级自定义工具示例
+
+数据库查询工具:
+
+```go
+type DatabaseToolkit struct {
+    *toolkit.BaseToolkit
+    db *sql.DB
+}
+
+func NewDatabaseToolkit(db *sql.DB) *DatabaseToolkit {
+    t := &DatabaseToolkit{
+        BaseToolkit: toolkit.NewBaseToolkit("database"),
+        db:          db,
+    }
+
+    t.RegisterFunction(&toolkit.Function{
+        Name:        "query_users",
+        Description: "Query users from database",
+        Parameters: map[string]toolkit.Parameter{
+            "limit": {
+                Type:        "integer",
+                Description: "Maximum number of results",
+                Required:    false,
+            },
+        },
+        Handler: t.queryUsers,
+    })
+
+    return t
+}
+
+func (t *DatabaseToolkit) queryUsers(args map[string]interface{}) (interface{}, error) {
+    limit := 10
+    if l, ok := args["limit"].(float64); ok {
+        limit = int(l)
+    }
+
+    rows, err := t.db.Query("SELECT id, name FROM users LIMIT ?", limit)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var users []map[string]interface{}
+    for rows.Next() {
+        var id int
+        var name string
+        rows.Scan(&id, &name)
+        users = append(users, map[string]interface{}{
+            "id":   id,
+            "name": name,
+        })
+    }
+
+    return users, nil
+}
+```
+
+---
+
+## 工具最佳实践
+
+### 1. 清晰的描述
+
+帮助 Agent 理解何时使用工具:
+
+```go
+// Good ✅
+Description: "Calculate the square root of a number. Use when user asks for square roots."
+
+// Bad ❌
+Description: "Math function"
+```
+
+### 2. 验证输入
+
+始终验证工具参数:
+
+```go
+func (t *MyToolkit) divide(args map[string]interface{}) (interface{}, error) {
+    b, ok := args["divisor"].(float64)
+    if !ok || b == 0 {
+        return nil, fmt.Errorf("divisor must be a non-zero number")
+    }
+    // ... perform division
+}
+```
+
+### 3. 错误处理
+
+返回有意义的错误:
+
+```go
+func (t *MyToolkit) fetchData(args map[string]interface{}) (interface{}, error) {
+    resp, err := http.Get(url)
+    if err != nil {
+        return nil, fmt.Errorf("failed to fetch data: %w", err)
+    }
+    // ... process response
+}
+```
+
+### 4. 安全性
+
+限制工具能力:
+
+```go
+// Whitelist allowed operations
+fileTool := file.New(file.Config{
+    AllowedPaths: []string{"/safe/path"},
+    ReadOnly:     true,  // Prevent writes
+})
+
+// Validate domains
+httpTool := http.New(http.Config{
+    AllowedDomains: []string{"api.trusted.com"},
+})
+```
+
+---
+
+## 工具执行流程
+
+1. 用户向 Agent 发送请求
+2. Agent (LLM) 决定是否需要工具
+3. LLM 生成带参数的工具调用
+4. Agno-Go 执行工具函数
+5. 工具结果返回给 LLM
+6. LLM 生成最终响应
+
+### 示例流程
+
+```
+用户: "What is 25 * 17?"
+  ↓
+LLM: "I need to use calculator"
+  ↓
+Tool Call: multiply(25, 17)
+  ↓
+Tool Result: 425
+  ↓
+LLM: "The answer is 425"
+  ↓
+用户收到: "The answer is 425"
+```
+
+---
+
+## 故障排除
+
+### Agent 不使用工具
+
+确保指令清晰:
+
+```go
+agent, _ := agent.New(agent.Config{
+    Model:        model,
+    Toolkits:     []toolkit.Toolkit{calculator.New()},
+    Instructions: "Use the calculator tool for any math operations.",
+})
+```
+
+### 工具错误
+
+检查工具注册和参数类型:
+
+```go
+// Tool expects float64 for numbers
+args := map[string]interface{}{
+    "value": 42.0,  // ✅ Correct
+    // "value": "42"  // ❌ Wrong type
+}
+```
+
+---
+
+## 下一步
+
+- 了解 [Memory](/guide/memory) 的对话状态
+- 使用专业化工具 Agent 构建 [Teams](/guide/team)
+- 探索 [Workflow](/guide/workflow) 的工具编排
+- 查看 [API Reference](/api/tools) 获取详细文档
+
+---
+
+## 相关示例
+
+- [Simple Agent](/examples/simple-agent) - Calculator 工具使用
+- [Search Agent](/examples/search-agent) - HTTP 工具进行网络搜索
+- [File Agent](/examples/file-agent) - 文件操作
