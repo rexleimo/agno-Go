@@ -27,7 +27,7 @@ export default defineConfig({
           { text: 'Advanced', link: '/advanced/' },
           { text: 'Examples', link: '/examples/' },
           {
-            text: 'v1.0.0',
+            text: 'v1.0.1',
             items: [
               { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: 'Release Notes', link: '/release-notes' }
@@ -52,7 +52,8 @@ export default defineConfig({
                 { text: 'Workflow', link: '/guide/workflow' },
                 { text: 'Models', link: '/guide/models' },
                 { text: 'Tools', link: '/guide/tools' },
-                { text: 'Memory', link: '/guide/memory' }
+                { text: 'Memory', link: '/guide/memory' },
+                { text: 'MCP Integration', link: '/guide/mcp' }
               ]
             }
           ],
@@ -93,7 +94,8 @@ export default defineConfig({
                 { text: 'Ollama Agent', link: '/examples/ollama-agent' },
                 { text: 'Team Demo', link: '/examples/team-demo' },
                 { text: 'Workflow Demo', link: '/examples/workflow-demo' },
-                { text: 'RAG Demo', link: '/examples/rag-demo' }
+                { text: 'RAG Demo', link: '/examples/rag-demo' },
+                { text: 'MCP Demo', link: '/examples/mcp-demo' }
               ]
             }
           ]
@@ -119,7 +121,7 @@ export default defineConfig({
           { text: '进阶', link: '/zh/advanced/' },
           { text: '示例', link: '/zh/examples/' },
           {
-            text: 'v1.0.0',
+            text: 'v1.0.1',
             items: [
               { text: '更新日志', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: '发布说明', link: '/zh/release-notes' }
@@ -144,7 +146,8 @@ export default defineConfig({
                 { text: 'Workflow 工作流', link: '/zh/guide/workflow' },
                 { text: 'Models 模型', link: '/zh/guide/models' },
                 { text: 'Tools 工具', link: '/zh/guide/tools' },
-                { text: 'Memory 记忆', link: '/zh/guide/memory' }
+                { text: 'Memory 记忆', link: '/zh/guide/memory' },
+                { text: 'MCP 集成', link: '/zh/guide/mcp' }
               ]
             }
           ],
@@ -185,7 +188,8 @@ export default defineConfig({
                 { text: 'Ollama 智能体', link: '/zh/examples/ollama-agent' },
                 { text: '团队演示', link: '/zh/examples/team-demo' },
                 { text: '工作流演示', link: '/zh/examples/workflow-demo' },
-                { text: 'RAG 演示', link: '/zh/examples/rag-demo' }
+                { text: 'RAG 演示', link: '/zh/examples/rag-demo' },
+                { text: 'MCP 演示', link: '/zh/examples/mcp-demo' }
               ]
             }
           ]
@@ -211,7 +215,7 @@ export default defineConfig({
           { text: '高度な内容', link: '/ja/advanced/' },
           { text: 'サンプル', link: '/ja/examples/' },
           {
-            text: 'v1.0.0',
+            text: 'v1.0.1',
             items: [
               { text: '変更履歴', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: 'リリースノート', link: '/ja/release-notes' }
@@ -236,7 +240,8 @@ export default defineConfig({
                 { text: 'Workflow ワークフロー', link: '/ja/guide/workflow' },
                 { text: 'Models モデル', link: '/ja/guide/models' },
                 { text: 'Tools ツール', link: '/ja/guide/tools' },
-                { text: 'Memory メモリ', link: '/ja/guide/memory' }
+                { text: 'Memory メモリ', link: '/ja/guide/memory' },
+                { text: 'MCP 統合', link: '/ja/guide/mcp' }
               ]
             }
           ],
@@ -277,7 +282,8 @@ export default defineConfig({
                 { text: 'Ollama エージェント', link: '/ja/examples/ollama-agent' },
                 { text: 'チームデモ', link: '/ja/examples/team-demo' },
                 { text: 'ワークフローデモ', link: '/ja/examples/workflow-demo' },
-                { text: 'RAG デモ', link: '/ja/examples/rag-demo' }
+                { text: 'RAG デモ', link: '/ja/examples/rag-demo' },
+                { text: 'MCP デモ', link: '/ja/examples/mcp-demo' }
               ]
             }
           ]
@@ -303,7 +309,7 @@ export default defineConfig({
           { text: '고급', link: '/ko/advanced/' },
           { text: '예제', link: '/ko/examples/' },
           {
-            text: 'v1.0.0',
+            text: 'v1.0.1',
             items: [
               { text: '변경 로그', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: '릴리스 노트', link: '/ko/release-notes' }
@@ -328,7 +334,8 @@ export default defineConfig({
                 { text: 'Workflow 워크플로우', link: '/ko/guide/workflow' },
                 { text: 'Models 모델', link: '/ko/guide/models' },
                 { text: 'Tools 도구', link: '/ko/guide/tools' },
-                { text: 'Memory 메모리', link: '/ko/guide/memory' }
+                { text: 'Memory 메모리', link: '/ko/guide/memory' },
+                { text: 'MCP 통합', link: '/ko/guide/mcp' }
               ]
             }
           ],
@@ -369,7 +376,8 @@ export default defineConfig({
                 { text: 'Ollama 에이전트', link: '/ko/examples/ollama-agent' },
                 { text: '팀 데모', link: '/ko/examples/team-demo' },
                 { text: '워크플로우 데모', link: '/ko/examples/workflow-demo' },
-                { text: 'RAG 데모', link: '/ko/examples/rag-demo' }
+                { text: 'RAG 데모', link: '/ko/examples/rag-demo' },
+                { text: 'MCP 데모', link: '/ko/examples/mcp-demo' }
               ]
             }
           ]
@@ -394,7 +402,7 @@ export default defineConfig({
       { text: 'Advanced', link: '/advanced/' },
       { text: 'Examples', link: '/examples/' },
       {
-        text: 'v1.0.0',
+        text: 'v1.0.1',
         items: [
           { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
           { text: 'Release Notes', link: '/release-notes' }
@@ -420,7 +428,8 @@ export default defineConfig({
             { text: 'Workflow', link: '/guide/workflow' },
             { text: 'Models', link: '/guide/models' },
             { text: 'Tools', link: '/guide/tools' },
-            { text: 'Memory', link: '/guide/memory' }
+            { text: 'Memory', link: '/guide/memory' },
+            { text: 'MCP Integration', link: '/guide/mcp' }
           ]
         }
       ],
@@ -461,7 +470,8 @@ export default defineConfig({
             { text: 'Ollama Agent', link: '/examples/ollama-agent' },
             { text: 'Team Demo', link: '/examples/team-demo' },
             { text: 'Workflow Demo', link: '/examples/workflow-demo' },
-            { text: 'RAG Demo', link: '/examples/rag-demo' }
+            { text: 'RAG Demo', link: '/examples/rag-demo' },
+            { text: 'MCP Demo', link: '/examples/mcp-demo' }
           ]
         }
       ]

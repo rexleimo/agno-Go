@@ -11,7 +11,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.0.1] - 2025-10-05
+
 ### Added | 新增
+
+#### Model Context Protocol (MCP) | 模型上下文协议
+- **MCP Implementation**: Complete implementation of Model Context Protocol for seamless integration with MCP servers
+  - MCP 实现: 完整的模型上下文协议实现,可与 MCP 服务器无缝集成
+  - JSON-RPC 2.0 protocol support | JSON-RPC 2.0 协议支持
+  - Stdio transport implementation | Stdio 传输实现
+  - Security validator with command whitelist and shell injection protection | 安全验证器,配有命令白名单和 shell 注入保护
+  - Content handling for text, images, and resources | 支持文本、图像和资源的内容处理
+  - MCP toolkit integration with agno agent system | MCP 工具包与 agno agent 系统集成
+  - Tool filtering (include/exclude) | 工具过滤(包含/排除)
+  - Test coverage: >80% across all MCP packages | 测试覆盖率: 所有 MCP 包 >80%
+
+- **MCP Packages | MCP 包**
+  - `pkg/agno/mcp/protocol/` - JSON-RPC 2.0 and MCP message types
+  - `pkg/agno/mcp/client/` - MCP client core and transports
+  - `pkg/agno/mcp/security/` - Command validation and security
+  - `pkg/agno/mcp/content/` - Content type handling (text, images, resources)
+  - `pkg/agno/mcp/toolkit/` - Integration with agno toolkit system
+
+- **MCP Demo Example | MCP 演示示例**
+  - `cmd/examples/mcp_demo/` - Complete example demonstrating MCP usage with calculator server
+  - 完整示例,演示使用 calculator 服务器的 MCP 用法
+
+#### Utilities & Infrastructure | 工具和基础设施
 - **JSON Serialization Utilities**: Added `pkg/agno/utils/serialize.go` for handling special types (time.Time, Stringer) in JSON serialization (92.3% test coverage)
   - 新增 JSON 序列化工具 `pkg/agno/utils/serialize.go`,处理特殊类型 (time.Time, Stringer) 的 JSON 序列化 (测试覆盖率 92.3%)
 - **AgentOS Route Prefix Support**: Added `Prefix` field to `agentos.Config` to support custom route prefixes for multi-instance deployments
@@ -23,11 +51,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AgentOS Router**: Modified `registerRoutes()` to support configurable route prefix while keeping health check at root level
   - AgentOS 路由器: 修改 `registerRoutes()` 支持可配置路由前缀,同时保持健康检查在根级别
 
+### Documentation | 文档
+- **MCP Documentation | MCP 文档**
+  - `pkg/agno/mcp/README.md` - MCP usage guide (bilingual EN/中文)
+  - `pkg/agno/mcp/IMPLEMENTATION.md` - Detailed implementation notes
+- **Known MCP Servers | 已知 MCP 服务器**
+  - @modelcontextprotocol/server-calculator
+  - @modelcontextprotocol/server-filesystem
+  - @modelcontextprotocol/server-git
+  - @modelcontextprotocol/server-sqlite
+
 ### Synced from Python Agno | 从 Python Agno 同步
 - Synced JSON serialization utilities from `agno/utils/serialize.py` (commit `aea0fc129`)
   - 从 `agno/utils/serialize.py` 同步 JSON 序列化工具 (commit `aea0fc129`)
 - Synced route prefix support from AgentOS interfaces (commit `06baed104`)
   - 从 AgentOS 接口同步路由前缀支持 (commit `06baed104`)
+
+### Performance | 性能
+- MCP Client Init: <100μs
+- Tool Discovery: <50μs per server
+- Memory: <10KB per connection
 
 ---
 

@@ -35,7 +35,7 @@ features:
 
   - icon: 🔧
     title: Extensible Tools
-    details: Easy-to-extend toolkit system with built-in Calculator, HTTP Client, File Operations, and DuckDuckGo Search. Create custom tools in minutes.
+    details: Easy-to-extend toolkit system with built-in Calculator, HTTP Client, File Operations, and DuckDuckGo Search. MCP integration for connecting to any MCP-compatible server.
 
   - icon: 💾
     title: RAG & Knowledge
@@ -146,9 +146,10 @@ curl http://localhost:8080/health
 - **Core Framework**: Agent, Team (4 modes), Workflow (5 primitives)
 - **Models**: OpenAI, Anthropic Claude, Ollama, DeepSeek, Gemini, ModelScope
 - **Tools**: Calculator (75.6%), HTTP (88.9%), File (76.2%), Search (92.1%)
+- **MCP Integration**: Model Context Protocol support for connecting to any MCP server
 - **RAG**: ChromaDB integration + OpenAI embeddings
 - **AgentOS**: Production HTTP server (65.0% coverage)
-- **Examples**: 6 working examples covering all features
+- **Examples**: 7 working examples covering all features
 - **Docs**: Complete guides, API reference, deployment instructions
 
 ## Community
