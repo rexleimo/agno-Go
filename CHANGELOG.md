@@ -5,6 +5,89 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2025-10-05
+
+### ✨ Added
+
+#### New LLM Provider
+- **GLM (智谱AI)** - Full integration with Zhipu AI's GLM models
+  - Support for GLM-4, GLM-4V (vision), GLM-3-Turbo
+  - Custom JWT authentication (HMAC-SHA256)
+  - Synchronous API calls (`Invoke`)
+  - Streaming responses (`InvokeStream`)
+  - Tool/Function calling support
+  - Test coverage: 57.2%
+
+#### Implementation Details
+- **pkg/agno/models/glm/glm.go** - Main model implementation (410 lines)
+- **pkg/agno/models/glm/auth.go** - JWT authentication logic (59 lines)
+- **pkg/agno/models/glm/types.go** - GLM API type definitions (105 lines)
+- **pkg/agno/models/glm/glm_test.go** - Comprehensive unit tests (320 lines)
+- **pkg/agno/models/glm/README.md** - Complete usage documentation
+
+#### Examples & Documentation
+- **cmd/examples/glm_agent/** - GLM agent example with calculator tools
+  - Chinese language support demonstration
+  - Multi-step calculation examples
+  - Tool calling integration
+- Updated README.md with GLM provider information
+- Updated CLAUDE.md with GLM configuration and usage
+- Added bilingual comments (English/中文) throughout codebase
+
+### 🔧 Technical Highlights
+
+- **Custom JWT Authentication** - Implemented GLM-specific JWT token generation
+  - 7-day token expiration
+  - Secure HMAC-SHA256 signing
+  - Automatic token regeneration per request
+
+- **OpenAI-Compatible Format** - API structure similar to OpenAI for easy integration
+  - Request/response format alignment
+  - Tool calling compatibility
+  - Streaming support via Server-Sent Events (SSE)
+
+- **Type Safety** - Full Go type system integration
+  - Strongly-typed request/response structures
+  - Error handling with custom error types
+  - Context support for cancellation
+
+### 📊 Test Results
+
+- ✅ All 7 GLM tests passing
+- ✅ 57.2% code coverage
+- ✅ Race detector: PASS
+- ✅ Build verification: SUCCESS
+
+### 🌍 Environment Variables
+
+New environment variable for GLM:
+```bash
+export ZHIPUAI_API_KEY=your-key-id.your-key-secret
+```
+
+### 📦 Dependencies
+
+Added:
+- `github.com/golang-jwt/jwt/v5 v5.3.0` - For JWT authentication
+
+### 🎯 Supported Models
+
+Total LLM providers increased from 6 to 7:
+- OpenAI (GPT-4, GPT-3.5, GPT-4 Turbo)
+- Anthropic (Claude 3.5 Sonnet, Claude 3 Opus/Sonnet/Haiku)
+- **GLM (智谱AI: GLM-4, GLM-4V, GLM-3-Turbo)** ⭐ NEW
+- Ollama (Local models)
+- DeepSeek (DeepSeek-V2, DeepSeek-Coder)
+- Google Gemini (Gemini Pro, Flash)
+- ModelScope (Qwen, Yi models)
+
+### 📝 Documentation Updates
+
+- README.md - Added GLM to supported models list with example code
+- CLAUDE.md - Added GLM environment variables and configuration
+- Created pkg/agno/models/glm/README.md with comprehensive usage guide
+- All code comments are bilingual (English/中文)
+
 ## [1.0.0] - 2025-10-02
 
 ### 🎉 Initial Release

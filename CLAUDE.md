@@ -147,6 +147,7 @@ LLM 提供商接口和实现:
 - **base.go** - Model 接口 (Invoke/InvokeStream 方法)
 - **openai/openai.go** - OpenAI 实现 (GPT-4, GPT-3.5, 等)
 - **anthropic/anthropic.go** - Anthropic Claude 实现
+- **glm/glm.go** - 智谱AI GLM 实现 (GLM-4, GLM-4V, GLM-3-Turbo) ⭐ NEW
 - **ollama/ollama.go** - Ollama 本地模型实现
 
 **Model 接口**:
@@ -190,6 +191,7 @@ type Model interface {
 
 - **simple_agent/** - 基础 Agent,使用计算器工具
 - **claude_agent/** - Anthropic Claude 集成示例
+- **glm_agent/** - 智谱AI GLM 集成示例 (支持中文对话) ⭐ NEW
 - **ollama_agent/** - 本地模型支持示例
 - **team_demo/** - 多智能体协作演示
 - **workflow_demo/** - 工作流引擎演示
@@ -400,6 +402,9 @@ export OPENAI_API_KEY=sk-...
 
 # Anthropic Claude
 export ANTHROPIC_API_KEY=sk-ant-...
+
+# 智谱AI GLM (格式: {key_id}.{key_secret})
+export ZHIPUAI_API_KEY=your-key-id.your-key-secret
 
 # Ollama (本地运行,默认: http://localhost:11434)
 export OLLAMA_BASE_URL=http://localhost:11434

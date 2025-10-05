@@ -16,6 +16,12 @@ Agno-Goは統一されたインターフェースで複数のLLMプロバイダ�
 - ストリーミングサポート
 - ツール使用
 
+### GLM (智谱AI) ⭐ v1.0.2で追加
+- GLM-4、GLM-4V（ビジョン）、GLM-3-Turbo
+- 中国語に最適化
+- カスタムJWT認証
+- 関数呼び出しサポート
+
 ### Ollama
 - ローカルでモデルを実行（Llama、Mistral等）
 - プライバシー重視
@@ -162,6 +168,104 @@ func main() {
 
 ---
 
+## GLM (智谱AI)
+
+### セットアップ
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/models/glm"
+
+model, err := glm.New("glm-4", glm.Config{
+    APIKey:      os.Getenv("ZHIPUAI_API_KEY"),  // 形式: {key_id}.{key_secret}
+    Temperature: 0.7,
+    MaxTokens:   1024,
+})
+```
+
+### 設定
+
+```go
+type Config struct {
+    APIKey      string  // 必須: APIキー、形式は {key_id}.{key_secret}
+    BaseURL     string  // オプション: カスタムエンドポイント（デフォルト: https://open.bigmodel.cn/api/paas/v4）
+    Temperature float64 // オプション: 0.0-1.0
+    MaxTokens   int     // オプション: 最大応答トークン数
+    TopP        float64 // オプション: Top-pサンプリングパラメータ
+    DoSample    bool    // オプション: サンプリングを使用するか
+}
+```
+
+### サポートされているモデル
+
+| モデル | コンテキスト | 最適な用途 |
+|-------|---------|----------|
+| `glm-4` | 128K | 一般的な会話、中国語 |
+| `glm-4v` | 128K | ビジョンタスク、マルチモーダル |
+| `glm-3-turbo` | 128K | 高速応答、コスト最適化 |
+
+### APIキー形式
+
+GLMは特別なAPIキー形式を使用し、2つの部分で構成されています：
+
+```
+{key_id}.{key_secret}
+```
+
+APIキーの取得先: https://open.bigmodel.cn/
+
+### 例
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/glm"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+)
+
+func main() {
+    model, err := glm.New("glm-4", glm.Config{
+        APIKey:      os.Getenv("ZHIPUAI_API_KEY"),
+        Temperature: 0.7,
+        MaxTokens:   1024,
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    agent, _ := agent.New(agent.Config{
+        Name:         "GLM 助手",
+        Model:        model,
+        Toolkits:     []toolkit.Toolkit{calculator.New()},
+        Instructions: "你是一个有用的 AI 助手。",
+    })
+
+    // 中国語サポート
+    output, _ := agent.Run(context.Background(), "你好！请计算 123 * 456")
+    fmt.Println(output.Content)
+}
+```
+
+### 認証
+
+GLMはJWT（JSON Web Token）認証を使用します：
+
+1. APIキーが`key_id`と`key_secret`に解析されます
+2. HMAC-SHA256署名を使用してJWTトークンを生成します
+3. トークンの有効期限は7日間です
+4. リクエストごとに自動的に再生成されます
+
+これらはすべてSDKによって自動的に処理されます。
+
+---
+
 ## Ollama（ローカルモデル）
 
 ### セットアップ
@@ -239,6 +343,7 @@ func main() {
 | OpenAI GPT-4o-mini | ⚡⚡⚡ | 💰 | ☁️ クラウド | 128K |
 | OpenAI GPT-4o | ⚡⚡ | 💰💰💰 | ☁️ クラウド | 128K |
 | Anthropic Claude | ⚡⚡ | 💰💰 | ☁️ クラウド | 200K |
+| GLM-4 | ⚡⚡⚡ | 💰 | ☁️ クラウド | 128K |
 | Ollama | ⚡ | 🆓 無料 | 🏠 ローカル | 可変 |
 
 ### それぞれをいつ使用するか
@@ -257,6 +362,12 @@ func main() {
 - 長いコンテキストのニーズ（200Kトークン）
 - コーディング支援
 - 複雑な分析
+
+**GLM-4**
+- 中国語アプリケーション
+- 中国国内での展開要件
+- 高速応答と高品質
+- 中国ユーザー向けコスト最適化
 
 **Ollama**
 - プライバシー要件
@@ -281,12 +392,17 @@ claudeModel, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
     APIKey: os.Getenv("ANTHROPIC_API_KEY"),
 })
 
+// GLM
+glmModel, _ := glm.New("glm-4", glm.Config{
+    APIKey: os.Getenv("ZHIPUAI_API_KEY"),
+})
+
 // Ollama
 ollamaModel, _ := ollama.New("llama2", ollama.Config{})
 
 // 同じAgentコードを使用
 agent, _ := agent.New(agent.Config{
-    Model: openaiModel,  // または claudeModel、ollamaModel
+    Model: openaiModel,  // または claudeModel、glmModel、ollamaModel
 })
 ```
 
@@ -394,6 +510,9 @@ OPENAI_API_KEY=sk-proj-...
 # Anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 
+# GLM (智谱AI) - 形式: {key_id}.{key_secret}
+ZHIPUAI_API_KEY=your-key-id.your-key-secret
+
 # Ollama（オプション、デフォルトはlocalhost）
 OLLAMA_BASE_URL=http://localhost:11434
 ```
@@ -423,4 +542,5 @@ func init() {
 
 - [Simple Agent](/examples/simple-agent) - OpenAIの例
 - [Claude Agent](/examples/claude-agent) - Anthropicの例
+- [GLM Agent](/examples/glm-agent) - GLM (智谱AI)の例
 - [Ollama Agent](/examples/ollama-agent) - ローカルモデルの例

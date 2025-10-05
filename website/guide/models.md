@@ -16,6 +16,12 @@ Agno-Go supports multiple LLM providers with a unified interface.
 - Streaming support
 - Tool use
 
+### GLM (智谱AI) ⭐ NEW in v1.0.2
+- GLM-4, GLM-4V (vision), GLM-3-Turbo
+- Chinese language optimized
+- Custom JWT authentication
+- Function calling support
+
 ### Ollama
 - Run models locally (Llama, Mistral, etc.)
 - Privacy-first
@@ -162,6 +168,104 @@ func main() {
 
 ---
 
+## GLM (智谱AI)
+
+### Setup
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/models/glm"
+
+model, err := glm.New("glm-4", glm.Config{
+    APIKey:      os.Getenv("ZHIPUAI_API_KEY"),  // Format: {key_id}.{key_secret}
+    Temperature: 0.7,
+    MaxTokens:   1024,
+})
+```
+
+### Configuration
+
+```go
+type Config struct {
+    APIKey      string  // Required: API key in format {key_id}.{key_secret}
+    BaseURL     string  // Optional: Custom endpoint (default: https://open.bigmodel.cn/api/paas/v4)
+    Temperature float64 // Optional: 0.0-1.0
+    MaxTokens   int     // Optional: Max response tokens
+    TopP        float64 // Optional: Top-p sampling parameter
+    DoSample    bool    // Optional: Whether to use sampling
+}
+```
+
+### Supported Models
+
+| Model | Context | Best For |
+|-------|---------|----------|
+| `glm-4` | 128K | General conversation, Chinese language |
+| `glm-4v` | 128K | Vision tasks, multimodal |
+| `glm-3-turbo` | 128K | Fast responses, cost-effective |
+
+### API Key Format
+
+GLM uses a special API key format with two parts:
+
+```
+{key_id}.{key_secret}
+```
+
+Get your API key at: https://open.bigmodel.cn/
+
+### Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/glm"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+)
+
+func main() {
+    model, err := glm.New("glm-4", glm.Config{
+        APIKey:      os.Getenv("ZHIPUAI_API_KEY"),
+        Temperature: 0.7,
+        MaxTokens:   1024,
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    agent, _ := agent.New(agent.Config{
+        Name:         "GLM Assistant",
+        Model:        model,
+        Toolkits:     []toolkit.Toolkit{calculator.New()},
+        Instructions: "You are a helpful AI assistant.",
+    })
+
+    // Chinese language support
+    output, _ := agent.Run(context.Background(), "你好！请计算 123 * 456")
+    fmt.Println(output.Content)
+}
+```
+
+### Authentication
+
+GLM uses JWT (JSON Web Token) authentication:
+
+1. API key is parsed into `key_id` and `key_secret`
+2. JWT token is generated with HMAC-SHA256 signing
+3. Token is valid for 7 days
+4. Automatically regenerated for each request
+
+This is handled automatically by the SDK.
+
+---
+
 ## Ollama (Local Models)
 
 ### Setup
@@ -239,6 +343,7 @@ func main() {
 | OpenAI GPT-4o-mini | ⚡⚡⚡ | 💰 | ☁️ Cloud | 128K |
 | OpenAI GPT-4o | ⚡⚡ | 💰💰💰 | ☁️ Cloud | 128K |
 | Anthropic Claude | ⚡⚡ | 💰💰 | ☁️ Cloud | 200K |
+| GLM-4 | ⚡⚡⚡ | 💰 | ☁️ Cloud | 128K |
 | Ollama | ⚡ | 🆓 Free | 🏠 Local | Varies |
 
 ### When to Use Each
@@ -257,6 +362,12 @@ func main() {
 - Long context needs (200K tokens)
 - Coding assistance
 - Complex analysis
+
+**GLM-4**
+- Chinese language applications
+- Domestic deployment requirements
+- Fast responses with good quality
+- Cost-effective for Chinese users
 
 **Ollama**
 - Privacy requirements
@@ -281,12 +392,17 @@ claudeModel, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
     APIKey: os.Getenv("ANTHROPIC_API_KEY"),
 })
 
+// GLM
+glmModel, _ := glm.New("glm-4", glm.Config{
+    APIKey: os.Getenv("ZHIPUAI_API_KEY"),
+})
+
 // Ollama
 ollamaModel, _ := ollama.New("llama2", ollama.Config{})
 
 // Use the same agent code
 agent, _ := agent.New(agent.Config{
-    Model: openaiModel,  // or claudeModel, or ollamaModel
+    Model: openaiModel,  // or claudeModel, glmModel, or ollamaModel
 })
 ```
 
@@ -394,6 +510,9 @@ OPENAI_API_KEY=sk-proj-...
 # Anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 
+# GLM (智谱AI) - Format: {key_id}.{key_secret}
+ZHIPUAI_API_KEY=your-key-id.your-key-secret
+
 # Ollama (optional, defaults to localhost)
 OLLAMA_BASE_URL=http://localhost:11434
 ```
@@ -423,4 +542,5 @@ func init() {
 
 - [Simple Agent](/examples/simple-agent) - OpenAI example
 - [Claude Agent](/examples/claude-agent) - Anthropic example
+- [GLM Agent](/examples/glm-agent) - GLM (智谱AI) example
 - [Ollama Agent](/examples/ollama-agent) - Local model example

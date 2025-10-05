@@ -3,7 +3,7 @@
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Test Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen.svg)](docs/DEVELOPMENT.md#testing-standards)
-[![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg)](docs/CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v1.0.2-blue.svg)](CHANGELOG.md)
 
 **Agno-Go** is a high-performance multi-agent system framework built with Go. Inheriting the Agno design philosophy, it leverages Go's concurrency model and performance advantages to build efficient, scalable AI agent systems.
 
@@ -14,7 +14,7 @@
 - **🤖 Production-Ready**: AgentOS HTTP server with RESTful API, session management, and agent registry
 - **🧩 Flexible Architecture**: Agent, Team (4 modes), Workflow (5 primitives)
 - **🔧 Extensible Tools**: Easy-to-extend toolkit system with built-in tools
-- **🔌 Multi-Model Support**: OpenAI, Anthropic Claude, Ollama (local models)
+- **🔌 Multi-Model Support**: OpenAI, Anthropic Claude, GLM (智谱AI), Ollama (local models)
 - **💾 RAG Support**: ChromaDB integration with batch embeddings support
 - **✅ Well-Tested**: 80.8% test coverage, 85+ test cases, 100% pass rate
 - **📦 Easy Deployment**: Docker, Docker Compose, Kubernetes manifests included
@@ -107,19 +107,38 @@ agent, _ := agent.New(agent.Config{
 See [examples/agent_with_guardrails](cmd/examples/agent_with_guardrails) for complete examples.
 
 ### Models
-Abstraction over different LLM providers. We support 6 major providers:
+Abstraction over different LLM providers. We support 7 major providers:
 - ✅ **OpenAI** (GPT-4, GPT-3.5, etc.) - 44.6% test coverage
 - ✅ **Anthropic Claude** (Claude 3 Opus, Sonnet, Haiku) - 50.9% test coverage
+- ✅ **GLM** (智谱AI: GLM-4, GLM-4V, GLM-3-Turbo) - 57.2% test coverage ⭐ NEW
 - ✅ **Ollama** (Llama 2, Mistral, CodeLlama, all local models) - 43.8% test coverage
 - ✅ **DeepSeek** (DeepSeek-V2, DeepSeek-Coder)
 - ✅ **Google Gemini** (Gemini Pro, Flash)
 - ✅ **ModelScope** (Qwen, Yi models)
 
 ```go
+// OpenAI
 model, err := openai.New("gpt-4o-mini", openai.Config{
     APIKey:      os.Getenv("OPENAI_API_KEY"),
     Temperature: 0.7,
     MaxTokens:   1000,
+})
+
+// GLM (智谱AI) - Chinese domestic LLM
+glmModel, err := glm.New("glm-4", glm.Config{
+    APIKey:      os.Getenv("ZHIPUAI_API_KEY"), // Format: {key_id}.{key_secret}
+    Temperature: 0.7,
+    MaxTokens:   1024,
+})
+
+// Anthropic Claude
+claudeModel, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+    APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+})
+
+// Ollama (Local Models)
+ollamaModel, err := ollama.New("llama2", ollama.Config{
+    BaseURL: "http://localhost:11434",
 })
 ```
 
