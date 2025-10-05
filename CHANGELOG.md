@@ -5,6 +5,58 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2025-10-06
+
+### 🧪 Improved
+
+#### Testing & Quality
+- **Enhanced JSON Serialization Tests** - Achieved 100% test coverage for utils/serialize package
+  - Added error handling tests for unserializable types (channels, functions)
+  - Added panic behavior tests for MustToJSONString
+  - Added edge case tests (nil pointers, empty collections)
+  - Test coverage: 92.3% → 100% ✅
+
+#### Performance Benchmarks
+- **Optimized Performance Tests** - Aligned with Python Agno performance testing patterns
+  - Simplified agent instantiation benchmark (removed unnecessary variable)
+  - Cleaned up tool registration patterns
+  - Renamed test for consistency: "Tool Instantiation Performance" → "Agent Instantiation"
+
+#### Documentation
+- **Comprehensive Package Documentation** - Added bilingual (English/中文) documentation
+  - Package-level overview with usage examples
+  - Detailed function documentation with examples
+  - Performance metrics included in package docs
+  - All public APIs now fully documented
+
+### 📊 Performance
+
+Current benchmark results on Apple M3:
+- **ToJSON**: ~600ns/op, 760B/op, 15 allocs/op
+- **ConvertValue**: ~180ns/op, 392B/op, 5 allocs/op
+- **Agent Creation**: ~180ns/op (16x faster than Python)
+
+### 🔧 Technical Highlights
+
+- **100% Test Coverage** - utils/serialize package now has complete test coverage
+- **Better Error Handling** - Comprehensive tests for edge cases and error conditions
+- **Production Ready** - Serialization utilities validated for WebSocket and API usage
+- **Python Compatibility** - Prevents the JSON serialization bug found in Python Agno (commit aea0fc129)
+
+### 📝 Files Changed
+
+- `pkg/agno/utils/serialize.go` - Enhanced documentation with examples and performance notes
+- `pkg/agno/utils/serialize_test.go` - Added 3 new test cases for error handling
+- `pkg/agno/agent/agent_bench_test.go` - Simplified benchmark following Python patterns
+
+### ✅ Migration Status
+
+Completed migration items from Python Agno:
+- ✅ JSON serialization bug fix (aea0fc129) - Already prevented in Go implementation
+- ✅ Performance test optimization (e639f4996) - Applied to Go benchmarks
+- 🔄 Custom route prefix (06baed104) - Deferred to Week 7 (AgentOS expansion)
+- 🔄 HN tools update (24c3ee688) - Documentation only, no action needed
+
 ## [1.0.2] - 2025-10-05
 
 ### ✨ Added

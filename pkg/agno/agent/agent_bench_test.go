@@ -30,6 +30,9 @@ func BenchmarkAgentCreation(b *testing.B) {
 }
 
 // BenchmarkAgentCreationWithTools measures agent instantiation with tools
+// Follows Python Agno pattern: inline tool initialization for cleaner benchmarks
+// BenchmarkAgentCreationWithTools 测量带工具的 agent 实例化性能
+// 遵循 Python Agno 模式：内联工具初始化以实现更简洁的基准测试
 func BenchmarkAgentCreationWithTools(b *testing.B) {
 	model := &MockModel{}
 	calc := calculator.New()

@@ -400,3 +400,56 @@ func ExampleToJSONString() {
 	fmt.Println(jsonStr)
 	// Output: {"timestamp":"2025-10-04T12:30:45Z"}
 }
+
+// TestToJSONString_Error tests error handling in ToJSONString
+// TestToJSONString_Error 测试 ToJSONString 中的错误处理
+func TestToJSONString_Error(t *testing.T) {
+	// Create an unserialiable type (channel)
+	// 创建一个不可序列化的类型（channel）
+	ch := make(chan int)
+	input := map[string]interface{}{
+		"channel": ch,
+	}
+
+	_, err := ToJSONString(input)
+	if err == nil {
+		t.Error("Expected error for unserializable type, got nil")
+	}
+}
+
+// TestToJSON_Error tests error handling in ToJSON
+// TestToJSON_Error 测试 ToJSON 中的错误处理
+func TestToJSON_Error(t *testing.T) {
+	// Create an unserialiable type (channel)
+	// 创建一个不可序列化的类型（channel）
+	ch := make(chan int)
+	input := map[string]interface{}{
+		"channel": ch,
+	}
+
+	_, err := ToJSON(input)
+	if err == nil {
+		t.Error("Expected error for unserializable type, got nil")
+	}
+}
+
+// TestMustToJSONString_Panic tests panic behavior
+// TestMustToJSONString_Panic 测试 panic 行为
+func TestMustToJSONString_Panic(t *testing.T) {
+	// This should panic
+	// 这应该 panic
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic for unserializable type, but didn't panic")
+		}
+	}()
+
+	// Create an unserialiable type (channel)
+	// 创建一个不可序列化的类型（channel）
+	ch := make(chan int)
+	input := map[string]interface{}{
+		"channel": ch,
+	}
+
+	_ = MustToJSONString(input)
+}
