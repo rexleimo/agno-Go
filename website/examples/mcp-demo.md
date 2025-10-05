@@ -1,66 +1,52 @@
 # MCP Demo Example
 
-## Overview | 概述
+## Overview
 
 This example demonstrates how to connect to an MCP (Model Context Protocol) server and use its tools through the Agno-Go MCP client. You'll learn how to set up security validation, create transports, connect to MCP servers, and integrate MCP tools with your Agno agents.
 
-本示例演示如何连接到 MCP (模型上下文协议) 服务器并通过 Agno-Go MCP 客户端使用其工具。您将学习如何设置安全验证、创建传输、连接到 MCP 服务器以及将 MCP 工具与您的 Agno agents 集成。
-
-## You Will Learn | 你将学到
+## You Will Learn
 
 - How to create and configure security validation for MCP commands
-  - 如何为 MCP 命令创建和配置安全验证
 - How to set up stdio transport for subprocess communication
-  - 如何设置用于子进程通信的 stdio 传输
 - How to connect to an MCP server and discover available tools
-  - 如何连接到 MCP 服务器并发现可用工具
 - How to create an MCP toolkit for use with Agno agents
-  - 如何创建用于 Agno agents 的 MCP 工具包
 - How to call MCP tools directly
-  - 如何直接调用 MCP 工具
 
-## Prerequisites | 前置要求
+## Prerequisites
 
-- Go 1.21 or later | Go 1.21 或更高版本
+- Go 1.21 or later
 - An MCP server installed (e.g., calculator server)
-  - 已安装的 MCP 服务器 (例如: calculator 服务器)
 
-## Setup | 设置
+## Setup
 
-### 1. Install an MCP Server | 安装 MCP 服务器
+### 1. Install an MCP Server
 
 ```bash
 # Install uvx package manager
-# 安装 uvx 包管理器
 pip install uvx
 
 # Install the calculator MCP server
-# 安装 calculator MCP 服务器
 uvx mcp install @modelcontextprotocol/server-calculator
 
 # Verify installation
-# 验证安装
 python -m mcp_server_calculator --help
 ```
 
-### 2. Run the Example | 运行示例
+### 2. Run the Example
 
 ```bash
 # Navigate to example directory
-# 进入示例目录
 cd cmd/examples/mcp_demo
 
 # Run directly
-# 直接运行
 go run main.go
 
 # Or build and run
-# 或构建并运行
 go build -o mcp_demo
 ./mcp_demo
 ```
 
-## Complete Code | 完整代码
+## Complete Code
 
 ```go
 package main
@@ -83,7 +69,6 @@ func main() {
 	defer cancel()
 
 	// Step 1: Create security validator
-	// 步骤 1: 创建安全验证器
 	fmt.Println("Step 1: Creating security validator...")
 	validator := security.NewCommandValidator()
 
@@ -96,7 +81,6 @@ func main() {
 	fmt.Printf("✓ Command validated: %s %v\n", command, args)
 
 	// Step 2: Create transport
-	// 步骤 2: 创建传输
 	fmt.Println("Step 2: Creating transport...")
 	transport, err := client.NewStdioTransport(client.StdioConfig{
 		Command: command,
@@ -108,7 +92,6 @@ func main() {
 	fmt.Println("✓ Stdio transport created")
 
 	// Step 3: Create MCP client
-	// 步骤 3: 创建 MCP 客户端
 	fmt.Println("Step 3: Creating MCP client...")
 	mcpClient, err := client.New(transport, client.Config{
 		ClientName:    "agno-go-demo",
@@ -120,7 +103,6 @@ func main() {
 	fmt.Println("✓ MCP client created")
 
 	// Step 4: Connect to server
-	// 步骤 4: 连接到服务器
 	fmt.Println("Step 4: Connecting to MCP server...")
 	if err := mcpClient.Connect(ctx); err != nil {
 		log.Fatalf("Connection failed: %v", err)
@@ -133,7 +115,6 @@ func main() {
 	}
 
 	// Step 5: Discover tools
-	// 步骤 5: 发现工具
 	fmt.Println("Step 5: Discovering tools...")
 	tools, err := mcpClient.ListTools(ctx)
 	if err != nil {
@@ -146,7 +127,6 @@ func main() {
 	}
 
 	// Step 6: Create MCP toolkit
-	// 步骤 6: 创建 MCP 工具包
 	fmt.Println("Step 6: Creating MCP toolkit...")
 	toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
 		Client: mcpClient,
@@ -162,7 +142,6 @@ func main() {
 	fmt.Printf("  Available functions: %d\n", len(toolkit.Functions()))
 
 	// Step 7: Call a tool directly
-	// 步骤 7: 直接调用工具
 	fmt.Println("Step 7: Calling a tool...")
 	result, err := mcpClient.CallTool(ctx, "add", map[string]interface{}{
 		"a": 5,
@@ -180,9 +159,9 @@ func main() {
 }
 ```
 
-## Code Explanation | 代码解释
+## Code Explanation
 
-### 1. Security Validation | 安全验证
+### 1. Security Validation
 
 ```go
 validator := security.NewCommandValidator()
@@ -191,11 +170,11 @@ if err := validator.Validate(command, args); err != nil {
 }
 ```
 
-- Creates a security validator with default whitelist | 使用默认白名单创建安全验证器
-- Validates that the command is safe to execute | 验证命令是否安全可执行
-- Blocks dangerous shell metacharacters | 阻止危险的 shell 元字符
+- Creates a security validator with default whitelist
+- Validates that the command is safe to execute
+- Blocks dangerous shell metacharacters
 
-### 2. Stdio Transport | Stdio 传输
+### 2. Stdio Transport
 
 ```go
 transport, err := client.NewStdioTransport(client.StdioConfig{
@@ -204,11 +183,11 @@ transport, err := client.NewStdioTransport(client.StdioConfig{
 })
 ```
 
-- Creates a transport that communicates via stdin/stdout | 创建通过 stdin/stdout 通信的传输
-- Spawns the MCP server as a subprocess | 将 MCP 服务器作为子进程生成
-- Handles bidirectional JSON-RPC 2.0 messages | 处理双向 JSON-RPC 2.0 消息
+- Creates a transport that communicates via stdin/stdout
+- Spawns the MCP server as a subprocess
+- Handles bidirectional JSON-RPC 2.0 messages
 
-### 3. MCP Client | MCP 客户端
+### 3. MCP Client
 
 ```go
 mcpClient, err := client.New(transport, client.Config{
@@ -217,11 +196,11 @@ mcpClient, err := client.New(transport, client.Config{
 })
 ```
 
-- Creates an MCP client with your application identity | 使用您的应用程序标识创建 MCP 客户端
-- Manages the connection lifecycle | 管理连接生命周期
-- Provides methods for tool discovery and invocation | 提供工具发现和调用的方法
+- Creates an MCP client with your application identity
+- Manages the connection lifecycle
+- Provides methods for tool discovery and invocation
 
-### 4. Tool Discovery | 工具发现
+### 4. Tool Discovery
 
 ```go
 tools, err := mcpClient.ListTools(ctx)
@@ -230,11 +209,11 @@ for _, tool := range tools {
 }
 ```
 
-- Queries the MCP server for available tools | 查询 MCP 服务器的可用工具
-- Returns tool metadata (name, description, parameters) | 返回工具元数据(名称、描述、参数)
-- Used for dynamic tool discovery | 用于动态工具发现
+- Queries the MCP server for available tools
+- Returns tool metadata (name, description, parameters)
+- Used for dynamic tool discovery
 
-### 5. MCP Toolkit Creation | MCP 工具包创建
+### 5. MCP Toolkit Creation
 
 ```go
 toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
@@ -244,11 +223,11 @@ toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
 defer toolkit.Close()
 ```
 
-- Converts MCP tools into Agno toolkit functions | 将 MCP 工具转换为 Agno 工具包函数
-- Automatically generates function signatures from MCP schemas | 从 MCP schema 自动生成函数签名
-- Compatible with `agent.Config.Toolkits` | 与 `agent.Config.Toolkits` 兼容
+- Converts MCP tools into Agno toolkit functions
+- Automatically generates function signatures from MCP schemas
+- Compatible with `agent.Config.Toolkits`
 
-### 6. Direct Tool Call | 直接工具调用
+### 6. Direct Tool Call
 
 ```go
 result, err := mcpClient.CallTool(ctx, "add", map[string]interface{}{
@@ -258,11 +237,11 @@ result, err := mcpClient.CallTool(ctx, "add", map[string]interface{}{
 fmt.Printf("Result: %v\n", result.Content)
 ```
 
-- Calls an MCP tool directly without an agent | 直接调用 MCP 工具,无需 agent
-- Passes parameters as a map | 将参数作为 map 传递
-- Returns the result content | 返回结果内容
+- Calls an MCP tool directly without an agent
+- Passes parameters as a map
+- Returns the result content
 
-## Expected Output | 预期输出
+## Expected Output
 
 ```
 === Agno-Go MCP Demo ===
@@ -300,11 +279,9 @@ Step 7: Calling a tool...
 The MCP toolkit can now be passed to an agno Agent!
 ```
 
-## Using with Agno Agents | 与 Agno Agents 一起使用
+## Using with Agno Agents
 
 Once you have the MCP toolkit, you can use it with any Agno agent:
-
-一旦您有了 MCP 工具包,您可以将其与任何 Agno agent 一起使用:
 
 ```go
 import (
@@ -313,13 +290,11 @@ import (
 )
 
 // Create model
-// 创建模型
 model, _ := openai.New("gpt-4o-mini", openai.Config{
     APIKey: "your-api-key",
 })
 
 // Create agent with MCP toolkit
-// 使用 MCP 工具包创建 agent
 ag, _ := agent.New(agent.Config{
     Name:     "MCP Calculator Agent",
     Model:    model,
@@ -327,42 +302,31 @@ ag, _ := agent.New(agent.Config{
 })
 
 // Run agent
-// 运行 agent
 output, _ := ag.Run(context.Background(), "What is 25 * 4 + 15?")
 fmt.Println(output.Content)
 ```
 
-## Troubleshooting | 故障排除
+## Troubleshooting
 
 **Error: "command not allowed"**
 - Make sure your MCP server command is in the security whitelist
-  - 确保您的 MCP 服务器命令在安全白名单中
 - Add it with `validator.AddAllowedCommand("your-command")`
 
 **Error: "failed to start process"**
 - Verify the MCP server is installed: `python -m mcp_server_calculator --help`
-  - 验证 MCP 服务器已安装
 - Check that Python is in your PATH
-  - 检查 Python 是否在您的 PATH 中
 
 **Error: "connection timeout"**
 - The MCP server may be taking too long to start
-  - MCP 服务器可能启动时间过长
 - Increase the context timeout: `context.WithTimeout(ctx, 60*time.Second)`
-  - 增加上下文超时
 
 **Tool calls return errors**
 - Verify the tool exists: check `mcpClient.ListTools(ctx)`
-  - 验证工具是否存在
 - Ensure parameter types match the tool schema
-  - 确保参数类型与工具 schema 匹配
 
-## Next Steps | 下一步
+## Next Steps
 
-- Read the [MCP Integration Guide](../guide/mcp.md) | 阅读 [MCP 集成指南](../guide/mcp.md)
+- Read the [MCP Integration Guide](../guide/mcp.md)
 - Try connecting to other MCP servers (filesystem, git, sqlite)
-  - 尝试连接到其他 MCP 服务器 (filesystem, git, sqlite)
 - Build a custom MCP server for your use case
-  - 为您的用例构建自定义 MCP 服务器
 - Combine MCP tools with built-in Agno tools
-  - 将 MCP 工具与内置的 Agno 工具结合使用
