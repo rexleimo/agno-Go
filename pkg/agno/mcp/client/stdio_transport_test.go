@@ -15,10 +15,20 @@ func TestNewStdioTransport(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "valid config",
+			name: "valid config with validation disabled",
 			config: StdioConfig{
-				Command: "echo",
-				Args:    []string{"test"},
+				Command:         "echo",
+				Args:            []string{"test"},
+				ValidateCommand: false, // Disable validation for testing
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid config with python (whitelisted)",
+			config: StdioConfig{
+				Command:         "python",
+				Args:            []string{"-m", "test"},
+				ValidateCommand: true,
 			},
 			wantErr: false,
 		},
@@ -26,6 +36,15 @@ func TestNewStdioTransport(t *testing.T) {
 			name: "empty command",
 			config: StdioConfig{
 				Command: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "dangerous command rejected",
+			config: StdioConfig{
+				Command:         "rm",
+				Args:            []string{"-rf", "/"},
+				ValidateCommand: true,
 			},
 			wantErr: true,
 		},
@@ -55,7 +74,8 @@ func TestStdioTransport_StartStop(t *testing.T) {
 	// Use a simple command that will run and respond
 	// 使用一个简单的将运行并响应的命令
 	transport, err := NewStdioTransport(StdioConfig{
-		Command: "cat", // cat will echo back what we send
+		Command:         "cat", // cat will echo back what we send
+		ValidateCommand: false, // Disable validation for testing
 	})
 	if err != nil {
 		t.Fatalf("Failed to create transport: %v", err)
@@ -87,7 +107,8 @@ func TestStdioTransport_StartStop(t *testing.T) {
 
 func TestStdioTransport_Send_NotRunning(t *testing.T) {
 	transport, err := NewStdioTransport(StdioConfig{
-		Command: "echo",
+		Command:         "echo",
+		ValidateCommand: false,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create transport: %v", err)
@@ -107,7 +128,8 @@ func TestStdioTransport_Send_NotRunning(t *testing.T) {
 
 func TestStdioTransport_SendNotification_NotRunning(t *testing.T) {
 	transport, err := NewStdioTransport(StdioConfig{
-		Command: "echo",
+		Command:         "echo",
+		ValidateCommand: false,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create transport: %v", err)
@@ -127,7 +149,8 @@ func TestStdioTransport_SendNotification_NotRunning(t *testing.T) {
 
 func TestStdioTransport_DoubleStart(t *testing.T) {
 	transport, err := NewStdioTransport(StdioConfig{
-		Command: "cat",
+		Command:         "cat",
+		ValidateCommand: false,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create transport: %v", err)
@@ -150,7 +173,8 @@ func TestStdioTransport_DoubleStart(t *testing.T) {
 
 func TestStdioTransport_InvalidCommand(t *testing.T) {
 	transport, err := NewStdioTransport(StdioConfig{
-		Command: "nonexistent-command-12345",
+		Command:         "nonexistent-command-12345",
+		ValidateCommand: false, // Disable validation to test Start() failure
 	})
 	if err != nil {
 		t.Fatalf("Failed to create transport: %v", err)
@@ -184,7 +208,8 @@ func TestStdioTransport_SendReceive(t *testing.T) {
 
 func TestStdioTransport_ContextCancellation(t *testing.T) {
 	transport, err := NewStdioTransport(StdioConfig{
-		Command: "cat",
+		Command:         "cat",
+		ValidateCommand: false,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create transport: %v", err)

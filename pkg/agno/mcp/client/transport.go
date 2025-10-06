@@ -49,6 +49,16 @@ type StdioConfig struct {
 	// WorkingDir is the working directory for the command
 	// WorkingDir 是命令的工作目录
 	WorkingDir string
+
+	// ValidateCommand enables command validation before execution (default: true)
+	// ValidateCommand 在执行前启用命令验证（默认: true）
+	ValidateCommand bool
+
+	// AllowedCommands is a custom whitelist of allowed commands
+	// If nil, default whitelist will be used
+	// AllowedCommands 是允许的命令自定义白名单
+	// 如果为 nil，将使用默认白名单
+	AllowedCommands []string
 }
 
 // StreamCallback is called when a message is received from the transport

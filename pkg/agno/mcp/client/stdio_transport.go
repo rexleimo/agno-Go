@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rexleimo/agno-go/pkg/agno/mcp/protocol"
+	"github.com/rexleimo/agno-go/pkg/agno/mcp/security"
 )
 
 // StdioTransport implements Transport using stdin/stdout communication with a subprocess
@@ -40,13 +41,44 @@ type StdioTransport struct {
 }
 
 // NewStdioTransport creates a new stdio transport with the given configuration.
-// Returns an error if the configuration is invalid.
+// Returns an error if the configuration is invalid or command validation fails.
 //
 // NewStdioTransport 使用给定配置创建新的 stdio 传输。
-// 如果配置无效则返回错误。
+// 如果配置无效或命令验证失败则返回错误。
 func NewStdioTransport(config StdioConfig) (*StdioTransport, error) {
 	if config.Command == "" {
 		return nil, fmt.Errorf("command cannot be empty")
+	}
+
+	// Validate command if enabled
+	// By default, validation is enabled when AllowedCommands is set
+	// Or when ValidateCommand is explicitly true
+	// 如果启用则验证命令
+	// 默认情况下，当设置了 AllowedCommands 或 ValidateCommand 显式为 true 时启用验证
+	shouldValidate := config.ValidateCommand || len(config.AllowedCommands) > 0
+
+	if shouldValidate {
+		// Create validator with custom or default whitelist
+		// 使用自定义或默认白名单创建验证器
+		var validator *security.CommandValidator
+		if len(config.AllowedCommands) > 0 {
+			validator = security.NewCustomCommandValidator(
+				config.AllowedCommands,
+				security.DefaultBlockedChars(),
+			)
+		} else {
+			validator = security.NewCommandValidator()
+		}
+
+		// Create path validator
+		// 创建路径验证器
+		pathValidator := security.NewPathValidator(validator)
+
+		// Validate the command and arguments
+		// 验证命令和参数
+		if err := pathValidator.ValidateExecutable(config.Command, config.Args); err != nil {
+			return nil, fmt.Errorf("command validation failed: %w", err)
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
