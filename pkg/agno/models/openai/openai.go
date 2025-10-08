@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/rexleimo/agno-go/pkg/agno/models"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
@@ -18,11 +20,13 @@ type OpenAI struct {
 }
 
 // Config contains OpenAI-specific configuration
+// Config 包含OpenAI特定配置
 type Config struct {
 	APIKey      string
 	BaseURL     string
 	Temperature float64
 	MaxTokens   int
+	Timeout     time.Duration // Request timeout / 请求超时时间
 }
 
 // New creates a new OpenAI model instance
@@ -34,6 +38,16 @@ func New(modelID string, config Config) (*OpenAI, error) {
 	clientConfig := openai.DefaultConfig(config.APIKey)
 	if config.BaseURL != "" {
 		clientConfig.BaseURL = config.BaseURL
+	}
+
+	// Set timeout on HTTP client
+	// 在HTTP客户端上设置超时
+	timeout := config.Timeout
+	if timeout == 0 {
+		timeout = 60 * time.Second // Default 60 seconds / 默认60秒
+	}
+	clientConfig.HTTPClient = &http.Client{
+		Timeout: timeout,
 	}
 
 	return &OpenAI{

@@ -36,31 +36,79 @@ const (
 )
 
 // ExecutionContext holds the execution state and data
+// ExecutionContext 保存执行状态和数据
 type ExecutionContext struct {
 	Input    string                 `json:"input"`
 	Output   string                 `json:"output"`
 	Data     map[string]interface{} `json:"data"`
 	Metadata map[string]interface{} `json:"metadata"`
+
+	// SessionState holds session-level state that persists across steps
+	// SessionState 保存跨步骤持久化的会话级状态
+	SessionState *SessionState `json:"session_state,omitempty"`
+
+	// SessionID is the unique session identifier
+	// SessionID 是唯一的会话标识符
+	SessionID string `json:"session_id,omitempty"`
+
+	// UserID is the user identifier for multi-tenant scenarios
+	// UserID 是多租户场景的用户标识符
+	UserID string `json:"user_id,omitempty"`
 }
 
 // NewExecutionContext creates a new execution context
+// NewExecutionContext 创建新的执行上下文
 func NewExecutionContext(input string) *ExecutionContext {
 	return &ExecutionContext{
-		Input:    input,
-		Data:     make(map[string]interface{}),
-		Metadata: make(map[string]interface{}),
+		Input:        input,
+		Data:         make(map[string]interface{}),
+		Metadata:     make(map[string]interface{}),
+		SessionState: NewSessionState(),
 	}
 }
 
-// Set stores a value in the context
+// NewExecutionContextWithSession creates a new execution context with session info
+// NewExecutionContextWithSession 创建带会话信息的新执行上下文
+func NewExecutionContextWithSession(input, sessionID, userID string) *ExecutionContext {
+	return &ExecutionContext{
+		Input:        input,
+		Data:         make(map[string]interface{}),
+		Metadata:     make(map[string]interface{}),
+		SessionState: NewSessionState(),
+		SessionID:    sessionID,
+		UserID:       userID,
+	}
+}
+
+// Set stores a value in the context data
+// Set 在上下文数据中存储值
 func (ec *ExecutionContext) Set(key string, value interface{}) {
 	ec.Data[key] = value
 }
 
-// Get retrieves a value from the context
+// Get retrieves a value from the context data
+// Get 从上下文数据检索值
 func (ec *ExecutionContext) Get(key string) (interface{}, bool) {
 	val, ok := ec.Data[key]
 	return val, ok
+}
+
+// SetSessionState stores a value in the session state
+// SetSessionState 在会话状态中存储值
+func (ec *ExecutionContext) SetSessionState(key string, value interface{}) {
+	if ec.SessionState == nil {
+		ec.SessionState = NewSessionState()
+	}
+	ec.SessionState.Set(key, value)
+}
+
+// GetSessionState retrieves a value from the session state
+// GetSessionState 从会话状态检索值
+func (ec *ExecutionContext) GetSessionState(key string) (interface{}, bool) {
+	if ec.SessionState == nil {
+		return nil, false
+	}
+	return ec.SessionState.Get(key)
 }
 
 // Config contains workflow configuration

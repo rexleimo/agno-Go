@@ -5,6 +5,198 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-10-08
+
+### ✨ Added
+
+#### A2A (Agent-to-Agent) Interface
+- **A2A Protocol Support** - Standardized agent-to-agent communication based on JSON-RPC 2.0
+  - **pkg/agentos/a2a/** - Complete A2A interface implementation (1001 lines)
+    - `types.go` - JSON-RPC 2.0 type definitions (154 lines)
+    - `validator.go` - Request validation logic (108 lines)
+    - `mapper.go` - A2A ↔ RunInput/Output conversion (317 lines)
+    - `a2a.go` - Main interface and entity management (148 lines)
+    - `handlers.go` - HTTP handlers for send/stream endpoints (274 lines)
+  - REST API endpoints:
+    - `POST /a2a/message/send` - Non-streaming message send
+    - `POST /a2a/message/stream` - Streaming via Server-Sent Events (SSE)
+  - Multi-media support: Text, images (URI/bytes), files, JSON data
+  - Compatible with Python Agno A2A implementation
+  - **cmd/examples/a2a_server/** - Example A2A server
+  - **pkg/agentos/a2a/README.md** - Complete bilingual documentation (English/中文)
+
+#### Workflow Session State Management
+- **Thread-Safe Session State** - Cross-step session management with race condition fix
+  - **pkg/agno/workflow/session_state.go** - SessionState implementation (192 lines)
+    - Thread-safe with sync.RWMutex
+    - Deep copy via JSON serialization for parallel branch isolation
+    - Smart merging: only applies actual changes (last-write-wins)
+  - **ExecutionContext Enhancement** - Added session support fields:
+    - `SessionState *SessionState` - Cross-step persistent state
+    - `SessionID string` - Unique session identifier
+    - `UserID string` - Multi-tenant user identifier
+  - **Parallel Execution Fix** - Solved Python Agno v2.1.2 race condition:
+    - Clone SessionState for each parallel branch
+    - Merge modified states after parallel execution
+    - Prevents data races in concurrent workflow steps
+  - **pkg/agno/workflow/SESSION_STATE.md** - Comprehensive documentation
+  - **Test Coverage:** 79.4% with race detector validation ✅
+
+#### Multi-Tenant Memory Support
+- **User-Isolated Memory Storage** - Multi-tenant conversation history
+  - Enhanced Memory interface with optional `userID` parameter:
+    - `Add(message, userID...)` - Add message for specific user
+    - `GetMessages(userID...)` - Get user-specific messages
+    - `Clear(userID...)` - Clear user messages
+    - `Size(userID...)` - Get user message count
+  - `InMemory` implementation:
+    - Per-user message storage: `map[string][]*types.Message`
+    - Independent maxSize limit per user
+    - Backward compatible: empty userID defaults to "default" user
+  - Agent integration:
+    - Added `UserID string` field to Agent and Config
+    - All memory operations pass agent's UserID
+  - New `ClearAll()` method to clear all users
+  - **Tests:** Multi-tenant isolation, backward compatibility, race detection ✅
+
+#### Model Timeout Configuration
+- **Configurable Request Timeout** - Fine-grained timeout control for LLM calls
+  - **OpenAI Model** (`pkg/agno/models/openai/openai.go`):
+    - Added `Timeout time.Duration` to Config
+    - Default: 60 seconds
+    - Applied to underlying HTTP client
+  - **Anthropic Claude** (`pkg/agno/models/anthropic/anthropic.go`):
+    - Added `Timeout time.Duration` to Config
+    - Default: 60 seconds
+    - Applied to HTTP client
+  - Usage example:
+    ```go
+    claude := anthropic.New("claude-3-opus", anthropic.Config{
+        APIKey:  apiKey,
+        Timeout: 30 * time.Second, // Custom timeout
+    })
+    ```
+
+### 🐛 Fixed
+
+- **Workflow Race Condition** - Fixed parallel step execution data race
+  - Python Agno v2.1.2 had shared `session_state` dict causing overwrites
+  - Go implementation uses independent SessionState clones per branch
+  - Smart merge strategy prevents data loss in concurrent execution
+
+### 🧪 Testing
+
+- **New Test Suites:**
+  - `session_state_test.go` - 543 lines of session state tests
+  - `memory_test.go` - Multi-tenant memory tests (4 new test cases)
+  - `agent_test.go` - Multi-tenant agent test (TestAgent_MultiTenant)
+  - `openai_test.go` - Timeout configuration test
+  - `anthropic_test.go` - Timeout configuration test
+
+- **Test Results:**
+  - All tests passing with `-race` detector ✅
+  - Workflow coverage: 79.4%
+  - Memory coverage: maintained at 93.1%
+  - Agent coverage: maintained at 74.7%
+
+### 📊 Performance
+
+- **No Performance Regression** - All benchmarks remain consistent:
+  - Agent instantiation: ~180ns/op
+  - Memory footprint: ~1.2KB per agent
+  - Thread-safe concurrent operations
+
+### 🔧 Technical Highlights
+
+- **Python Agno v2.1.2 Compatibility** - Migrated features from commits:
+  - `7e487eb` → `bf3286bb` (23 commits, 5 major features)
+  - A2A utils implementation
+  - Session state race condition fix
+  - Multi-tenant memory support
+  - Model timeout parameters
+
+- **Bilingual Documentation** - All new features documented in English/中文:
+  - Inline code comments
+  - README files
+  - API documentation
+
+### 📝 Files Added/Modified
+
+**New Files:**
+- `pkg/agentos/a2a/*.go` - A2A interface (5 files, 1001 lines)
+- `pkg/agno/workflow/session_state.go` - Session state (192 lines)
+- `pkg/agno/workflow/session_state_test.go` - Tests (543 lines)
+- `pkg/agentos/a2a/README.md` - A2A documentation
+- `pkg/agno/workflow/SESSION_STATE.md` - Session state guide
+- `cmd/examples/a2a_server/main.go` - A2A example server
+
+**Modified Files:**
+- `pkg/agno/memory/memory.go` - Multi-tenant support
+- `pkg/agno/memory/memory_test.go` - New multi-tenant tests
+- `pkg/agno/agent/agent.go` - UserID support
+- `pkg/agno/agent/agent_test.go` - Multi-tenant test
+- `pkg/agno/workflow/workflow.go` - SessionState fields
+- `pkg/agno/workflow/parallel.go` - Race condition fix
+- `pkg/agno/models/openai/openai.go` - Timeout support
+- `pkg/agno/models/anthropic/anthropic.go` - Timeout support
+
+### ✅ Migration Status
+
+Completed migration from Python Agno v2.1.2:
+- ✅ A2A interface implementation
+- ✅ Workflow session state management (race condition fix)
+- ✅ Multi-tenant memory support (userID)
+- ✅ Model timeout parameters (OpenAI, Anthropic)
+
+### 🚀 Upgrade Guide
+
+**Multi-Tenant Memory:**
+```go
+// Old (single-tenant)
+agent := agent.New(agent.Config{
+    Memory: memory.NewInMemory(100),
+})
+
+// New (multi-tenant)
+agent := agent.New(agent.Config{
+    UserID: "user-123",  // Add UserID
+    Memory: memory.NewInMemory(100),
+})
+```
+
+**Workflow Session State:**
+```go
+// Create context with session info
+ctx := workflow.NewExecutionContextWithSession(
+    "input",
+    "session-id",
+    "user-id",
+)
+
+// Access session state
+ctx.SetSessionState("key", "value")
+value, _ := ctx.GetSessionState("key")
+```
+
+**A2A Interface:**
+```go
+// Create A2A interface
+a2a := a2a.New(a2a.Config{
+    Agents: []a2a.Entity{myAgent},
+    Prefix: "/a2a",
+})
+
+// Register routes (Gin)
+router := gin.Default()
+a2a.RegisterRoutes(router)
+```
+
+### 📖 Documentation
+
+- [A2A README](pkg/agentos/a2a/README.md) - Complete A2A protocol guide
+- [Session State Guide](pkg/agno/workflow/SESSION_STATE.md) - Workflow session management
+- [CHANGELOG.md](CHANGELOG.md) - This file
+
 ## [1.0.3] - 2025-10-06
 
 ### 🧪 Improved

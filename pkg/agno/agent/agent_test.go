@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/rexleimo/agno-go/pkg/agno/memory"
@@ -303,5 +305,99 @@ func TestAgent_WithCustomMemory(t *testing.T) {
 	messages := agent.Memory.GetMessages()
 	if len(messages) != 1 {
 		t.Errorf("Should preserve custom memory, got %d messages", len(messages))
+	}
+}
+
+// TestAgent_MultiTenant tests multi-tenant memory isolation
+// 测试多租户内存隔离
+func TestAgent_MultiTenant(t *testing.T) {
+	model := &MockModel{
+		BaseModel: models.BaseModel{ID: "test", Provider: "mock"},
+		InvokeFunc: func(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
+			// Echo back the number of messages in memory
+			return &types.ModelResponse{
+				ID:      "test-response",
+				Content: fmt.Sprintf("I see %d messages in history", len(req.Messages)),
+				Model:   "test",
+			}, nil
+		},
+	}
+
+	// Create two agents with same memory but different userIDs
+	sharedMemory := memory.NewInMemory(100)
+
+	agent1, _ := New(Config{
+		ID:     "agent1",
+		Name:   "Agent for User 1",
+		Model:  model,
+		UserID: "user1",
+		Memory: sharedMemory,
+	})
+
+	agent2, _ := New(Config{
+		ID:     "agent2",
+		Name:   "Agent for User 2",
+		Model:  model,
+		UserID: "user2",
+		Memory: sharedMemory,
+	})
+
+	// User 1 sends first message
+	output1, err := agent1.Run(context.Background(), "Hello from user1")
+	if err != nil {
+		t.Fatalf("User1 run failed: %v", err)
+	}
+
+	// When Run() is called, it gets messages BEFORE adding the assistant response
+	// So model sees: [user message] = 1 message
+	if !strings.Contains(output1.Content, "1 messages") {
+		t.Errorf("User1 model should see 1 message, got: %s", output1.Content)
+	}
+
+	// User 2 sends first message (should start fresh)
+	output2, err := agent2.Run(context.Background(), "Hello from user2")
+	if err != nil {
+		t.Fatalf("User2 run failed: %v", err)
+	}
+
+	// User 2 also sees 1 message (their user message)
+	if !strings.Contains(output2.Content, "1 messages") {
+		t.Errorf("User2 model should see 1 message in their own context, got: %s", output2.Content)
+	}
+
+	// User 1 sends second message
+	output1b, err := agent1.Run(context.Background(), "Second message from user1")
+	if err != nil {
+		t.Fatalf("User1 second run failed: %v", err)
+	}
+
+	// User 1 model should see 3 messages: [user1, assistant1, user2]
+	if !strings.Contains(output1b.Content, "3 messages") {
+		t.Errorf("User1 model should see 3 messages after second interaction, got: %s", output1b.Content)
+	}
+
+	// Verify memory isolation: user1 has 4 messages, user2 has 2 messages
+	user1Size := sharedMemory.Size("user1")
+	user2Size := sharedMemory.Size("user2")
+
+	if user1Size != 4 {
+		t.Errorf("User1 should have 4 messages in memory, got %d", user1Size)
+	}
+
+	if user2Size != 2 {
+		t.Errorf("User2 should have 2 messages in memory, got %d", user2Size)
+	}
+
+	// Clear user1's memory
+	agent1.ClearMemory()
+
+	// User1 should start fresh
+	if sharedMemory.Size("user1") != 0 {
+		t.Errorf("User1 memory should be cleared, got %d messages", sharedMemory.Size("user1"))
+	}
+
+	// User2's memory should be unaffected
+	if sharedMemory.Size("user2") != 2 {
+		t.Errorf("User2 memory should be unaffected, got %d messages", sharedMemory.Size("user2"))
 	}
 }

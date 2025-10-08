@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/rexleimo/agno-go/pkg/agno/models"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
@@ -526,4 +527,56 @@ func TestInvoke_Integration(t *testing.T) {
 
 	t.Logf("Response: %s", resp.Content)
 	t.Logf("Tokens: %d", resp.Usage.TotalTokens)
+}
+
+// TestNew_WithTimeout tests timeout configuration
+// 测试超时配置
+func TestNew_WithTimeout(t *testing.T) {
+	tests := []struct {
+		name            string
+		config          Config
+		expectedTimeout time.Duration
+	}{
+		{
+			name: "with custom timeout",
+			config: Config{
+				APIKey:  "test-key",
+				Timeout: 30 * time.Second,
+			},
+			expectedTimeout: 30 * time.Second,
+		},
+		{
+			name: "with default timeout",
+			config: Config{
+				APIKey: "test-key",
+			},
+			expectedTimeout: 60 * time.Second,
+		},
+		{
+			name: "with zero timeout gets default",
+			config: Config{
+				APIKey:  "test-key",
+				Timeout: 0,
+			},
+			expectedTimeout: 60 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model, err := New("claude-3-opus-20240229", tt.config)
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+
+			if model == nil {
+				t.Error("Expected model to be created")
+			}
+
+			// Verify the http client timeout is set correctly
+			if model.httpClient.Timeout != tt.expectedTimeout {
+				t.Errorf("HTTP client timeout = %v, want %v", model.httpClient.Timeout, tt.expectedTimeout)
+			}
+		})
+	}
 }

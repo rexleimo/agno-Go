@@ -22,6 +22,7 @@ type Agent struct {
 	Memory       memory.Memory
 	Instructions string
 	MaxLoops     int          // Maximum tool calling loops
+	UserID       string       // User ID for multi-tenant memory isolation / 多租户内存隔离的用户ID
 	PreHooks     []hooks.Hook // Hooks executed before processing input
 	PostHooks    []hooks.Hook // Hooks executed after generating output
 	logger       *slog.Logger
@@ -36,6 +37,7 @@ type Config struct {
 	Memory       memory.Memory
 	Instructions string
 	MaxLoops     int
+	UserID       string       // User ID for multi-tenant scenarios / 多租户场景的用户ID
 	PreHooks     []hooks.Hook // Hooks to execute before processing input
 	PostHooks    []hooks.Hook // Hooks to execute after generating output
 	Logger       *slog.Logger
@@ -75,14 +77,16 @@ func New(config Config) (*Agent, error) {
 		Memory:       config.Memory,
 		Instructions: config.Instructions,
 		MaxLoops:     config.MaxLoops,
+		UserID:       config.UserID,
 		PreHooks:     config.PreHooks,
 		PostHooks:    config.PostHooks,
 		logger:       config.Logger,
 	}
 
 	// Add system message if instructions provided
+	// 如果提供了指令则添加系统消息
 	if config.Instructions != "" {
-		agent.Memory.Add(types.NewSystemMessage(config.Instructions))
+		agent.Memory.Add(types.NewSystemMessage(config.Instructions), config.UserID)
 	}
 
 	return agent, nil
@@ -117,8 +121,9 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	}
 
 	// Add user message
+	// 添加用户消息
 	userMsg := types.NewUserMessage(input)
-	a.Memory.Add(userMsg)
+	a.Memory.Add(userMsg, a.UserID)
 
 	var finalResponse *types.ModelResponse
 	loopCount := 0
@@ -128,8 +133,9 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 		loopCount++
 
 		// Prepare request
+		// 准备请求
 		req := &models.InvokeRequest{
-			Messages: a.Memory.GetMessages(),
+			Messages: a.Memory.GetMessages(a.UserID),
 		}
 
 		// Add tools if available
@@ -145,12 +151,13 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 		}
 
 		// Store assistant response
+		// 存储助手响应
 		assistantMsg := &types.Message{
 			Role:      types.RoleAssistant,
 			Content:   resp.Content,
 			ToolCalls: resp.ToolCalls,
 		}
-		a.Memory.Add(assistantMsg)
+		a.Memory.Add(assistantMsg, a.UserID)
 
 		// Check if there are tool calls
 		if !resp.HasToolCalls() {
@@ -195,7 +202,7 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 
 	return &RunOutput{
 		Content:  finalResponse.Content,
-		Messages: a.Memory.GetMessages(),
+		Messages: a.Memory.GetMessages(a.UserID),
 		Metadata: map[string]interface{}{
 			"loops": loopCount,
 			"usage": finalResponse.Usage,
@@ -218,7 +225,7 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []types.ToolCall
 		if targetToolkit == nil {
 			errMsg := fmt.Sprintf("function %s not found in any toolkit", tc.Function.Name)
 			a.logger.Warn("tool not found", "function", tc.Function.Name)
-			a.Memory.Add(types.NewToolMessage(tc.ID, errMsg))
+			a.Memory.Add(types.NewToolMessage(tc.ID, errMsg), a.UserID)
 			continue
 		}
 
@@ -227,7 +234,7 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []types.ToolCall
 		if err != nil {
 			errMsg := fmt.Sprintf("failed to parse arguments: %v", err)
 			a.logger.Error("argument parsing failed", "error", err)
-			a.Memory.Add(types.NewToolMessage(tc.ID, errMsg))
+			a.Memory.Add(types.NewToolMessage(tc.ID, errMsg), a.UserID)
 			continue
 		}
 
@@ -239,7 +246,7 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []types.ToolCall
 		if fn == nil {
 			errMsg := fmt.Sprintf("function %s not found", tc.Function.Name)
 			a.logger.Error("function not found", "function", tc.Function.Name)
-			a.Memory.Add(types.NewToolMessage(tc.ID, errMsg))
+			a.Memory.Add(types.NewToolMessage(tc.ID, errMsg), a.UserID)
 			continue
 		}
 
@@ -247,7 +254,7 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []types.ToolCall
 		if err != nil {
 			errMsg := fmt.Sprintf("tool execution error: %v", err)
 			a.logger.Error("tool execution failed", "function", tc.Function.Name, "error", err)
-			a.Memory.Add(types.NewToolMessage(tc.ID, errMsg))
+			a.Memory.Add(types.NewToolMessage(tc.ID, errMsg), a.UserID)
 			continue
 		}
 
@@ -258,17 +265,19 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []types.ToolCall
 		}
 
 		a.logger.Info("tool executed successfully", "function", tc.Function.Name)
-		a.Memory.Add(types.NewToolMessage(tc.ID, resultStr))
+		a.Memory.Add(types.NewToolMessage(tc.ID, resultStr), a.UserID)
 	}
 
 	return nil
 }
 
-// ClearMemory clears the agent's conversation history
+// ClearMemory clears the agent's conversation history for this user
+// ClearMemory 清除此用户的Agent对话历史
 func (a *Agent) ClearMemory() {
-	a.Memory.Clear()
+	a.Memory.Clear(a.UserID)
 	// Re-add system message
+	// 重新添加系统消息
 	if a.Instructions != "" {
-		a.Memory.Add(types.NewSystemMessage(a.Instructions))
+		a.Memory.Add(types.NewSystemMessage(a.Instructions), a.UserID)
 	}
 }

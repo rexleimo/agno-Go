@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/rexleimo/agno-go/pkg/agno/models"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
@@ -25,11 +26,13 @@ type Anthropic struct {
 }
 
 // Config contains Anthropic-specific configuration
+// Config 包含Anthropic特定配置
 type Config struct {
 	APIKey      string
 	BaseURL     string
 	Temperature float64
 	MaxTokens   int
+	Timeout     time.Duration // Request timeout / 请求超时时间
 }
 
 // New creates a new Anthropic Claude model instance
@@ -47,14 +50,23 @@ func New(modelID string, config Config) (*Anthropic, error) {
 		config.MaxTokens = 4096
 	}
 
+	// Set default timeout if not specified
+	// 如果未指定则设置默认超时时间
+	timeout := config.Timeout
+	if timeout == 0 {
+		timeout = 60 * time.Second // Default 60 seconds / 默认60秒
+	}
+
 	return &Anthropic{
 		BaseModel: models.BaseModel{
 			ID:       modelID,
 			Provider: "anthropic",
 			Name:     modelID,
 		},
-		config:     config,
-		httpClient: &http.Client{},
+		config: config,
+		httpClient: &http.Client{
+			Timeout: timeout,
+		},
 	}, nil
 }
 
