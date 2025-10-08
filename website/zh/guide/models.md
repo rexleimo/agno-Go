@@ -445,6 +445,62 @@ model, _ := openai.New("gpt-4o-mini", openai.Config{
 })
 ```
 
+### Timeout 配置
+
+为 LLM 调用配置请求超时（默认：60 秒）：
+
+```go
+// OpenAI
+model, _ := openai.New("gpt-4o-mini", openai.Config{
+    APIKey:  os.Getenv("OPENAI_API_KEY"),
+    Timeout: 30 * time.Second,  // 自定义超时
+})
+
+// Anthropic Claude
+claude, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+    APIKey:  os.Getenv("ANTHROPIC_API_KEY"),
+    Timeout: 45 * time.Second,  // 自定义超时
+})
+```
+
+**默认超时：** 60 秒
+**最小值：** 1 秒
+**最大值：** 10 分钟（600 秒）
+
+**使用场景：**
+- **短超时（10-20秒）：** 快速查询、回退场景
+- **中等超时（30-60秒）：** 标准操作（默认）
+- **长超时（120-300秒）：** 复杂推理、大上下文
+
+**错误处理：**
+```go
+import (
+    "context"
+    "errors"
+    "time"
+)
+
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+output, err := agent.Run(ctx, input)
+if err != nil {
+    if errors.Is(err, context.DeadlineExceeded) {
+        // 处理超时错误
+        fmt.Println("请求超时")
+    } else {
+        // 处理其他错误
+        fmt.Printf("错误: %v\n", err)
+    }
+}
+```
+
+**最佳实践：**
+- 根据预期响应时间设置超时
+- 使用 context 超时进行请求级控制
+- 监控超时错误以调整设置
+- 考虑超时失败的重试逻辑
+
 ---
 
 ## 最佳实践

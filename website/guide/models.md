@@ -445,6 +445,62 @@ model, _ := openai.New("gpt-4o-mini", openai.Config{
 })
 ```
 
+### Timeout Configuration
+
+Configure request timeout for LLM calls (default: 60 seconds):
+
+```go
+// OpenAI
+model, _ := openai.New("gpt-4o-mini", openai.Config{
+    APIKey:  os.Getenv("OPENAI_API_KEY"),
+    Timeout: 30 * time.Second,  // Custom timeout
+})
+
+// Anthropic Claude
+claude, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+    APIKey:  os.Getenv("ANTHROPIC_API_KEY"),
+    Timeout: 45 * time.Second,  // Custom timeout
+})
+```
+
+**Default Timeout:** 60 seconds
+**Minimum:** 1 second
+**Maximum:** 10 minutes (600 seconds)
+
+**Use Cases:**
+- **Short timeout (10-20s):** Quick queries, fallback scenarios
+- **Medium timeout (30-60s):** Standard operations (default)
+- **Long timeout (120-300s):** Complex reasoning, large context
+
+**Error Handling:**
+```go
+import (
+    "context"
+    "errors"
+    "time"
+)
+
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+output, err := agent.Run(ctx, input)
+if err != nil {
+    if errors.Is(err, context.DeadlineExceeded) {
+        // Handle timeout error
+        fmt.Println("Request timed out")
+    } else {
+        // Handle other errors
+        fmt.Printf("Error: %v\n", err)
+    }
+}
+```
+
+**Best Practices:**
+- Set timeout based on expected response time
+- Use context timeout for request-level control
+- Monitor timeout errors to adjust settings
+- Consider retry logic for timeout failures
+
 ---
 
 ## Best Practices

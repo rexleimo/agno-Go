@@ -27,7 +27,7 @@ export default defineConfig({
           { text: 'Advanced', link: '/advanced/' },
           { text: 'Examples', link: '/examples/' },
           {
-            text: 'v1.0.2',
+            text: 'v1.1.0',
             items: [
               { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: 'Release Notes', link: '/release-notes' }
@@ -53,6 +53,7 @@ export default defineConfig({
                 { text: 'Models', link: '/guide/models' },
                 { text: 'Tools', link: '/guide/tools' },
                 { text: 'Memory', link: '/guide/memory' },
+                { text: 'Session State', link: '/guide/session-state' },
                 { text: 'MCP Integration', link: '/guide/mcp' }
               ]
             }
@@ -69,7 +70,8 @@ export default defineConfig({
                 { text: 'Tools', link: '/api/tools' },
                 { text: 'Memory', link: '/api/memory' },
                 { text: 'Types', link: '/api/types' },
-                { text: 'AgentOS Server', link: '/api/agentos' }
+                { text: 'AgentOS Server', link: '/api/agentos' },
+                { text: 'A2A Interface', link: '/api/a2a' }
               ]
             }
           ],
@@ -80,7 +82,8 @@ export default defineConfig({
                 { text: 'Architecture', link: '/advanced/architecture' },
                 { text: 'Performance', link: '/advanced/performance' },
                 { text: 'Deployment', link: '/advanced/deployment' },
-                { text: 'Testing', link: '/advanced/testing' }
+                { text: 'Testing', link: '/advanced/testing' },
+                { text: 'Multi-Tenant', link: '/advanced/multi-tenant' }
               ]
             }
           ],
@@ -121,7 +124,7 @@ export default defineConfig({
           { text: '进阶', link: '/zh/advanced/' },
           { text: '示例', link: '/zh/examples/' },
           {
-            text: 'v1.0.2',
+            text: 'v1.1.0',
             items: [
               { text: '更新日志', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: '发布说明', link: '/zh/release-notes' }
@@ -147,6 +150,7 @@ export default defineConfig({
                 { text: 'Models 模型', link: '/zh/guide/models' },
                 { text: 'Tools 工具', link: '/zh/guide/tools' },
                 { text: 'Memory 记忆', link: '/zh/guide/memory' },
+                { text: '会话状态', link: '/zh/guide/session-state' },
                 { text: 'MCP 集成', link: '/zh/guide/mcp' }
               ]
             }
@@ -163,7 +167,8 @@ export default defineConfig({
                 { text: 'Tools', link: '/zh/api/tools' },
                 { text: 'Memory', link: '/zh/api/memory' },
                 { text: 'Types', link: '/zh/api/types' },
-                { text: 'AgentOS 服务器', link: '/zh/api/agentos' }
+                { text: 'AgentOS 服务器', link: '/zh/api/agentos' },
+                { text: 'A2A 接口', link: '/zh/api/a2a' }
               ]
             }
           ],
@@ -174,7 +179,8 @@ export default defineConfig({
                 { text: '架构', link: '/zh/advanced/architecture' },
                 { text: '性能', link: '/zh/advanced/performance' },
                 { text: '部署', link: '/zh/advanced/deployment' },
-                { text: '测试', link: '/zh/advanced/testing' }
+                { text: '测试', link: '/zh/advanced/testing' },
+                { text: '多租户', link: '/zh/advanced/multi-tenant' }
               ]
             }
           ],
@@ -215,7 +221,7 @@ export default defineConfig({
           { text: '高度な内容', link: '/ja/advanced/' },
           { text: 'サンプル', link: '/ja/examples/' },
           {
-            text: 'v1.0.2',
+            text: 'v1.1.0',
             items: [
               { text: '変更履歴', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: 'リリースノート', link: '/ja/release-notes' }
@@ -241,6 +247,7 @@ export default defineConfig({
                 { text: 'Models モデル', link: '/ja/guide/models' },
                 { text: 'Tools ツール', link: '/ja/guide/tools' },
                 { text: 'Memory メモリ', link: '/ja/guide/memory' },
+                { text: 'セッション状態', link: '/ja/guide/session-state' },
                 { text: 'MCP 統合', link: '/ja/guide/mcp' }
               ]
             }
@@ -257,7 +264,8 @@ export default defineConfig({
                 { text: 'Tools', link: '/ja/api/tools' },
                 { text: 'Memory', link: '/ja/api/memory' },
                 { text: 'Types', link: '/ja/api/types' },
-                { text: 'AgentOS サーバー', link: '/ja/api/agentos' }
+                { text: 'AgentOS サーバー', link: '/ja/api/agentos' },
+                { text: 'A2A インターフェース', link: '/ja/api/a2a' }
               ]
             }
           ],
@@ -268,7 +276,8 @@ export default defineConfig({
                 { text: 'アーキテクチャ', link: '/ja/advanced/architecture' },
                 { text: 'パフォーマンス', link: '/ja/advanced/performance' },
                 { text: 'デプロイ', link: '/ja/advanced/deployment' },
-                { text: 'テスト', link: '/ja/advanced/testing' }
+                { text: 'テスト', link: '/ja/advanced/testing' },
+                { text: 'マルチテナント', link: '/ja/advanced/multi-tenant' }
               ]
             }
           ],
@@ -309,7 +318,7 @@ export default defineConfig({
           { text: '고급', link: '/ko/advanced/' },
           { text: '예제', link: '/ko/examples/' },
           {
-            text: 'v1.0.2',
+            text: 'v1.1.0',
             items: [
               { text: '변경 로그', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: '릴리스 노트', link: '/ko/release-notes' }
@@ -335,6 +344,7 @@ export default defineConfig({
                 { text: 'Models 모델', link: '/ko/guide/models' },
                 { text: 'Tools 도구', link: '/ko/guide/tools' },
                 { text: 'Memory 메모리', link: '/ko/guide/memory' },
+                { text: '세션 상태', link: '/ko/guide/session-state' },
                 { text: 'MCP 통합', link: '/ko/guide/mcp' }
               ]
             }
@@ -351,7 +361,8 @@ export default defineConfig({
                 { text: 'Tools', link: '/ko/api/tools' },
                 { text: 'Memory', link: '/ko/api/memory' },
                 { text: 'Types', link: '/ko/api/types' },
-                { text: 'AgentOS 서버', link: '/ko/api/agentos' }
+                { text: 'AgentOS 서버', link: '/ko/api/agentos' },
+                { text: 'A2A 인터페이스', link: '/ko/api/a2a' }
               ]
             }
           ],
@@ -362,7 +373,8 @@ export default defineConfig({
                 { text: '아키텍처', link: '/ko/advanced/architecture' },
                 { text: '성능', link: '/ko/advanced/performance' },
                 { text: '배포', link: '/ko/advanced/deployment' },
-                { text: '테스트', link: '/ko/advanced/testing' }
+                { text: '테스트', link: '/ko/advanced/testing' },
+                { text: '멀티 테넌트', link: '/ko/advanced/multi-tenant' }
               ]
             }
           ],
@@ -402,7 +414,7 @@ export default defineConfig({
       { text: 'Advanced', link: '/advanced/' },
       { text: 'Examples', link: '/examples/' },
       {
-        text: 'v1.0.2',
+        text: 'v1.1.0',
         items: [
           { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
           { text: 'Release Notes', link: '/release-notes' }
@@ -429,6 +441,7 @@ export default defineConfig({
             { text: 'Models', link: '/guide/models' },
             { text: 'Tools', link: '/guide/tools' },
             { text: 'Memory', link: '/guide/memory' },
+            { text: 'Session State', link: '/guide/session-state' },
             { text: 'MCP Integration', link: '/guide/mcp' }
           ]
         }
@@ -445,7 +458,8 @@ export default defineConfig({
             { text: 'Tools', link: '/api/tools' },
             { text: 'Memory', link: '/api/memory' },
             { text: 'Types', link: '/api/types' },
-            { text: 'AgentOS Server', link: '/api/agentos' }
+            { text: 'AgentOS Server', link: '/api/agentos' },
+            { text: 'A2A Interface', link: '/api/a2a' }
           ]
         }
       ],
@@ -456,7 +470,8 @@ export default defineConfig({
             { text: 'Architecture', link: '/advanced/architecture' },
             { text: 'Performance', link: '/advanced/performance' },
             { text: 'Deployment', link: '/advanced/deployment' },
-            { text: 'Testing', link: '/advanced/testing' }
+            { text: 'Testing', link: '/advanced/testing' },
+            { text: 'Multi-Tenant', link: '/advanced/multi-tenant' }
           ]
         }
       ],

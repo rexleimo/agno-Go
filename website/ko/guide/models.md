@@ -408,6 +408,90 @@ agent, _ := agent.New(agent.Config{
 
 ---
 
+## Timeout 구성
+
+### 개요
+
+모델 타임아웃 구성을 통해 LLM API 호출의 최대 대기 시간을 제어할 수 있습니다.
+
+### 지원 모델
+
+- ✅ **OpenAI** - 모든 모델
+- ✅ **Anthropic Claude** - 모든 모델
+- ⏳ **GLM** - 곧 지원 예정
+- ⏳ **Ollama** - 곧 지원 예정
+
+### 기본 설정
+
+- **기본 타임아웃**: 60초
+- **최소값**: 1초
+- **최대값**: 10분 (600초)
+
+### 사용 방법
+
+#### OpenAI
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+
+model, err := openai.New("gpt-4", openai.Config{
+    APIKey:  os.Getenv("OPENAI_API_KEY"),
+    Timeout: 30 * time.Second,  // 30초 타임아웃
+})
+```
+
+#### Anthropic Claude
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+
+model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+    APIKey:  os.Getenv("ANTHROPIC_API_KEY"),
+    Timeout: 45 * time.Second,  // 45초 타임아웃
+})
+```
+
+### 모범 사례
+
+#### 1. 사용 사례에 따라 조정
+
+```go
+// 간단한 작업: 짧은 타임아웃
+quickModel, _ := openai.New("gpt-4o-mini", openai.Config{
+    Timeout: 15 * time.Second,
+})
+
+// 복잡한 작업: 긴 타임아웃
+complexModel, _ := openai.New("gpt-4", openai.Config{
+    Timeout: 120 * time.Second,
+})
+```
+
+#### 2. 프로덕션 환경
+
+```go
+// 프로덕션 환경에서 적절한 타임아웃 설정
+prodModel, _ := openai.New("gpt-4", openai.Config{
+    APIKey:  os.Getenv("OPENAI_API_KEY"),
+    Timeout: 60 * time.Second,  // 1분
+})
+```
+
+#### 3. 오류 처리
+
+```go
+output, err := agent.Run(ctx, input)
+if err != nil {
+    if errors.Is(err, context.DeadlineExceeded) {
+        log.Println("Request timed out")
+    } else {
+        log.Printf("Request failed: %v", err)
+    }
+}
+```
+
+---
+
 ## 고급 구성
 
 ### Temperature
