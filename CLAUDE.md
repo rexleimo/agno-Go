@@ -147,7 +147,8 @@ LLM 提供商接口和实现:
 - **base.go** - Model 接口 (Invoke/InvokeStream 方法)
 - **openai/openai.go** - OpenAI 实现 (GPT-4, GPT-3.5, 等)
 - **anthropic/anthropic.go** - Anthropic Claude 实现
-- **glm/glm.go** - 智谱AI GLM 实现 (GLM-4, GLM-4V, GLM-3-Turbo) ⭐ NEW
+- **groq/groq.go** - Groq 超快速推理实现 (LLaMA 3.1, Mixtral, Gemma) ⭐ NEW
+- **glm/glm.go** - 智谱AI GLM 实现 (GLM-4, GLM-4V, GLM-3-Turbo)
 - **ollama/ollama.go** - Ollama 本地模型实现
 
 **Model 接口**:
@@ -191,7 +192,8 @@ type Model interface {
 
 - **simple_agent/** - 基础 Agent,使用计算器工具
 - **claude_agent/** - Anthropic Claude 集成示例
-- **glm_agent/** - 智谱AI GLM 集成示例 (支持中文对话) ⭐ NEW
+- **groq_agent/** - Groq 超快速推理示例 (LLaMA 3.1 8B) ⭐ NEW
+- **glm_agent/** - 智谱AI GLM 集成示例 (支持中文对话)
 - **ollama_agent/** - 本地模型支持示例
 - **team_demo/** - 多智能体协作演示
 - **workflow_demo/** - 工作流引擎演示
@@ -336,6 +338,7 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 | file | 76.2% | ✅ 良好 |
 | calculator | 75.6% | ✅ 良好 |
 | agent | 74.7% | ✅ 良好 |
+| groq | 52.4% | 🟡 需要改进 |
 | anthropic | 50.9% | 🟡 需要改进 |
 | openai | 44.6% | 🟡 需要改进 |
 | ollama | 43.8% | 🟡 需要改进 |
@@ -399,6 +402,9 @@ func BenchmarkAgentCreation(b *testing.B) {
 ```bash
 # OpenAI
 export OPENAI_API_KEY=sk-...
+
+# Groq (超快速推理,获取密钥: https://console.groq.com/keys)
+export GROQ_API_KEY=gsk-...
 
 # Anthropic Claude
 export ANTHROPIC_API_KEY=sk-ant-...
