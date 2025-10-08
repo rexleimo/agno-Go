@@ -5,6 +5,44 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2025-10-08
+
+### ✨ Added
+
+#### Groq Model Integration
+- **Groq Ultra-Fast Inference Support** - Industry-leading LLM inference speed
+  - **pkg/agno/models/groq/** - Complete Groq model implementation (287 lines)
+    - `groq.go` - Main implementation using OpenAI-compatible API
+    - `types.go` - Model constants and metadata (7+ models)
+    - `groq_test.go` - Comprehensive unit tests (580+ lines)
+    - `README.md` - Detailed documentation and examples
+  - **Supported Models:**
+    - LLaMA 3.1 8B Instant (fastest, recommended)
+    - LLaMA 3.1 70B Versatile (most capable)
+    - LLaMA 3.3 70B Versatile (latest)
+    - Mixtral 8x7B (Mixture of Experts)
+    - Gemma 2 9B (compact but powerful)
+    - Whisper Large V3 (speech recognition)
+    - LLaMA Guard 3 8B (content moderation)
+  - **Performance Benefits:**
+    - 10x faster inference vs traditional cloud LLM providers
+    - Ultra-low first-token latency
+    - High concurrent request throughput
+  - **Features:**
+    - OpenAI-compatible API (reuses go-openai SDK)
+    - Full function calling support
+    - Streaming and non-streaming modes
+    - Configurable timeout, temperature, max tokens
+  - **cmd/examples/groq_agent/** - Example program with 4 scenarios
+  - **Test Coverage:** 52.4% ✅
+  - **Documentation:** Updated CLAUDE.md with Groq configuration
+
+### 📝 Documentation
+- Added Groq to supported models list in CLAUDE.md
+- Added `GROQ_API_KEY` environment variable documentation
+- Updated example programs list with groq_agent
+- Added Groq to test coverage table
+
 ## [1.1.0] - 2025-10-08
 
 ### ✨ Added
