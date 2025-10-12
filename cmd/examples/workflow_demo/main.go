@@ -82,7 +82,7 @@ func runSequentialWorkflow(ctx context.Context, apiKey string) {
 		Steps: []workflow.Node{step1, step2, step3},
 	})
 
-	result, err := wf.Run(ctx, "The impact of renewable energy on climate change")
+	result, err := wf.Run(ctx, "The impact of renewable energy on climate change", "")
 	if err != nil {
 		log.Fatalf("Workflow failed: %v", err)
 	}
@@ -129,7 +129,7 @@ func runConditionalWorkflow(ctx context.Context, apiKey string) {
 		Steps: []workflow.Node{classifyStep, condition},
 	})
 
-	result, err := wf.Run(ctx, "Your product is amazing! I love it!")
+	result, err := wf.Run(ctx, "Your product is amazing! I love it!", "")
 	if err != nil {
 		log.Fatalf("Workflow failed: %v", err)
 	}
@@ -160,7 +160,7 @@ func runLoopWorkflow(ctx context.Context, apiKey string) {
 		Steps: []workflow.Node{loop},
 	})
 
-	result, err := wf.Run(ctx, "AI is a technology that enables machines to perform tasks that typically require human intelligence, such as learning, reasoning, problem-solving, and understanding natural language.")
+	result, err := wf.Run(ctx, "AI is a technology that enables machines to perform tasks that typically require human intelligence, such as learning, reasoning, problem-solving, and understanding natural language.", "")
 	if err != nil {
 		log.Fatalf("Workflow failed: %v", err)
 	}
@@ -188,7 +188,7 @@ func runParallelWorkflow(ctx context.Context, apiKey string) {
 		Steps: []workflow.Node{parallel},
 	})
 
-	result, err := wf.Run(ctx, "The use of facial recognition technology in public spaces")
+	result, err := wf.Run(ctx, "The use of facial recognition technology in public spaces", "")
 	if err != nil {
 		log.Fatalf("Workflow failed: %v", err)
 	}
@@ -239,10 +239,10 @@ func runComplexWorkflow(ctx context.Context, apiKey string) {
 	})
 
 	// Test with calculation
-	result1, _ := wf.Run(ctx, "What is 25 * 4 + 100?")
+	result1, _ := wf.Run(ctx, "What is 25 * 4 + 100?", "")
 	fmt.Printf("Calculation result: %s\n", result1.Output)
 
 	// Test with general question
-	result2, _ := wf.Run(ctx, "What is the capital of France?")
+	result2, _ := wf.Run(ctx, "What is the capital of France?", "")
 	fmt.Printf("General result: %s\n", result2.Output)
 }

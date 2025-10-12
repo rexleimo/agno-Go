@@ -22,7 +22,7 @@ type RunInput struct {
 }
 
 // RunOutput represents Agno's internal run output format
-// RunOutput 表示 Agno 的内部运行输出格式  
+// RunOutput 表示 Agno 的内部运行输出格式
 type RunOutput struct {
 	Content   string                 `json:"content"`
 	Images    []Image                `json:"images,omitempty"`

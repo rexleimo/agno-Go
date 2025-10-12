@@ -269,6 +269,22 @@ func (s *WorkflowSession) CountSuccessfulRuns() int {
 	return count
 }
 
+// CountFailedRuns returns the number of failed runs
+// CountFailedRuns 返回失败运行的数量
+func (s *WorkflowSession) CountFailedRuns() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	count := 0
+	for _, run := range s.Runs {
+		if run.Status == RunStatusFailed {
+			count++
+		}
+	}
+
+	return count
+}
+
 // Clear removes all runs from the session
 // Clear 移除会话中的所有运行
 func (s *WorkflowSession) Clear() {

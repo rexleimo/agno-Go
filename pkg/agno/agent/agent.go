@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/rexleimo/agno-go/pkg/agno/hooks"
 	"github.com/rexleimo/agno-go/pkg/agno/memory"
@@ -26,6 +27,11 @@ type Agent struct {
 	PreHooks     []hooks.Hook // Hooks executed before processing input
 	PostHooks    []hooks.Hook // Hooks executed after generating output
 	logger       *slog.Logger
+
+	// Temporary instructions support for workflow history injection
+	// 临时 instructions 支持,用于工作流历史注入
+	tempInstructions string       // Temporary instructions (single execution only) / 临时指令（仅单次执行）
+	instructionsMu   sync.RWMutex // Protects instructions modification / 保护指令修改
 }
 
 // Config contains agent configuration
@@ -101,9 +107,17 @@ type RunOutput struct {
 
 // Run executes the agent with the given input
 func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
+	// Ensure temporary instructions are cleared after execution (even on early return)
+	// 确保执行完成后清除临时指令（即使提前返回）
+	defer a.ClearTempInstructions()
+
 	if input == "" {
 		return nil, types.NewInvalidInputError("input cannot be empty", nil)
 	}
+
+	// Get current instructions at execution start (temporary or permanent)
+	// 在执行开始时获取当前指令（临时或永久）
+	currentInstructions := a.GetInstructions()
 
 	a.logger.Info("agent run started", "agent_id", a.ID, "input", input)
 
@@ -132,10 +146,20 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	for loopCount < a.MaxLoops {
 		loopCount++
 
-		// Prepare request
-		// 准备请求
+		// Prepare request with current instructions
+		// 使用当前指令准备请求
+		messages := a.Memory.GetMessages(a.UserID)
+
+		// If using temporary instructions, update system message
+		// 如果使用临时指令，更新系统消息
+		if currentInstructions != a.Instructions && currentInstructions != "" {
+			// Replace or prepend system message with current instructions
+			// 用当前指令替换或添加系统消息
+			messages = a.updateSystemMessage(messages, currentInstructions)
+		}
+
 		req := &models.InvokeRequest{
-			Messages: a.Memory.GetMessages(a.UserID),
+			Messages: messages,
 		}
 
 		// Add tools if available
@@ -280,4 +304,85 @@ func (a *Agent) ClearMemory() {
 	if a.Instructions != "" {
 		a.Memory.Add(types.NewSystemMessage(a.Instructions), a.UserID)
 	}
+}
+
+// GetID returns the agent ID
+// GetID 返回 agent ID
+func (a *Agent) GetID() string {
+	return a.ID
+}
+
+// GetInstructions returns the current instructions (temporary or permanent)
+// GetInstructions 返回当前指令（临时或永久）
+func (a *Agent) GetInstructions() string {
+	a.instructionsMu.RLock()
+	defer a.instructionsMu.RUnlock()
+
+	// Temporary instructions take precedence
+	// 临时指令优先
+	if a.tempInstructions != "" {
+		return a.tempInstructions
+	}
+	return a.Instructions
+}
+
+// SetInstructions permanently sets the agent's instructions
+// SetInstructions 永久设置 agent 的指令
+func (a *Agent) SetInstructions(instructions string) {
+	a.instructionsMu.Lock()
+	defer a.instructionsMu.Unlock()
+
+	a.Instructions = instructions
+}
+
+// SetTempInstructions temporarily sets instructions (only affects next Run)
+// SetTempInstructions 临时设置指令（仅影响下一次 Run）
+func (a *Agent) SetTempInstructions(instructions string) {
+	a.instructionsMu.Lock()
+	defer a.instructionsMu.Unlock()
+
+	a.tempInstructions = instructions
+}
+
+// ClearTempInstructions clears temporary instructions
+// ClearTempInstructions 清除临时指令
+func (a *Agent) ClearTempInstructions() {
+	a.instructionsMu.Lock()
+	defer a.instructionsMu.Unlock()
+
+	a.tempInstructions = ""
+}
+
+// updateSystemMessage updates or adds system message with new instructions
+// updateSystemMessage 更新或添加带有新指令的系统消息
+func (a *Agent) updateSystemMessage(messages []*types.Message, instructions string) []*types.Message {
+	if len(messages) == 0 {
+		return []*types.Message{types.NewSystemMessage(instructions)}
+	}
+
+	// Create a copy to avoid modifying the original
+	// 创建副本以避免修改原始消息
+	result := make([]*types.Message, 0, len(messages)+1)
+
+	// Check if first message is system message
+	// 检查第一条消息是否为系统消息
+	systemMessageFound := false
+	for i, msg := range messages {
+		if i == 0 && msg.Role == types.RoleSystem {
+			// Replace first system message
+			// 替换第一条系统消息
+			result = append(result, types.NewSystemMessage(instructions))
+			systemMessageFound = true
+		} else {
+			result = append(result, msg)
+		}
+	}
+
+	// If no system message found, prepend one
+	// 如果没有找到系统消息，添加一个到开头
+	if !systemMessageFound {
+		result = append([]*types.Message{types.NewSystemMessage(instructions)}, result...)
+	}
+
+	return result
 }

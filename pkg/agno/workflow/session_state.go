@@ -42,7 +42,7 @@ func (ss *SessionState) Get(key string) (interface{}, bool) {
 func (ss *SessionState) GetAll() map[string]interface{} {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	
+
 	copy := make(map[string]interface{}, len(ss.data))
 	for k, v := range ss.data {
 		copy[k] = v
@@ -71,7 +71,7 @@ func (ss *SessionState) Clear() {
 func (ss *SessionState) Clone() *SessionState {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	
+
 	cloned := NewSessionState()
 	for k, v := range ss.data {
 		// Deep copy using JSON serialization
@@ -83,16 +83,16 @@ func (ss *SessionState) Clone() *SessionState {
 			cloned.data[k] = v
 			continue
 		}
-		
+
 		var clonedValue interface{}
 		if err := json.Unmarshal(jsonBytes, &clonedValue); err != nil {
 			cloned.data[k] = v
 			continue
 		}
-		
+
 		cloned.data[k] = clonedValue
 	}
-	
+
 	return cloned
 }
 
@@ -104,13 +104,13 @@ func (ss *SessionState) Merge(other *SessionState) {
 	if other == nil {
 		return
 	}
-	
+
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
-	
+
 	other.mu.RLock()
 	defer other.mu.RUnlock()
-	
+
 	for k, v := range other.data {
 		ss.data[k] = v
 	}
@@ -124,18 +124,18 @@ func MergeParallelSessionStates(original *SessionState, modified []*SessionState
 	if original == nil {
 		original = NewSessionState()
 	}
-	
+
 	// Create a new session state for the merged result
 	// 为合并结果创建新的会话状态
 	merged := original.Clone()
-	
+
 	// Merge each modified state
 	// 合并每个修改的状态
 	for _, modifiedState := range modified {
 		if modifiedState == nil {
 			continue
 		}
-		
+
 		// Get all changes from this parallel branch
 		// 获取此并行分支的所有变更
 		modifiedState.mu.RLock()
@@ -143,7 +143,7 @@ func MergeParallelSessionStates(original *SessionState, modified []*SessionState
 			// Check if this is a new key or changed value
 			// 检查这是否是新键或已更改的值
 			originalValue, existsInOriginal := original.Get(key)
-			
+
 			// If key doesn't exist in original or value changed, apply it
 			// 如果键在原始状态中不存在或值已更改，则应用它
 			if !existsInOriginal || !deepEqual(originalValue, value) {
@@ -152,7 +152,7 @@ func MergeParallelSessionStates(original *SessionState, modified []*SessionState
 		}
 		modifiedState.mu.RUnlock()
 	}
-	
+
 	return merged
 }
 
@@ -163,11 +163,11 @@ func deepEqual(a, b interface{}) bool {
 	// 对于简单比较，我们使用JSON序列化
 	aBytes, aErr := json.Marshal(a)
 	bBytes, bErr := json.Marshal(b)
-	
+
 	if aErr != nil || bErr != nil {
 		return false
 	}
-	
+
 	return string(aBytes) == string(bBytes)
 }
 

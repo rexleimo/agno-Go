@@ -74,7 +74,7 @@ func (a *A2AInterface) HandleSendMessage(c *gin.Context) {
 	// 将结果转换为 RunOutput
 	runOutput, err := convertResultToRunOutput(result)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, errorResponse(req.ID, InternalError, 
+		c.JSON(http.StatusInternalServerError, errorResponse(req.ID, InternalError,
 			fmt.Sprintf("failed to convert result: %v", err)))
 		return
 	}
@@ -180,14 +180,14 @@ func (a *A2AInterface) HandleStreamMessage(c *gin.Context) {
 	// Map to task and send completion event
 	// 映射到任务并发送完成事件
 	task := MapRunOutputToTask(runOutput, &req.Params.Message)
-	
+
 	completionEvent := TaskStatusUpdate{
 		TaskID:    task.ID,
 		ContextID: task.ContextID,
 		Status:    TaskStatusCompleted,
 		Message:   &task.History[len(task.History)-1], // Last message is agent's response
 	}
-	
+
 	sendSSEEvent(c.Writer, "task_completed", completionEvent)
 	c.Writer.Flush()
 }

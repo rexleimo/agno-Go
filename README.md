@@ -175,6 +175,38 @@ Manages conversation history with automatic truncation.
 memory := memory.NewInMemory(100) // Keep last 100 messages
 ```
 
+### Workflow History
+
+Enable multi-turn conversations by maintaining context across workflow runs. Each session independently stores its history, automatically injected into agents.
+
+```go
+// Create workflow with history enabled
+storage := workflow.NewMemoryStorage(100)
+wf, _ := workflow.New(workflow.Config{
+    ID:                "chat-workflow",
+    EnableHistory:     true,           // Enable history
+    HistoryStore:      storage,        // History storage
+    NumHistoryRuns:    5,              // Remember last 5 runs
+    AddHistoryToSteps: true,           // Auto-inject to steps
+    Steps:             []workflow.Node{chatStep},
+})
+
+// Multi-turn conversation with memory
+result1, _ := wf.Run(ctx, "Hello, my name is Alice", "session-123")
+// Assistant: Hello Alice! Nice to meet you.
+
+result2, _ := wf.Run(ctx, "What's my name?", "session-123")
+// Assistant: Your name is Alice!  (remembers from previous run)
+```
+
+**Features**:
+- 🔒 **Session Isolation**: Each session has independent history
+- ⚡ **High Performance**: <0.2ms overhead for 100 history entries
+- 🛡️ **Safe Injection**: Uses temporary instructions, doesn't modify agent config
+- 🔧 **Flexible Control**: Configure per-workflow or per-step
+
+📖 [Complete Documentation](docs/WORKFLOW_HISTORY.md) | [Examples](cmd/examples/workflow_history)
+
 ## 🛠️ Built-in Tools
 
 Following KISS principle, we provide essential tools with high quality:

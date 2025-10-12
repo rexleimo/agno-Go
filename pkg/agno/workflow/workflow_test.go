@@ -111,7 +111,7 @@ func TestWorkflow_Run(t *testing.T) {
 		Steps: []Node{step1, step2},
 	})
 
-	result, err := wf.Run(context.Background(), "start")
+	result, err := wf.Run(context.Background(), "start", "")
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -145,7 +145,7 @@ func TestWorkflow_RunEmptyInput(t *testing.T) {
 		Steps: []Node{step1},
 	})
 
-	_, err := wf.Run(context.Background(), "")
+	_, err := wf.Run(context.Background(), "", "")
 	if err == nil {
 		t.Error("Run() with empty input should return error")
 	}
@@ -453,7 +453,7 @@ func TestComplexWorkflow(t *testing.T) {
 	})
 
 	// Test false branch (parallel)
-	result, err := wf.Run(context.Background(), "test")
+	result, err := wf.Run(context.Background(), "test", "")
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
