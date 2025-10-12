@@ -464,5 +464,5 @@ For complete example code, refer to:
 
 ---
 
-**版本 / Version**: v1.1.0
+**版本 / Version**: v1.2.0
 **最后更新 / Last Updated**: 2025-10-12

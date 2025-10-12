@@ -3,7 +3,7 @@
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Test Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen.svg)](docs/DEVELOPMENT.md#testing-standards)
-[![Release](https://img.shields.io/badge/release-v1.0.2-blue.svg)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v1.2.0-blue.svg)](CHANGELOG.md)
 
 **Agno-Go** is a high-performance multi-agent system framework built with Go. Inheriting the Agno design philosophy, it leverages Go's concurrency model and performance advantages to build efficient, scalable AI agent systems.
 

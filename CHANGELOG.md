@@ -5,9 +5,28 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2025-10-12
 
 ### ✨ Added
+
+#### Workflow Session Storage (S005)
+- **In-Memory Session Management** - Complete workflow session lifecycle management
+  - **pkg/agno/workflow/memory_storage.go** - MemoryStorage implementation (393 lines)
+    - Session creation, retrieval, updating, deletion
+    - Concurrent-safe with sync.RWMutex
+    - Configurable max sessions limit
+    - Automatic session pruning
+  - **pkg/agno/workflow/session.go** - WorkflowSession structure (300 lines)
+    - Session metadata and run history
+    - History retrieval with flexible count
+    - Statistics tracking (total/completed/success/failed runs)
+  - **pkg/agno/workflow/run.go** - WorkflowRun structure (158 lines)
+    - Individual run execution tracking
+    - Input/output/error recording
+    - Timestamp and status management
+  - **pkg/agno/workflow/storage.go** - WorkflowStorage interface (141 lines)
+    - Abstract storage interface for extensibility
+    - Support for custom storage implementations (Redis, PostgreSQL, etc.)
 
 #### Workflow History Injection (S008)
 - **Agent Temporary Instructions Support** - Enable history context injection without modifying agent's original configuration

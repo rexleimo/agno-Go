@@ -27,7 +27,7 @@ export default defineConfig({
           { text: 'Advanced', link: '/advanced/' },
           { text: 'Examples', link: '/examples/' },
           {
-            text: 'v1.1.0',
+            text: 'v1.2.0',
             items: [
               { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: 'Release Notes', link: '/release-notes' }
@@ -50,6 +50,7 @@ export default defineConfig({
                 { text: 'Agent', link: '/guide/agent' },
                 { text: 'Team', link: '/guide/team' },
                 { text: 'Workflow', link: '/guide/workflow' },
+                { text: 'Workflow History', link: '/guide/workflow-history' },
                 { text: 'Models', link: '/guide/models' },
                 { text: 'Tools', link: '/guide/tools' },
                 { text: 'Memory', link: '/guide/memory' },
@@ -124,7 +125,7 @@ export default defineConfig({
           { text: '进阶', link: '/zh/advanced/' },
           { text: '示例', link: '/zh/examples/' },
           {
-            text: 'v1.1.0',
+            text: 'v1.2.0',
             items: [
               { text: '更新日志', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: '发布说明', link: '/zh/release-notes' }
@@ -147,6 +148,7 @@ export default defineConfig({
                 { text: 'Agent 智能体', link: '/zh/guide/agent' },
                 { text: 'Team 团队', link: '/zh/guide/team' },
                 { text: 'Workflow 工作流', link: '/zh/guide/workflow' },
+                { text: 'Workflow 历史管理', link: '/zh/guide/workflow-history' },
                 { text: 'Models 模型', link: '/zh/guide/models' },
                 { text: 'Tools 工具', link: '/zh/guide/tools' },
                 { text: 'Memory 记忆', link: '/zh/guide/memory' },
@@ -221,7 +223,7 @@ export default defineConfig({
           { text: '高度な内容', link: '/ja/advanced/' },
           { text: 'サンプル', link: '/ja/examples/' },
           {
-            text: 'v1.1.0',
+            text: 'v1.2.0',
             items: [
               { text: '変更履歴', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: 'リリースノート', link: '/ja/release-notes' }
@@ -244,6 +246,7 @@ export default defineConfig({
                 { text: 'Agent エージェント', link: '/ja/guide/agent' },
                 { text: 'Team チーム', link: '/ja/guide/team' },
                 { text: 'Workflow ワークフロー', link: '/ja/guide/workflow' },
+                { text: 'Workflow 履歴管理', link: '/ja/guide/workflow-history' },
                 { text: 'Models モデル', link: '/ja/guide/models' },
                 { text: 'Tools ツール', link: '/ja/guide/tools' },
                 { text: 'Memory メモリ', link: '/ja/guide/memory' },
@@ -318,7 +321,7 @@ export default defineConfig({
           { text: '고급', link: '/ko/advanced/' },
           { text: '예제', link: '/ko/examples/' },
           {
-            text: 'v1.1.0',
+            text: 'v1.2.0',
             items: [
               { text: '변경 로그', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: '릴리스 노트', link: '/ko/release-notes' }
@@ -341,6 +344,7 @@ export default defineConfig({
                 { text: 'Agent 에이전트', link: '/ko/guide/agent' },
                 { text: 'Team 팀', link: '/ko/guide/team' },
                 { text: 'Workflow 워크플로우', link: '/ko/guide/workflow' },
+                { text: 'Workflow 히스토리 관리', link: '/ko/guide/workflow-history' },
                 { text: 'Models 모델', link: '/ko/guide/models' },
                 { text: 'Tools 도구', link: '/ko/guide/tools' },
                 { text: 'Memory 메모리', link: '/ko/guide/memory' },
@@ -414,7 +418,7 @@ export default defineConfig({
       { text: 'Advanced', link: '/advanced/' },
       { text: 'Examples', link: '/examples/' },
       {
-        text: 'v1.1.0',
+        text: 'v1.2.0',
         items: [
           { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
           { text: 'Release Notes', link: '/release-notes' }
@@ -438,6 +442,7 @@ export default defineConfig({
             { text: 'Agent', link: '/guide/agent' },
             { text: 'Team', link: '/guide/team' },
             { text: 'Workflow', link: '/guide/workflow' },
+            { text: 'Workflow History', link: '/guide/workflow-history' },
             { text: 'Models', link: '/guide/models' },
             { text: 'Tools', link: '/guide/tools' },
             { text: 'Memory', link: '/guide/memory' },
