@@ -507,20 +507,28 @@ func (a *Agent) scrubRunOutputWithContext(output *RunOutput, initialMessageCount
 
 	// Filter tool messages first (order matters!) / 先过滤工具消息（顺序很重要！）
 	if !a.storeToolMessages {
-		output.Messages = a.filterToolMessages(output.Messages)
-		// Update initialMessageCount if it was affected by tool message filtering
-		// 如果工具消息过滤影响了初始消息数，需要调整
-		if initialMessageCount > 0 {
-			removed := initialCount - len(output.Messages)
-			if removed > 0 {
-				// Estimate how many removed were from history / 估算有多少被移除的是历史消息
-				if initialMessageCount > removed {
-					initialMessageCount = initialMessageCount - removed
-				} else {
-					initialMessageCount = 0
+		// Count tool messages in history (before filtering) to adjust initialMessageCount
+		// 计算历史消息中的工具消息数量（在过滤之前），以便调整 initialMessageCount
+		toolMessagesInHistory := 0
+		if initialMessageCount > 0 && initialMessageCount <= len(output.Messages) {
+			for i := 0; i < initialMessageCount; i++ {
+				if output.Messages[i].Role == types.RoleTool {
+					toolMessagesInHistory++
 				}
 			}
 		}
+
+		output.Messages = a.filterToolMessages(output.Messages)
+
+		// Adjust initialMessageCount by removing count of tool messages that were in history
+		// 调整 initialMessageCount，减去历史中的工具消息数量
+		if toolMessagesInHistory > 0 {
+			initialMessageCount -= toolMessagesInHistory
+			if initialMessageCount < 0 {
+				initialMessageCount = 0
+			}
+		}
+
 		initialCount = len(output.Messages)
 	}
 
