@@ -175,6 +175,36 @@ Manages conversation history with automatic truncation.
 memory := memory.NewInMemory(100) // Keep last 100 messages
 ```
 
+### Storage Control
+
+Control which messages are stored in Agent outputs:
+
+```go
+// Don't store tool messages (tool calls and tool responses)
+storeToolMessages := false
+agent, _ := agent.New(agent.Config{
+    Name:              "agent",
+    Model:             model,
+    Toolkits:          []toolkit.Toolkit{calculator.New()},
+    StoreToolMessages: &storeToolMessages, // Filter tool messages
+})
+
+// Don't store history messages (only keep current Run messages)
+storeHistoryMessages := false
+agent, _ := agent.New(agent.Config{
+    Name:                 "agent",
+    Model:                model,
+    StoreHistoryMessages: &storeHistoryMessages, // Only current messages
+})
+```
+
+**Use Cases:**
+- `StoreToolMessages=false`: Privacy-sensitive scenarios, hide tool call details
+- `StoreHistoryMessages=false`: Stateless scenarios, each Run is independent
+- Combined: Minimal storage for logging and audit purposes
+
+See [storage_control example](cmd/examples/storage_control) for complete examples.
+
 ### Workflow History
 
 Enable multi-turn conversations by maintaining context across workflow runs. Each session independently stores its history, automatically injected into agents.

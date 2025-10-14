@@ -675,6 +675,48 @@ ag, _ := agent.New(agent.Config{
 })
 ```
 
+### 5. Storage Control
+
+控制哪些消息被存储到 Agent 的输出中：
+
+```go
+// 不存储工具消息（tool calls 和 tool responses）
+storeToolMessages := false
+ag1, _ := agent.New(agent.Config{
+    Name:              "agent",
+    Model:             model,
+    Toolkits:          []toolkit.Toolkit{calculator.New()},
+    StoreToolMessages: &storeToolMessages, // 过滤工具消息
+})
+
+// 不存储历史消息（只保留当前 Run 的消息）
+storeHistoryMessages := false
+ag2, _ := agent.New(agent.Config{
+    Name:                 "agent",
+    Model:                model,
+    StoreHistoryMessages: &/, // 只保留当前消息
+})
+
+// 最小存储（同时禁用工具消息和历史消息）
+storeTools := false
+storeHistory := false
+ag3, _ := agent.New(agent.Config{
+    Name:                 "agent",
+    Model:                model,
+    StoreToolMessages:    &storeTools,    // 不存储工具消息
+    StoreHistoryMessages: &storeHistory,  // 不存储历史消息
+})
+```
+
+**使用场景：**
+- `StoreToolMessages=false`: 适用于隐私敏感场景，不想暴露工具调用细节
+- `StoreHistoryMessages=false`: 适用于无状态场景，每次 Run 独立处理
+- 两者结合: 最小化存储，适用于日志记录或审计需求
+
+**注意：** 默认情况下（`nil` 或 `true`），所有消息都会被存储。
+
+更多示例请参考 [storage_control 示例](../cmd/examples/storage_control/main.go)。
+
 ## Quick Reference
 
 ### Common Imports

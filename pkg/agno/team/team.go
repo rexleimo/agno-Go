@@ -25,6 +25,11 @@ type Team struct {
 	logger      *slog.Logger
 	mu          sync.RWMutex
 	taskResults map[string]*TaskResult
+
+	// Storage control flags
+	// 注意: 这些标志由各个 Agent 在其 Run() 方法中处理
+	storeToolMessages    bool // 是否存储工具消息
+	storeHistoryMessages bool // 是否存储历史消息
 }
 
 // TeamMode defines how agents collaborate
@@ -52,6 +57,12 @@ type Config struct {
 	PreHooks  []hooks.Hook // Hooks to execute before processing input
 	PostHooks []hooks.Hook // Hooks to execute after generating output
 	Logger    *slog.Logger
+
+	// Storage control flags (nil means use default: true)
+	// 注意: Team 通过调用 Agent.Run() 工作，各个 Agent 已经实现了存储控制
+	// 这些字段主要用于保持 API 一致性和未来扩展
+	StoreToolMessages    *bool // 是否存储工具消息（由各个 Agent 处理）
+	StoreHistoryMessages *bool // 是否存储历史消息（由各个 Agent 处理）
 }
 
 // TaskResult holds the result of an agent's task execution
@@ -92,17 +103,27 @@ func New(config Config) (*Team, error) {
 		return nil, types.NewInvalidConfigError("leader_follower mode requires a leader agent", nil)
 	}
 
+	// Helper function to handle nil bool pointers with default value
+	boolOrDefault := func(ptr *bool, defaultVal bool) bool {
+		if ptr == nil {
+			return defaultVal
+		}
+		return *ptr
+	}
+
 	return &Team{
-		ID:          config.ID,
-		Name:        config.Name,
-		Agents:      config.Agents,
-		Leader:      config.Leader,
-		Mode:        config.Mode,
-		MaxRounds:   config.MaxRounds,
-		PreHooks:    config.PreHooks,
-		PostHooks:   config.PostHooks,
-		logger:      config.Logger,
-		taskResults: make(map[string]*TaskResult),
+		ID:                   config.ID,
+		Name:                 config.Name,
+		Agents:               config.Agents,
+		Leader:               config.Leader,
+		Mode:                 config.Mode,
+		MaxRounds:            config.MaxRounds,
+		PreHooks:             config.PreHooks,
+		PostHooks:            config.PostHooks,
+		logger:               config.Logger,
+		taskResults:          make(map[string]*TaskResult),
+		storeToolMessages:    boolOrDefault(config.StoreToolMessages, true),
+		storeHistoryMessages: boolOrDefault(config.StoreHistoryMessages, true),
 	}, nil
 }
 
@@ -125,7 +146,13 @@ func (t *Team) Run(ctx context.Context, input string) (*RunOutput, error) {
 		return nil, types.NewInvalidInputError("input cannot be empty", nil)
 	}
 
-	t.logger.Info("team run started", "team_id", t.ID, "mode", t.Mode, "agents", len(t.Agents))
+	t.logger.Info("team run started",
+		"team_id", t.ID,
+		"mode", t.Mode,
+		"agents", len(t.Agents),
+		"store_tool_messages", t.storeToolMessages,
+		"store_history_messages", t.storeHistoryMessages,
+	)
 
 	// Execute pre-hooks
 	if len(t.PreHooks) > 0 {

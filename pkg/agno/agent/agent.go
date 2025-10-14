@@ -28,6 +28,10 @@ type Agent struct {
 	PostHooks    []hooks.Hook // Hooks executed after generating output
 	logger       *slog.Logger
 
+	// Storage control / 存储控制
+	storeToolMessages    bool // Whether to store tool messages in RunOutput / 是否在 RunOutput 中存储工具消息
+	storeHistoryMessages bool // Whether to store history messages in RunOutput / 是否在 RunOutput 中存储历史消息
+
 	// Temporary instructions support for workflow history injection
 	// 临时 instructions 支持,用于工作流历史注入
 	tempInstructions string       // Temporary instructions (single execution only) / 临时指令（仅单次执行）
@@ -47,6 +51,19 @@ type Config struct {
 	PreHooks     []hooks.Hook // Hooks to execute before processing input
 	PostHooks    []hooks.Hook // Hooks to execute after generating output
 	Logger       *slog.Logger
+
+	// Storage control flags (nil means use default: true) / 存储控制标志 (nil 表示使用默认值: true)
+	// StoreToolMessages controls whether tool-related messages are included in RunOutput.
+	// When false, tool messages and tool-related fields are filtered from output.
+	// StoreToolMessages 控制是否在 RunOutput 中包含工具相关消息
+	// 当为 false 时，工具消息和工具相关字段会从输出中过滤
+	StoreToolMessages *bool
+
+	// StoreHistoryMessages controls whether historical messages (from Memory) are included in RunOutput.
+	// When false, only messages generated during the current Run are included.
+	// StoreHistoryMessages 控制是否在 RunOutput 中包含历史消息(来自 Memory)
+	// 当为 false 时，仅包含当前 Run 生成的消息
+	StoreHistoryMessages *bool
 }
 
 // New creates a new agent
@@ -75,6 +92,14 @@ func New(config Config) (*Agent, error) {
 		config.Logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	}
 
+	// Helper function to get bool value or default / 辅助函数获取布尔值或默认值
+	boolOrDefault := func(ptr *bool, defaultVal bool) bool {
+		if ptr == nil {
+			return defaultVal
+		}
+		return *ptr
+	}
+
 	agent := &Agent{
 		ID:           config.ID,
 		Name:         config.Name,
@@ -87,6 +112,10 @@ func New(config Config) (*Agent, error) {
 		PreHooks:     config.PreHooks,
 		PostHooks:    config.PostHooks,
 		logger:       config.Logger,
+
+		// Storage control (default to true for backward compatibility) / 存储控制 (默认为 true 以保持向后兼容)
+		storeToolMessages:    boolOrDefault(config.StoreToolMessages, true),
+		storeHistoryMessages: boolOrDefault(config.StoreHistoryMessages, true),
 	}
 
 	// Add system message if instructions provided
@@ -120,6 +149,9 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	currentInstructions := a.GetInstructions()
 
 	a.logger.Info("agent run started", "agent_id", a.ID, "input", input)
+
+	// Record initial message count for history filtering / 记录初始消息数量用于历史过滤
+	initialMessageCount := len(a.Memory.GetMessages(a.UserID))
 
 	// Execute pre-hooks
 	if len(a.PreHooks) > 0 {
@@ -224,14 +256,20 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 
 	a.logger.Info("agent run completed", "agent_id", a.ID)
 
-	return &RunOutput{
+	// Build output / 构建输出
+	output := &RunOutput{
 		Content:  finalResponse.Content,
 		Messages: a.Memory.GetMessages(a.UserID),
 		Metadata: map[string]interface{}{
 			"loops": loopCount,
 			"usage": finalResponse.Usage,
 		},
-	}, nil
+	}
+
+	// Apply storage filters / 应用存储过滤器
+	a.scrubRunOutputWithContext(output, initialMessageCount)
+
+	return output, nil
 }
 
 // executeToolCalls executes all tool calls and adds results to memory
@@ -385,4 +423,119 @@ func (a *Agent) updateSystemMessage(messages []*types.Message, instructions stri
 	}
 
 	return result
+}
+
+// filterToolMessages removes tool-related messages from the slice.
+// It filters out messages with Role == RoleTool and clears tool-related fields from other messages.
+// filterToolMessages 从切片中移除工具相关消息
+// 它会过滤掉 Role == RoleTool 的消息，并清除其他消息中的工具相关字段
+func (a *Agent) filterToolMessages(messages []*types.Message) []*types.Message {
+	if len(messages) == 0 {
+		return messages
+	}
+
+	// Pre-allocate with same capacity for efficiency / 预分配相同容量以提高效率
+	filtered := make([]*types.Message, 0, len(messages))
+
+	for _, msg := range messages {
+		// Skip tool response messages entirely / 完全跳过工具响应消息
+		if msg.Role == types.RoleTool {
+			continue
+		}
+
+		// For other messages, clear tool-related fields / 对于其他消息，清除工具相关字段
+		if len(msg.ToolCalls) > 0 || msg.ToolCallID != "" {
+			// Create a shallow copy to avoid modifying the original message in Memory
+			// 创建浅拷贝以避免修改 Memory 中的原始消息
+			msgCopy := *msg
+			msgCopy.ToolCalls = nil
+			msgCopy.ToolCallID = ""
+			filtered = append(filtered, &msgCopy)
+		} else {
+			// No tool data, can use original message / 没有工具数据，可以使用原始消息
+			filtered = append(filtered, msg)
+		}
+	}
+
+	return filtered
+}
+
+// filterHistoryMessages removes messages that existed before the current Run.
+// It uses the initialCount to determine which messages are historical.
+// filterHistoryMessages 移除当前 Run 之前就存在的消息
+// 它使用 initialCount 来确定哪些消息是历史消息
+func (a *Agent) filterHistoryMessages(messages []*types.Message, initialCount int) []*types.Message {
+	// Defensive: handle nil / 防御性: 处理 nil
+	if messages == nil {
+		return nil
+	}
+
+	// Defensive: handle empty / 防御性: 处理空
+	if len(messages) == 0 {
+		return messages
+	}
+
+	// Defensive: handle negative count / 防御性: 处理负数
+	if initialCount < 0 {
+		initialCount = 0
+	}
+
+	// All messages are new / 所有消息都是新的
+	if initialCount == 0 {
+		return messages
+	}
+
+	// All messages are historical / 所有消息都是历史的
+	if initialCount >= len(messages) {
+		return []*types.Message{}
+	}
+
+	// Return new messages (after initialCount) / 返回新消息（initialCount 之后的）
+	return messages[initialCount:]
+}
+
+// scrubRunOutputWithContext applies filters to RunOutput based on storage configuration.
+// It modifies the output in place for performance.
+// scrubRunOutputWithContext 根据存储配置对 RunOutput 应用过滤器
+// 为了性能考虑，会原地修改输出
+func (a *Agent) scrubRunOutputWithContext(output *RunOutput, initialMessageCount int) {
+	if output == nil || output.Messages == nil {
+		return
+	}
+
+	initialCount := len(output.Messages)
+
+	// Filter tool messages first (order matters!) / 先过滤工具消息（顺序很重要！）
+	if !a.storeToolMessages {
+		output.Messages = a.filterToolMessages(output.Messages)
+		// Update initialMessageCount if it was affected by tool message filtering
+		// 如果工具消息过滤影响了初始消息数，需要调整
+		if initialMessageCount > 0 {
+			removed := initialCount - len(output.Messages)
+			if removed > 0 {
+				// Estimate how many removed were from history / 估算有多少被移除的是历史消息
+				if initialMessageCount > removed {
+					initialMessageCount = initialMessageCount - removed
+				} else {
+					initialMessageCount = 0
+				}
+			}
+		}
+		initialCount = len(output.Messages)
+	}
+
+	// Then filter history messages / 然后过滤历史消息
+	if !a.storeHistoryMessages {
+		output.Messages = a.filterHistoryMessages(output.Messages, initialMessageCount)
+	}
+
+	// Log if messages were filtered / 如果消息被过滤则记录日志
+	if len(output.Messages) < initialCount {
+		a.logger.Debug("filtered messages from output",
+			"original_count", initialCount,
+			"filtered_count", len(output.Messages),
+			"store_tool_messages", a.storeToolMessages,
+			"store_history_messages", a.storeHistoryMessages,
+		)
+	}
 }
