@@ -369,6 +369,57 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/knowledge/content:
+    post:
+      tags:
+        - Knowledge
+      summary: Add content to knowledge base
+      description: Ingests content into the knowledge base (chunking, embedding, storage)
+      operationId: addContent
+      parameters:
+        - name: chunker_type
+          in: query
+          description: Chunker type to use (only for text/plain)
+          schema:
+            type: string
+            enum: [character, sentence, paragraph]
+            default: character
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddContentRequest'
+          text/plain:
+            schema:
+              type: string
+              example: "This is sample text content to be added to the knowledge base."
+      responses:
+        '201':
+          description: Content added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddContentResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ingestion failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Knowledge service not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
     CreateSessionRequest:
@@ -636,3 +687,25 @@ components:
           type: integer
           description: Embedding dimensions
           example: 1536
+
+    AddContentResponse:
+      type: object
+      properties:
+        document_ids:
+          type: array
+          items:
+            type: string
+          description: List of created document IDs
+          example: ["doc_1697123456_0", "doc_1697123456_1"]
+        chunk_count:
+          type: integer
+          description: Number of chunks generated
+          example: 2
+        chunker_type:
+          type: string
+          description: Chunker type used
+          example: "character"
+        message:
+          type: string
+          description: Success message
+          example: "successfully ingested 2 chunks"

@@ -30,13 +30,20 @@ outline: deep
 
 - This release updates documentation only; runtime behavior is unchanged
 
-### 🔜 Planned (Not Yet Implemented)
+### ✨ New in 1.2.1 (Implemented)
 
-- P1: SSE event filtering on streaming endpoints (A2A)
-- P1: Content extraction middleware for AgentOS (JSON/Form → context)
-- P1: Google Sheets toolkit (service account)
-- P2: Minimal knowledge ingestion endpoint (`POST /api/v1/knowledge/content`)
-- M1: SQLite session storage backend and migration utilities
+- SSE event filtering for streaming endpoints (A2A)
+  - `POST /api/v1/agents/:id/run/stream?types=token,complete`
+  - Emits only requested event types; standard SSE format; context cancel supported
+- Content extraction middleware for AgentOS
+  - JSON/Form → context injection of `content/metadata/user_id/session_id`
+  - Request size guard via `MaxRequestSize`; skip paths supported
+- Google Sheets toolkit (service account)
+  - `read_range`, `write_range`, `append_rows`; JSON or file credentials
+- Minimal knowledge ingestion endpoint
+  - `POST /api/v1/knowledge/content` supports `text/plain` and `application/json`
+
+Enterprise validation steps: see `docs/ENTERPRISE_MIGRATION_PLAN.md`.
 
 ## Version 1.1.0 (2025-10-08)
 

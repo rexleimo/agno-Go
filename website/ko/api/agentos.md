@@ -108,8 +108,7 @@ server.Shutdown(ctx)
 **지식 엔드포인트 (선택) / Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — 지식 베이스에서 벡터 유사도 검색 / Vector similarity search
 - `GET  /api/v1/knowledge/config` — 사용 가능한 청커, VectorDB, 임베딩 모델 정보 / Available chunkers, VectorDBs, embedding model
-
-참고 / Note: 컨텐츠 적재 엔드포인트(`POST /api/v1/knowledge/content`)는 계획(P2) 중이며, 아직 구현되지 않았습니다.
+- `POST /api/v1/knowledge/content` — 최소 적재 (text/plain 또는 application/json)
 
 요청 예시 / Example:
 ```bash

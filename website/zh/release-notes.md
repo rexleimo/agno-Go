@@ -30,13 +30,20 @@ outline: deep
 
 - 无（仅文档与结构调整）
 
-### 🔜 计划中（尚未实现）
+### ✨ 本次新增（已实现）
 
-- P1：A2A 流式端点的事件类型过滤（SSE）
-- P1：AgentOS 内容抽取中间件（JSON/Form → context）
-- P1：Google Sheets 工具（服务账号）
-- P2：最小化知识入库端点（`POST /api/v1/knowledge/content`）
-- M1：SQLite 会话存储与迁移工具
+- A2A 流式端点事件类型过滤（SSE）
+  - `POST /api/v1/agents/:id/run/stream?types=token,complete`
+  - 仅输出所请求的事件类型；标准 SSE 格式；支持 Context 取消
+- AgentOS 内容抽取中间件
+  - 将 JSON/Form 中的 `content/metadata/user_id/session_id` 注入上下文
+  - 支持 `MaxRequestSize` 请求大小保护与路径跳过
+- Google Sheets 工具（服务账号）
+  - 提供 `read_range`、`write_range`、`append_rows`，支持 JSON/文件凭证
+- 最小化知识入库端点
+  - `POST /api/v1/knowledge/content` 支持 `text/plain` 与 `application/json`
+
+企业验收步骤请参考 `docs/ENTERPRISE_MIGRATION_PLAN.md`。
 
 ## Version 1.1.0 (2025-10-08)
 

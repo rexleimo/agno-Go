@@ -108,8 +108,7 @@ server.Shutdown(ctx)
 **知識エンドポイント（オプション） / Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — ナレッジベースでベクトル類似検索 / Vector similarity search
 - `GET  /api/v1/knowledge/config` — 利用可能なチャンクャー、VectorDB、埋め込みモデル情報 / Available chunkers, VectorDBs, embedding model
-
-注記 / Note：コンテンツ取り込みエンドポイント（`POST /api/v1/knowledge/content`）は計画中（P2）で、まだ実装されていません。
+- `POST /api/v1/knowledge/content` — 最小取り込み（text/plain または application/json）
 
 リクエスト例 / Example:
 ```bash

@@ -270,6 +270,7 @@ func (s *Server) registerRoutes() {
 		{
 			agents.GET("", s.handleListAgents)
 			agents.POST("/:id/run", s.handleAgentRun)
+			agents.POST("/:id/run/stream", s.handleAgentRunStream) // P1: SSE 流式输出
 		}
 
 		// Knowledge endpoints（新增）
@@ -279,6 +280,7 @@ func (s *Server) registerRoutes() {
 			{
 				knowledge.POST("/search", s.handleKnowledgeSearch)
 				knowledge.GET("/config", s.handleKnowledgeConfig)
+				knowledge.POST("/content", s.handleAddContent) // P2: 知识入库 API
 			}
 		}
 	}

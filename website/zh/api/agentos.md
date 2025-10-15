@@ -108,8 +108,7 @@ server.Shutdown(ctx)
 **知识库端点（可选） / Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — 在知识库中进行向量相似搜索 / Vector similarity search in knowledge base
 - `GET  /api/v1/knowledge/config` — 返回可用分块器、向量库与嵌入模型信息 / Available chunkers, VectorDBs, embedding model info
-
-提示 / Note：内容入库端点（`POST /api/v1/knowledge/content`）规划中（P2），当前尚未实现。
+- `POST /api/v1/knowledge/content` — 最小入库（text/plain 或 application/json）
 
 示例请求 / Example:
 ```bash

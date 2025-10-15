@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.1] - 2025-10-15
 
+### ✨ Added
+- SSE event filtering on streaming endpoints (A2A)
+  - `POST /api/v1/agents/:id/run/stream?types=token,complete`
+- Content extraction middleware for AgentOS (JSON/Form → context)
+- Google Sheets toolkit (service account)
+- Minimal knowledge ingestion endpoint (`POST /api/v1/knowledge/content`)
+
 ### 🧭 Documentation Reorganization
 - Adopted clear separation of docs:
   - `website/` → Implemented, user-facing documentation (VitePress site)
@@ -25,8 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated API docs to include Knowledge API and configuration on AgentOS page
 - Updated website Release Notes with v1.2.1 summary
 
-### ✅ No Behavior Changes
-- Code functionality unaffected; this release focuses on documentation structure and consistency only
+### ✅ Backward Compatibility
+- Additive changes only; no breaking changes
 
 ## [1.2.0] - 2025-10-12
 

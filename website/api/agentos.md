@@ -108,8 +108,7 @@ See [OpenAPI Specification](../../pkg/agentos/openapi.yaml) for complete API doc
 **Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — Vector similarity search in knowledge base
 - `GET  /api/v1/knowledge/config` — Available chunkers, VectorDBs, and embedding model info
-
-Note: Content ingestion endpoint (`POST /api/v1/knowledge/content`) is planned (P2) and not implemented yet.
+- `POST /api/v1/knowledge/content` — Minimal ingestion (text/plain or application/json)
 
 Example request:
 ```bash

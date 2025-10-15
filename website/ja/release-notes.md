@@ -30,13 +30,20 @@ outline: deep
 
 - なし（ドキュメントと構成のみ更新）
 
-### 🔜 計画中（未実装）
+### ✨ 今回の追加（実装済み）
 
-- P1：A2A ストリーミングエンドポイントのイベント種別フィルタ（SSE）
-- P1：AgentOS のコンテンツ抽出ミドルウェア（JSON/Form → context）
-- P1：Google Sheets ツール（サービスアカウント）
-- P2：最小限のナレッジ取り込みエンドポイント（`POST /api/v1/knowledge/content`）
-- M1：SQLite セッションストレージと移行ツール
+- A2A ストリーミングのイベント種別フィルタ（SSE）
+  - `POST /api/v1/agents/:id/run/stream?types=token,complete`
+  - 要求したイベントのみ出力；標準SSE形式；Contextキャンセル対応
+- AgentOS コンテンツ抽出ミドルウェア
+  - JSON/Form から `content/metadata/user_id/session_id` をContextに注入
+  - `MaxRequestSize` によるサイズ保護とスキップパスをサポート
+- Google Sheets ツール（サービスアカウント）
+  - `read_range`、`write_range`、`append_rows`；JSON/ファイル資格情報対応
+- 最小限のナレッジ取り込みエンドポイント
+  - `POST /api/v1/knowledge/content` は `text/plain` と `application/json` をサポート
+
+企業向けの検収手順は `docs/ENTERPRISE_MIGRATION_PLAN.md` を参照してください。
 
 ## バージョン 1.1.0 (2025-10-08)
 

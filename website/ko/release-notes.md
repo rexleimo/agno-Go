@@ -30,13 +30,20 @@ outline: deep
 
 - 없음 (문서/구조 조정만 포함)
 
-### 🔜 계획 (아직 미구현)
+### ✨ 신규 (이번 릴리스에서 구현됨)
 
-- P1: A2A 스트리밍 엔드포인트의 이벤트 유형 필터 (SSE)
-- P1: AgentOS 컨텐츠 추출 미들웨어 (JSON/Form → context)
-- P1: Google Sheets 도구 (서비스 계정)
-- P2: 최소 지식 적재 엔드포인트 (`POST /api/v1/knowledge/content`)
-- M1: SQLite 세션 스토리지 및 마이그레이션 유틸리티
+- A2A 스트리밍 이벤트 유형 필터 (SSE)
+  - `POST /api/v1/agents/:id/run/stream?types=token,complete`
+  - 요청한 이벤트만 출력; 표준 SSE 형식; Context 취소 지원
+- AgentOS 컨텐츠 추출 미들웨어
+  - JSON/Form의 `content/metadata/user_id/session_id`를 Context로 주입
+  - `MaxRequestSize` 크기 보호 및 경로 스킵 지원
+- Google Sheets 도구 (서비스 계정)
+  - `read_range`, `write_range`, `append_rows`; JSON/파일 자격 증명 지원
+- 최소 지식 적재 엔드포인트
+  - `POST /api/v1/knowledge/content` 는 `text/plain` 및 `application/json` 지원
+
+엔터프라이즈 검수 절차: `docs/ENTERPRISE_MIGRATION_PLAN.md` 참고.
 
 ## 버전 1.1.0 (2025-10-08)
 
