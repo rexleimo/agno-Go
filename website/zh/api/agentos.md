@@ -109,6 +109,8 @@ server.Shutdown(ctx)
 - `POST /api/v1/knowledge/search` — 在知识库中进行向量相似搜索 / Vector similarity search in knowledge base
 - `GET  /api/v1/knowledge/config` — 返回可用分块器、向量库与嵌入模型信息 / Available chunkers, VectorDBs, embedding model info
 
+提示 / Note：内容入库端点（`POST /api/v1/knowledge/content`）规划中（P2），当前尚未实现。
+
 示例请求 / Example:
 ```bash
 curl -X POST http://localhost:8080/api/v1/knowledge/search \

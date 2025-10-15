@@ -72,6 +72,7 @@ export default defineConfig({
                 { text: 'Memory', link: '/api/memory' },
                 { text: 'Types', link: '/api/types' },
                 { text: 'AgentOS Server', link: '/api/agentos' },
+                { text: 'Knowledge API', link: '/api/agentos' },
                 { text: 'A2A Interface', link: '/api/a2a' }
               ]
             }
@@ -170,6 +171,7 @@ export default defineConfig({
                 { text: 'Memory', link: '/zh/api/memory' },
                 { text: 'Types', link: '/zh/api/types' },
                 { text: 'AgentOS 服务器', link: '/zh/api/agentos' },
+                { text: '知识库 API', link: '/zh/api/agentos' },
                 { text: 'A2A 接口', link: '/zh/api/a2a' }
               ]
             }
@@ -268,6 +270,7 @@ export default defineConfig({
                 { text: 'Memory', link: '/ja/api/memory' },
                 { text: 'Types', link: '/ja/api/types' },
                 { text: 'AgentOS サーバー', link: '/ja/api/agentos' },
+                { text: 'ナレッジ API', link: '/ja/api/agentos' },
                 { text: 'A2A インターフェース', link: '/ja/api/a2a' }
               ]
             }
@@ -366,6 +369,7 @@ export default defineConfig({
                 { text: 'Memory', link: '/ko/api/memory' },
                 { text: 'Types', link: '/ko/api/types' },
                 { text: 'AgentOS 서버', link: '/ko/api/agentos' },
+                { text: '지식 API', link: '/ko/api/agentos' },
                 { text: 'A2A 인터페이스', link: '/ko/api/a2a' }
               ]
             }
@@ -463,8 +467,9 @@ export default defineConfig({
             { text: 'Tools', link: '/api/tools' },
             { text: 'Memory', link: '/api/memory' },
             { text: 'Types', link: '/api/types' },
-            { text: 'AgentOS Server', link: '/api/agentos' },
-            { text: 'A2A Interface', link: '/api/a2a' }
+                { text: 'AgentOS Server', link: '/api/agentos' },
+                { text: 'Knowledge API', link: '/api/agentos' },
+                { text: 'A2A Interface', link: '/api/a2a' }
           ]
         }
       ],

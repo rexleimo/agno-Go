@@ -30,6 +30,14 @@ outline: deep
 
 - This release updates documentation only; runtime behavior is unchanged
 
+### 🔜 Planned (Not Yet Implemented)
+
+- P1: SSE event filtering on streaming endpoints (A2A)
+- P1: Content extraction middleware for AgentOS (JSON/Form → context)
+- P1: Google Sheets toolkit (service account)
+- P2: Minimal knowledge ingestion endpoint (`POST /api/v1/knowledge/content`)
+- M1: SQLite session storage backend and migration utilities
+
 ## Version 1.1.0 (2025-10-08)
 
 ### 🎉 Highlights

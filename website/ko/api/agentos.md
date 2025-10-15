@@ -109,6 +109,8 @@ server.Shutdown(ctx)
 - `POST /api/v1/knowledge/search` — 지식 베이스에서 벡터 유사도 검색 / Vector similarity search
 - `GET  /api/v1/knowledge/config` — 사용 가능한 청커, VectorDB, 임베딩 모델 정보 / Available chunkers, VectorDBs, embedding model
 
+참고 / Note: 컨텐츠 적재 엔드포인트(`POST /api/v1/knowledge/content`)는 계획(P2) 중이며, 아직 구현되지 않았습니다.
+
 요청 예시 / Example:
 ```bash
 curl -X POST http://localhost:8080/api/v1/knowledge/search \

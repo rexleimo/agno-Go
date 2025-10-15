@@ -109,6 +109,8 @@ server.Shutdown(ctx)
 - `POST /api/v1/knowledge/search` — ナレッジベースでベクトル類似検索 / Vector similarity search
 - `GET  /api/v1/knowledge/config` — 利用可能なチャンクャー、VectorDB、埋め込みモデル情報 / Available chunkers, VectorDBs, embedding model
 
+注記 / Note：コンテンツ取り込みエンドポイント（`POST /api/v1/knowledge/content`）は計画中（P2）で、まだ実装されていません。
+
 リクエスト例 / Example:
 ```bash
 curl -X POST http://localhost:8080/api/v1/knowledge/search \

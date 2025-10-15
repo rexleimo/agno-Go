@@ -30,6 +30,14 @@ outline: deep
 
 - 无（仅文档与结构调整）
 
+### 🔜 计划中（尚未实现）
+
+- P1：A2A 流式端点的事件类型过滤（SSE）
+- P1：AgentOS 内容抽取中间件（JSON/Form → context）
+- P1：Google Sheets 工具（服务账号）
+- P2：最小化知识入库端点（`POST /api/v1/knowledge/content`）
+- M1：SQLite 会话存储与迁移工具
+
 ## Version 1.1.0 (2025-10-08)
 
 ### 🎉 重点功能
