@@ -9,17 +9,21 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rexleimo/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/embeddings/openai"
 	"github.com/rexleimo/agno-go/pkg/agno/session"
+	"github.com/rexleimo/agno-go/pkg/agno/vectordb"
+	"github.com/rexleimo/agno-go/pkg/agno/vectordb/chromadb"
 )
 
 // Server represents the AgentOS HTTP server
 type Server struct {
-	router         *gin.Engine
-	config         *Config
-	sessionStorage session.Storage
-	agentRegistry  *AgentRegistry
-	logger         *slog.Logger
-	httpServer     *http.Server
+	router           *gin.Engine
+	config           *Config
+	sessionStorage   session.Storage
+	agentRegistry    *AgentRegistry
+	logger           *slog.Logger
+	httpServer       *http.Server
+	knowledgeService *KnowledgeService // 知识库服务
 }
 
 // Config holds server configuration
@@ -58,6 +62,58 @@ type Config struct {
 	// Max request size (in bytes)
 	// 最大请求大小 (字节)
 	MaxRequestSize int64
+
+	// VectorDBConfig 向量数据库配置（新增）
+	// VectorDBConfig is the vector database configuration (new)
+	VectorDBConfig *VectorDBConfig
+
+	// EmbeddingConfig 嵌入模型配置（新增）
+	// EmbeddingConfig is the embedding model configuration (new)
+	EmbeddingConfig *EmbeddingConfig
+}
+
+// VectorDBConfig 向量数据库配置
+// VectorDBConfig is the vector database configuration
+type VectorDBConfig struct {
+	// Type 向量数据库类型（chromadb）
+	// Type is the vector database type
+	Type string
+
+	// BaseURL 向量数据库 URL
+	// BaseURL is the vector database URL
+	BaseURL string
+
+	// CollectionName 集合名称
+	// CollectionName is the collection name
+	CollectionName string
+
+	// Database 数据库名称
+	// Database is the database name
+	Database string
+
+	// Tenant 租户名称
+	// Tenant is the tenant name
+	Tenant string
+}
+
+// EmbeddingConfig 嵌入模型配置
+// EmbeddingConfig is the embedding model configuration
+type EmbeddingConfig struct {
+	// Provider 提供商（openai）
+	// Provider is the provider
+	Provider string
+
+	// APIKey API 密钥
+	// APIKey is the API key
+	APIKey string
+
+	// Model 模型名称
+	// Model is the model name
+	Model string
+
+	// BaseURL API 基础 URL
+	// BaseURL is the API base URL
+	BaseURL string
 }
 
 // NewServer creates a new AgentOS server
@@ -109,6 +165,18 @@ func NewServer(config *Config) (*Server, error) {
 		sessionStorage: config.SessionStorage,
 		agentRegistry:  NewAgentRegistry(),
 		logger:         config.Logger,
+	}
+
+	// 初始化知识库服务（如果配置了）
+	// Initialize knowledge service (if configured)
+	if config.VectorDBConfig != nil && config.EmbeddingConfig != nil {
+		knowledgeSvc, err := initKnowledgeService(config, config.Logger)
+		if err != nil {
+			config.Logger.Warn("failed to initialize knowledge service", "error", err)
+		} else {
+			server.knowledgeService = knowledgeSvc
+			config.Logger.Info("knowledge service initialized")
+		}
 	}
 
 	// Register routes
@@ -203,6 +271,16 @@ func (s *Server) registerRoutes() {
 			agents.GET("", s.handleListAgents)
 			agents.POST("/:id/run", s.handleAgentRun)
 		}
+
+		// Knowledge endpoints（新增）
+		// Knowledge endpoints (new)
+		if s.knowledgeService != nil {
+			knowledge := v1.Group("/knowledge")
+			{
+				knowledge.POST("/search", s.handleKnowledgeSearch)
+				knowledge.GET("/config", s.handleKnowledgeConfig)
+			}
+		}
 	}
 }
 
@@ -290,4 +368,66 @@ func timeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
+}
+
+// initKnowledgeService 初始化知识库服务
+// initKnowledgeService initializes the knowledge service
+func initKnowledgeService(config *Config, logger *slog.Logger) (*KnowledgeService, error) {
+	// 初始化嵌入函数
+	// Initialize embedding function
+	embConfig := openai.Config{
+		APIKey:  config.EmbeddingConfig.APIKey,
+		Model:   config.EmbeddingConfig.Model,
+		BaseURL: config.EmbeddingConfig.BaseURL,
+	}
+	embFunc, err := openai.New(embConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create embedding function: %w", err)
+	}
+
+	// 初始化向量数据库
+	// Initialize vector database
+	var vdb vectordb.VectorDB
+	switch config.VectorDBConfig.Type {
+	case "chromadb":
+		chromaConfig := chromadb.Config{
+			BaseURL:           config.VectorDBConfig.BaseURL,
+			CollectionName:    config.VectorDBConfig.CollectionName,
+			Database:          config.VectorDBConfig.Database,
+			Tenant:            config.VectorDBConfig.Tenant,
+			EmbeddingFunction: embFunc,
+		}
+		chromaDB, err := chromadb.New(chromaConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create chromadb: %w", err)
+		}
+
+		// 创建或连接到集合
+		// Create or connect to collection
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := chromaDB.CreateCollection(ctx, chromaConfig.CollectionName, nil); err != nil {
+			// 如果集合已存在，忽略错误
+			// Ignore error if collection already exists
+			logger.Debug("collection may already exist", "collection", chromaConfig.CollectionName, "error", err)
+		}
+
+		vdb = chromaDB
+	default:
+		return nil, fmt.Errorf("unsupported vector db type: %s", config.VectorDBConfig.Type)
+	}
+
+	// 创建知识库服务
+	// Create knowledge service
+	svcConfig := KnowledgeServiceConfig{
+		DefaultLimit:        10,
+		MaxLimit:            100,
+		DefaultChunkerType:  "character",
+		DefaultChunkSize:    1000,
+		DefaultOverlap:      100,
+		EmbeddingProvider:   config.EmbeddingConfig.Provider,
+		EmbeddingModel:      config.EmbeddingConfig.Model,
+		EmbeddingDimensions: 1536, // OpenAI text-embedding-3-small 默认维度
+	}
+	return NewKnowledgeService(vdb, embFunc, svcConfig), nil
 }

@@ -60,9 +60,9 @@ go get github.com/rexleimo/agno-go@v1.0.0
 
 - 📖 [Quick Start Guide](https://github.com/rexleimo/agno-Go#-quick-start)
 - 📖 [API Documentation](https://pkg.go.dev/github.com/rexleimo/agno-go)
-- 📖 [Deployment Guide](https://github.com/rexleimo/agno-Go/blob/main/docs/DEPLOYMENT.md)
-- 📖 [Architecture Overview](https://github.com/rexleimo/agno-Go/blob/main/docs/ARCHITECTURE.md)
-- 📖 [Performance Benchmarks](https://github.com/rexleimo/agno-Go/blob/main/docs/PERFORMANCE.md)
+- 📖 [Deployment Guide](https://github.com/rexleimo/agno-Go/blob/main/website/advanced/deployment.md)
+- 📖 [Architecture Overview](https://github.com/rexleimo/agno-Go/blob/main/website/advanced/architecture.md)
+- 📖 [Performance Benchmarks](https://github.com/rexleimo/agno-Go/blob/main/website/advanced/performance.md)
 - 📖 [Examples](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples)
 
 ## 🎯 Quick Start Example

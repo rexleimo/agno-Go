@@ -6,6 +6,30 @@ outline: deep
 
 # 版本发布说明
 
+## Version 1.2.1 (2025-10-15)
+
+### 🧭 文档重组
+
+- 明确区分：
+  - `website/` → 已实现的对外文档（VitePress 网站）
+  - `docs/` → 设计草案、迁移计划、任务与开发者/内部文档
+- 新增 `docs/README.md` 说明策略与入口
+- 新增 `CONTRIBUTING.md` 方便贡献者上手
+
+### 🔗 链接修复
+
+- README、CLAUDE、CHANGELOG 与发布说明链接统一指向 `website/advanced/*` 与 `website/guide/*`
+- 移除指向 `docs/` 下重复实现文档的旧链接
+
+### 🌐 网站更新
+
+- API：在 AgentOS 页面补充知识库 API（/api/agentos）
+- 确认 Workflow History、Performance 页面为规范引用
+
+### ✅ 行为变更
+
+- 无（仅文档与结构调整）
+
 ## Version 1.1.0 (2025-10-08)
 
 ### 🎉 重点功能

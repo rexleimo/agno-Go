@@ -5,6 +5,29 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-10-15
+
+### 🧭 Documentation Reorganization
+- Adopted clear separation of docs:
+  - `website/` → Implemented, user-facing documentation (VitePress site)
+  - `docs/` → Design drafts, WIP, migration plans, developer/internal docs
+- Added `docs/README.md` to state policy and entry points
+- Added `CONTRIBUTING.md` for contributors (development, testing, docs website)
+
+### 🔗 Link Updates
+- README, CLAUDE, CHANGELOG, and release notes now point to canonical pages under `website/advanced/*` and `website/guide/*`
+- Removed outdated links to duplicated files under `docs/`
+
+### 🧹 Removed (duplicated implemented docs from docs/)
+- Deleted `docs/{API_REFERENCE.md, ARCHITECTURE.md, DEPLOYMENT.md, MULTI_TENANT.md, PERFORMANCE.md, QUICK_START.md, SESSION_STATE.md, WORKFLOW_HISTORY.md, A2A_INTERFACE.md, CHANGELOG.md}`
+
+### 🌐 Website
+- Updated API docs to include Knowledge API and configuration on AgentOS page
+- Updated website Release Notes with v1.2.1 summary
+
+### ✅ No Behavior Changes
+- Code functionality unaffected; this release focuses on documentation structure and consistency only
+
 ## [1.2.0] - 2025-10-12
 
 ### ✨ Added
@@ -708,10 +731,10 @@ Agno-Go follows the **KISS principle** (Keep It Simple, Stupid):
 ### 📖 Documentation
 
 - [README.md](README.md) - Getting started
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - Architecture overview
-- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - Deployment guide
-- [docs/PERFORMANCE.md](docs/PERFORMANCE.md) - Performance benchmarks
-- [docs/TEST_REPORT.md](docs/TEST_REPORT.md) - Test coverage report
+- [website/advanced/architecture.md](website/advanced/architecture.md) - Architecture overview
+- [website/advanced/deployment.md](website/advanced/deployment.md) - Deployment guide
+- [website/advanced/performance.md](website/advanced/performance.md) - Performance benchmarks
+- [docs/DEVELOPMENT.md#testing-standards](docs/DEVELOPMENT.md#testing-standards) - Test coverage standards
 - [pkg/agentos/README.md](pkg/agentos/README.md) - AgentOS API guide
 - [pkg/agentos/openapi.yaml](pkg/agentos/openapi.yaml) - OpenAPI specification
 

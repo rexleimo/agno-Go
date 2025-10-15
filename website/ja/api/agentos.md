@@ -18,6 +18,25 @@ type Config struct {
     AllowHeaders   []string         // CORSヘッダー
     RequestTimeout time.Duration    // リクエストタイムアウト (デフォルト: 30秒)
     MaxRequestSize int64            // 最大リクエストサイズ (デフォルト: 10MB)
+
+    // ナレッジ API (オプション) / Knowledge API (optional)
+    VectorDBConfig  *VectorDBConfig  // ベクトルDB構成（例: chromadb）
+    EmbeddingConfig *EmbeddingConfig // 埋め込みモデル構成（例: OpenAI）
+}
+
+type VectorDBConfig struct {
+    Type           string // 例: "chromadb"
+    BaseURL        string // ベクトルDBエンドポイント
+    CollectionName string // 既定のコレクション
+    Database       string // 任意のデータベース
+    Tenant         string // 任意のテナント
+}
+
+type EmbeddingConfig struct {
+    Provider string // 例: "openai"
+    APIKey   string
+    Model    string // 例: "text-embedding-3-small"
+    BaseURL  string // 例: "https://api.openai.com/v1"
 }
 ```
 
@@ -85,6 +104,40 @@ server.Shutdown(ctx)
 - `GET /api/v1/sessions` - セッション一覧
 - `GET /api/v1/agents` - エージェント一覧
 - `POST /api/v1/agents/{id}/run` - エージェント実行
+
+**知識エンドポイント（オプション） / Knowledge Endpoints (optional):**
+- `POST /api/v1/knowledge/search` — ナレッジベースでベクトル類似検索 / Vector similarity search
+- `GET  /api/v1/knowledge/config` — 利用可能なチャンクャー、VectorDB、埋め込みモデル情報 / Available chunkers, VectorDBs, embedding model
+
+リクエスト例 / Example:
+```bash
+curl -X POST http://localhost:8080/api/v1/knowledge/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "エージェントの作成方法は?",
+    "limit": 5,
+    "filters": {"source": "documentation"}
+  }'
+```
+
+最小サーバー構成（ナレッジ API 有効化）/ Minimal server config (enable Knowledge API):
+```go
+server, err := agentos.NewServer(&agentos.Config{
+  Address: ":8080",
+  VectorDBConfig: &agentos.VectorDBConfig{
+    Type:           "chromadb",
+    BaseURL:        os.Getenv("CHROMADB_URL"),
+    CollectionName: "agno_knowledge",
+  },
+  EmbeddingConfig: &agentos.EmbeddingConfig{
+    Provider: "openai",
+    APIKey:   os.Getenv("OPENAI_API_KEY"),
+    Model:    "text-embedding-3-small",
+  },
+})
+```
+
+実行可能なサンプル / Runnable example: `cmd/examples/knowledge_api/`
 
 ## ベストプラクティス
 

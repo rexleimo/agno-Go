@@ -572,7 +572,7 @@ func main() {
 
 - `pkg/agno/workflow/workflow_history_e2e_test.go` - 端到端测试
 - `cmd/examples/workflow_history/main.go` - 集成示例
-- `docs/WORKFLOW_HISTORY.md` - 功能文档 (需创建)
+- `website/guide/workflow-history.md` - 功能文档（已实现）
 - `README.md` - 更新示例
 
 ---
@@ -581,7 +581,7 @@ func main() {
 
 ### 创建功能文档
 
-**文件**: `docs/WORKFLOW_HISTORY.md`
+**文件**: `website/guide/workflow-history.md`
 
 包含：
 1. 功能概述

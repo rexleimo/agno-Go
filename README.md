@@ -3,13 +3,13 @@
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Test Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen.svg)](docs/DEVELOPMENT.md#testing-standards)
-[![Release](https://img.shields.io/badge/release-v1.2.0-blue.svg)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v1.2.1-blue.svg)](CHANGELOG.md)
 
 **Agno-Go** is a high-performance multi-agent system framework built with Go. Inheriting the Agno design philosophy, it leverages Go's concurrency model and performance advantages to build efficient, scalable AI agent systems.
 
 ## ✨ Highlights
 
-- **🚀 High Performance**: 180ns agent instantiation, 1.2KB memory per agent ([16x faster than Python](docs/PERFORMANCE.md))
+- **🚀 High Performance**: 180ns agent instantiation, 1.2KB memory per agent ([16x faster than Python](website/advanced/performance.md))
 - **🛡️ Security First**: Built-in hooks & guardrails for input/output validation and prompt injection protection
 - **🤖 Production-Ready**: AgentOS HTTP server with RESTful API, session management, and agent registry
 - **🧩 Flexible Architecture**: Agent, Team (4 modes), Workflow (5 primitives)
@@ -235,7 +235,7 @@ result2, _ := wf.Run(ctx, "What's my name?", "session-123")
 - 🛡️ **Safe Injection**: Uses temporary instructions, doesn't modify agent config
 - 🔧 **Flexible Control**: Configure per-workflow or per-step
 
-📖 [Complete Documentation](docs/WORKFLOW_HISTORY.md) | [Examples](cmd/examples/workflow_history)
+📖 [Complete Documentation](website/guide/workflow-history.md) | [Examples](cmd/examples/workflow_history)
 
 ## 🛠️ Built-in Tools
 
@@ -320,9 +320,12 @@ agno-go/
 │   ├── team_demo/      # Multi-agent collaboration
 │   ├── workflow_demo/  # Workflow example
 │   └── rag_demo/       # RAG pipeline example
-├── docs/               # Documentation
-│   ├── PERFORMANCE.md  # Performance benchmarks
-│   └── PROGRESS.md     # Development progress
+├── docs/               # Internal docs (design/WIP/dev)
+│   ├── DEVELOPMENT.md  # Development guide
+│   ├── VITEPRESS.md    # Docs site setup
+│   ├── ENTERPRISE_MIGRATION_PLAN.md
+│   └── task/           # Task specs
+├── website/            # VitePress documentation (implemented features)
 ├── Makefile            # Build commands
 └── go.mod              # Dependencies
 ```
@@ -380,7 +383,7 @@ See [`cmd/examples/`](cmd/examples/) for complete examples:
 - [x] Anthropic Claude integration (50.9% coverage)
 - [x] Ollama local model support (43.8% coverage)
 - [x] DuckDuckGo search tool (92.1% coverage)
-- [x] Performance benchmarks ([details](docs/PERFORMANCE.md))
+- [x] Performance benchmarks ([details](website/advanced/performance.md))
 - [x] Model provider refactoring (common utilities, 84.8% coverage)
 - [x] Documentation (README, CLAUDE.md, models/README.md)
 
@@ -389,24 +392,24 @@ See [`cmd/examples/`](cmd/examples/) for complete examples:
 - 💾 Memory per agent: **1.2KB** (60% better than 3KB target)
 - 🚀 16x faster than Python version
 
-### 🟢 M3: Knowledge & Storage (Week 5-6) - 60% COMPLETE
+### ✅ M3: Knowledge & Storage (Week 5-6) - 100% COMPLETE
 - [x] VectorDB interface design
 - [x] Knowledge package - Document loaders (Text, Directory, Reader)
 - [x] Knowledge package - Chunkers (Character, Sentence, Paragraph)
-- [ ] Vector DB implementation (ChromaDB or alternative)
-- [ ] RAG workflow example
+ - [x] Vector DB implementation (ChromaDB)
+ - [x] RAG workflow example
 
-### ⏰ M4: Production Ready (Week 7-8) - PLANNED
-- [ ] Performance optimization
-- [ ] Complete documentation and examples
-- [ ] v1.0.0 release
+### ✅ M4: Production Ready (Week 7-8) - 100% COMPLETE
+- [x] Performance optimization
+- [x] Complete documentation and examples (VitePress site under `website/`; design/WIP under `docs/`)
+- [x] v1.0.0 release (see CHANGELOG)
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please read:
 - [DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development guide and code standards
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture and design
-- [PERFORMANCE.md](docs/PERFORMANCE.md) - Performance benchmarks
+- [Architecture](website/advanced/architecture.md) - System architecture and design
+- [Performance](website/advanced/performance.md) - Performance benchmarks
 - [VITEPRESS.md](docs/VITEPRESS.md) - Documentation website setup and deployment
 - [CLAUDE.md](CLAUDE.md) - Project overview and quick reference
 

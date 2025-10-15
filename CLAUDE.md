@@ -206,7 +206,7 @@ Agno-Go 利用 Go 的并发模型实现卓越性能:
 - **内存占用**: ~1.2KB/agent 平均 (目标: <3KB, 比目标低 60%)
 - **原生 Goroutine**: 支持并行执行,无 GIL 限制
 
-**详细性能报告**: 查看 [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
+**详细性能报告**: 查看 [website/advanced/performance.md](website/advanced/performance.md)
 
 ## 添加新组件
 
@@ -418,11 +418,9 @@ export OLLAMA_BASE_URL=http://localhost:11434
 
 ## 文档和资源
 
-- **性能基准**: [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
-- **开发进度**: [docs/PROGRESS.md](docs/PROGRESS.md)
-- **架构文档**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- **团队指南**: [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md)
-- **项目计划**: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md)
+- **性能基准**: [website/advanced/performance.md](website/advanced/performance.md)
+- **架构文档**: [website/advanced/architecture.md](website/advanced/architecture.md)
+- **开发指南**: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
 ## KISS 原则应用
 

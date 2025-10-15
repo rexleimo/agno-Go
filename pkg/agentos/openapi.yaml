@@ -34,6 +34,8 @@ tags:
     description: Session management operations
   - name: Agents
     description: Agent management and execution
+  - name: Knowledge
+    description: Knowledge base search and configuration operations
 
 paths:
   /health:
@@ -303,6 +305,70 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/knowledge/search:
+    post:
+      tags:
+        - Knowledge
+      summary: Search knowledge base
+      description: Performs a vector similarity search in the knowledge base
+      operationId: searchKnowledge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VectorSearchRequest'
+            example:
+              query: "如何使用 agno-Go 创建 Agent?"
+              limit: 10
+              offset: 0
+      responses:
+        '200':
+          description: Search successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VectorSearchResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Search failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Knowledge service not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/knowledge/config:
+    get:
+      tags:
+        - Knowledge
+      summary: Get knowledge base configuration
+      description: Returns available chunkers, vector databases, and embedding model information
+      operationId: getKnowledgeConfig
+      responses:
+        '200':
+          description: Configuration information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeConfigResponse'
+        '503':
+          description: Knowledge service not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
     CreateSessionRequest:
@@ -422,3 +488,151 @@ components:
           type: string
           description: Error code
           example: AGENT_NOT_FOUND
+
+    VectorSearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Search query text
+          example: "如何使用 agno-Go 创建 Agent?"
+        limit:
+          type: integer
+          description: Maximum number of results to return (default 10, max 100)
+          default: 10
+          minimum: 1
+          maximum: 100
+        offset:
+          type: integer
+          description: Pagination offset
+          default: 0
+          minimum: 0
+        filters:
+          type: object
+          additionalProperties: true
+          description: Metadata filter conditions
+          example:
+            source: "documentation"
+        collection_name:
+          type: string
+          description: Collection name (optional)
+
+    VectorSearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Document ID
+          example: "doc_12345"
+        content:
+          type: string
+          description: Document content
+          example: "To create an Agent in agno-Go, use agent.New()..."
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Document metadata
+          example:
+            source: "documentation"
+            page: 5
+        score:
+          type: number
+          format: float
+          description: Similarity score (higher is better)
+          example: 0.95
+        distance:
+          type: number
+          format: float
+          description: Distance metric (lower is better)
+          example: 0.05
+
+    VectorSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/VectorSearchResult'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginationMeta:
+      type: object
+      properties:
+        total_count:
+          type: integer
+          description: Total number of results
+          example: 42
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        page_size:
+          type: integer
+          description: Number of results per page
+          example: 10
+        total_pages:
+          type: integer
+          description: Total number of pages
+          example: 5
+
+    KnowledgeConfigResponse:
+      type: object
+      properties:
+        available_chunkers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChunkerInfo'
+        available_vector_dbs:
+          type: array
+          items:
+            type: string
+          example: ["chromadb"]
+        default_chunker:
+          type: string
+          description: Default chunker type
+          example: "character"
+        default_vector_db:
+          type: string
+          description: Default vector database
+          example: "chromadb"
+        embedding_model:
+          $ref: '#/components/schemas/EmbeddingModelInfo'
+
+    ChunkerInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Chunker name
+          example: "character"
+        description:
+          type: string
+          description: Chunker description
+          example: "按字符数量分块，适合通用文本"
+        default_chunk_size:
+          type: integer
+          description: Default chunk size
+          example: 1000
+        default_overlap:
+          type: integer
+          description: Default overlap size
+          example: 100
+
+    EmbeddingModelInfo:
+      type: object
+      properties:
+        provider:
+          type: string
+          description: Model provider
+          example: "openai"
+        model:
+          type: string
+          description: Model name
+          example: "text-embedding-3-small"
+        dimensions:
+          type: integer
+          description: Embedding dimensions
+          example: 1536

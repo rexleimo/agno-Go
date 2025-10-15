@@ -6,6 +6,30 @@ outline: deep
 
 # Release Notes
 
+## Version 1.2.1 (2025-10-15)
+
+### 🧭 Documentation Reorganization
+
+- Adopted clear separation between implemented docs and design/WIP:
+  - `website/` → Implemented, user-facing documentation (VitePress)
+  - `docs/` → Design drafts, migration plans, tasks, and developer/internal docs
+- Added `docs/README.md` to document the policy and entry points
+- Added `CONTRIBUTING.md` for contributor onboarding
+
+### 🔗 Link Fixes
+
+- Updated README, CLAUDE, CHANGELOG, and release notes to point to canonical pages under `website/advanced/*` and `website/guide/*`
+- Removed outdated references to duplicated files under `docs/`
+
+### 🌐 Website Updates
+
+- API: Added Knowledge API details to AgentOS page (`/api/agentos`)
+- Ensured Workflow History and Performance pages are the canonical references
+
+### ✅ No Behavior Changes
+
+- This release updates documentation only; runtime behavior is unchanged
+
 ## Version 1.1.0 (2025-10-08)
 
 ### 🎉 Highlights

@@ -6,6 +6,30 @@ outline: deep
 
 # リリースノート
 
+## バージョン 1.2.1 (2025-10-15)
+
+### 🧭 ドキュメント再編
+
+- 明確に分離：
+  - `website/` → 実装済みの対外ドキュメント（VitePress サイト）
+  - `docs/` → 設計ドラフト、移行計画、タスク、開発者/内部ドキュメント
+- `docs/README.md` を追加（方針と入口を記載）
+- 貢献者向けに `CONTRIBUTING.md` を追加
+
+### 🔗 リンク修正
+
+- README、CLAUDE、CHANGELOG、リリースノートのリンクを `website/advanced/*` と `website/guide/*` に統一
+- `docs/` 配下の重複実装ドキュメントへの旧リンクを削除
+
+### 🌐 サイト更新
+
+- API：AgentOS ページにナレッジ API を追記（/api/agentos）
+- Workflow History と Performance ページを正規参照に
+
+### ✅ 動作変更
+
+- なし（ドキュメントと構成のみ更新）
+
 ## バージョン 1.1.0 (2025-10-08)
 
 ### 🎉 ハイライト

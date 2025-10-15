@@ -18,6 +18,25 @@ type Config struct {
     AllowHeaders   []string         // CORS headers
     RequestTimeout time.Duration    // Request timeout (default: 30s)
     MaxRequestSize int64            // Max request size (default: 10MB)
+
+    // Knowledge API (optional)
+    VectorDBConfig *VectorDBConfig  // Vector database configuration (e.g., chromadb)
+    EmbeddingConfig *EmbeddingConfig // Embedding model configuration (e.g., OpenAI)
+}
+
+type VectorDBConfig struct {
+    Type           string // e.g., "chromadb"
+    BaseURL        string // Vector DB endpoint
+    CollectionName string // Default collection
+    Database       string // Optional database name
+    Tenant         string // Optional tenant name
+}
+
+type EmbeddingConfig struct {
+    Provider string // e.g., "openai"
+    APIKey   string
+    Model    string // e.g., "text-embedding-3-small"
+    BaseURL  string // e.g., "https://api.openai.com/v1"
 }
 ```
 
@@ -85,6 +104,40 @@ See [OpenAPI Specification](../../pkg/agentos/openapi.yaml) for complete API doc
 - `GET /api/v1/sessions` - List sessions
 - `GET /api/v1/agents` - List agents
 - `POST /api/v1/agents/{id}/run` - Run agent
+
+**Knowledge Endpoints (optional):**
+- `POST /api/v1/knowledge/search` — Vector similarity search in knowledge base
+- `GET  /api/v1/knowledge/config` — Available chunkers, VectorDBs, and embedding model info
+
+Example request:
+```bash
+curl -X POST http://localhost:8080/api/v1/knowledge/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How to create an Agent?",
+    "limit": 5,
+    "filters": {"source": "documentation"}
+  }'
+```
+
+Minimal server config for Knowledge API:
+```go
+server, err := agentos.NewServer(&agentos.Config{
+  Address: ":8080",
+  VectorDBConfig: &agentos.VectorDBConfig{
+    Type:           "chromadb",
+    BaseURL:        os.Getenv("CHROMADB_URL"),
+    CollectionName: "agno_knowledge",
+  },
+  EmbeddingConfig: &agentos.EmbeddingConfig{
+    Provider: "openai",
+    APIKey:   os.Getenv("OPENAI_API_KEY"),
+    Model:    "text-embedding-3-small",
+  },
+})
+```
+
+See runnable example: `cmd/examples/knowledge_api/`.
 
 ## Best Practices
 

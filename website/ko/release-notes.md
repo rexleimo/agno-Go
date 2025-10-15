@@ -6,6 +6,30 @@ outline: deep
 
 # 릴리스 노트
 
+## 버전 1.2.1 (2025-10-15)
+
+### 🧭 문서 재구성
+
+- 명확한 분리:
+  - `website/` → 구현된 대외 문서 (VitePress 사이트)
+  - `docs/` → 설계 초안, 마이그레이션 계획, 태스크, 개발자/내부 문서
+- 정책과 진입점을 담은 `docs/README.md` 추가
+- 기여자 온보딩을 위한 `CONTRIBUTING.md` 추가
+
+### 🔗 링크 수정
+
+- README, CLAUDE, CHANGELOG, 릴리스 노트 링크를 `website/advanced/*`, `website/guide/*`로 정규화
+- `docs/` 하위 중복 구현 문서로의 오래된 링크 제거
+
+### 🌐 사이트 업데이트
+
+- API: AgentOS 페이지에 지식 API 추가 (/api/agentos)
+- Workflow History, Performance 페이지를 표준 참조로 통일
+
+### ✅ 동작 변경
+
+- 없음 (문서/구조 조정만 포함)
+
 ## 버전 1.1.0 (2025-10-08)
 
 ### 🎉 하이라이트

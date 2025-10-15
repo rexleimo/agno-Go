@@ -18,6 +18,25 @@ type Config struct {
     AllowHeaders   []string         // CORS headers
     RequestTimeout time.Duration    // 요청 타임아웃 (기본값: 30s)
     MaxRequestSize int64            // 최대 요청 크기 (기본값: 10MB)
+
+    // 지식 API (선택) / Knowledge API (optional)
+    VectorDBConfig  *VectorDBConfig  // 벡터 DB 구성 (예: chromadb)
+    EmbeddingConfig *EmbeddingConfig // 임베딩 모델 구성 (예: OpenAI)
+}
+
+type VectorDBConfig struct {
+    Type           string // 예: "chromadb"
+    BaseURL        string // 벡터 DB 엔드포인트
+    CollectionName string // 기본 컬렉션
+    Database       string // 선택 데이터베이스
+    Tenant         string // 선택 테넌트
+}
+
+type EmbeddingConfig struct {
+    Provider string // 예: "openai"
+    APIKey   string
+    Model    string // 예: "text-embedding-3-small"
+    BaseURL  string // 예: "https://api.openai.com/v1"
 }
 ```
 
@@ -85,6 +104,40 @@ server.Shutdown(ctx)
 - `GET /api/v1/sessions` - 세션 목록
 - `GET /api/v1/agents` - 에이전트 목록
 - `POST /api/v1/agents/{id}/run` - 에이전트 실행
+
+**지식 엔드포인트 (선택) / Knowledge Endpoints (optional):**
+- `POST /api/v1/knowledge/search` — 지식 베이스에서 벡터 유사도 검색 / Vector similarity search
+- `GET  /api/v1/knowledge/config` — 사용 가능한 청커, VectorDB, 임베딩 모델 정보 / Available chunkers, VectorDBs, embedding model
+
+요청 예시 / Example:
+```bash
+curl -X POST http://localhost:8080/api/v1/knowledge/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "에이전트 생성 방법?",
+    "limit": 5,
+    "filters": {"source": "documentation"}
+  }'
+```
+
+최소 서버 구성 (지식 API 활성화) / Minimal server config (enable Knowledge API):
+```go
+server, err := agentos.NewServer(&agentos.Config{
+  Address: ":8080",
+  VectorDBConfig: &agentos.VectorDBConfig{
+    Type:           "chromadb",
+    BaseURL:        os.Getenv("CHROMADB_URL"),
+    CollectionName: "agno_knowledge",
+  },
+  EmbeddingConfig: &agentos.EmbeddingConfig{
+    Provider: "openai",
+    APIKey:   os.Getenv("OPENAI_API_KEY"),
+    Model:    "text-embedding-3-small",
+  },
+})
+```
+
+실행 가능한 예시 / Runnable example: `cmd/examples/knowledge_api/`
 
 ## 모범 사례
 

@@ -18,6 +18,25 @@ type Config struct {
     AllowHeaders   []string         // CORS 头 / CORS headers
     RequestTimeout time.Duration    // 请求超时 (默认: 30s) / Request timeout (default: 30s)
     MaxRequestSize int64            // 最大请求大小 (默认: 10MB) / Max request size (default: 10MB)
+
+    // 知识库 API（可选）/ Knowledge API (optional)
+    VectorDBConfig  *VectorDBConfig  // 向量数据库配置（如 chromadb）/ Vector DB configuration
+    EmbeddingConfig *EmbeddingConfig // 嵌入模型配置（如 OpenAI）/ Embedding model configuration
+}
+ 
+type VectorDBConfig struct {
+    Type           string // 例如 "chromadb" / e.g., "chromadb"
+    BaseURL        string // 向量数据库地址 / Vector DB endpoint
+    CollectionName string // 默认集合名 / Default collection
+    Database       string // 可选数据库名 / Optional database
+    Tenant         string // 可选租户名 / Optional tenant
+}
+
+type EmbeddingConfig struct {
+    Provider string // 例如 "openai" / e.g., "openai"
+    APIKey   string
+    Model    string // 例如 "text-embedding-3-small"
+    BaseURL  string // 例如 "https://api.openai.com/v1"
 }
 ```
 
@@ -85,6 +104,40 @@ server.Shutdown(ctx)
 - `GET /api/v1/sessions` - 列出会话 / List sessions
 - `GET /api/v1/agents` - 列出智能体 / List agents
 - `POST /api/v1/agents/{id}/run` - 运行智能体 / Run agent
+
+**知识库端点（可选） / Knowledge Endpoints (optional):**
+- `POST /api/v1/knowledge/search` — 在知识库中进行向量相似搜索 / Vector similarity search in knowledge base
+- `GET  /api/v1/knowledge/config` — 返回可用分块器、向量库与嵌入模型信息 / Available chunkers, VectorDBs, embedding model info
+
+示例请求 / Example:
+```bash
+curl -X POST http://localhost:8080/api/v1/knowledge/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "如何创建 Agent?",
+    "limit": 5,
+    "filters": {"source": "documentation"}
+  }'
+```
+
+最小服务器配置（启用知识库 API）/ Minimal server config (enable Knowledge API):
+```go
+server, err := agentos.NewServer(&agentos.Config{
+  Address: ":8080",
+  VectorDBConfig: &agentos.VectorDBConfig{
+    Type:           "chromadb",
+    BaseURL:        os.Getenv("CHROMADB_URL"),
+    CollectionName: "agno_knowledge",
+  },
+  EmbeddingConfig: &agentos.EmbeddingConfig{
+    Provider: "openai",
+    APIKey:   os.Getenv("OPENAI_API_KEY"),
+    Model:    "text-embedding-3-small",
+  },
+})
+```
+
+可运行示例 / Runnable example: `cmd/examples/knowledge_api/`
 
 ## 最佳实践 / Best Practices
 
