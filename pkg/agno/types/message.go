@@ -18,6 +18,10 @@ type Message struct {
 	ToolCallID string      `json:"tool_call_id,omitempty"`
 	ToolCalls  []ToolCall  `json:"tool_calls,omitempty"`
 	Metadata   interface{} `json:"metadata,omitempty"`
+
+	// ReasoningContent 包含模型的推理过程(仅推理模型)
+	// ReasoningContent contains the model's reasoning process (reasoning models only)
+	ReasoningContent *ReasoningContent `json:"reasoning_content,omitempty"`
 }
 
 // ToolCall represents a tool invocation request from the model

@@ -10,6 +10,7 @@ import (
 	"github.com/rexleimo/agno-go/pkg/agno/hooks"
 	"github.com/rexleimo/agno-go/pkg/agno/memory"
 	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/reasoning"
 	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
@@ -206,12 +207,16 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 			return nil, types.NewAPIError("model invocation failed", err)
 		}
 
+		// 提取推理内容(如果模型支持) / Extract reasoning content (if model supports)
+		reasoningContent := a.extractReasoning(ctx, resp)
+
 		// Store assistant response
 		// 存储助手响应
 		assistantMsg := &types.Message{
-			Role:      types.RoleAssistant,
-			Content:   resp.Content,
-			ToolCalls: resp.ToolCalls,
+			Role:             types.RoleAssistant,
+			Content:          resp.Content,
+			ToolCalls:        resp.ToolCalls,
+			ReasoningContent: reasoningContent,
 		}
 		a.Memory.Add(assistantMsg, a.UserID)
 
@@ -492,6 +497,27 @@ func (a *Agent) filterHistoryMessages(messages []*types.Message, initialCount in
 
 	// Return new messages (after initialCount) / 返回新消息（initialCount 之后的）
 	return messages[initialCount:]
+}
+
+// extractReasoning 从响应中提取推理内容(优雅降级)
+// extractReasoning extracts reasoning from response (graceful degradation)
+func (a *Agent) extractReasoning(ctx context.Context, resp *types.ModelResponse) *types.ReasoningContent {
+	// 检查模型是否支持推理 / Check if model supports reasoning
+	if !reasoning.IsReasoningModel(a.Model) {
+		return nil
+	}
+
+	// 提取推理内容 / Extract reasoning content
+	reasoningContent, err := reasoning.ExtractReasoning(ctx, a.Model, resp)
+	if err != nil {
+		// 记录警告但不中断流程 / Log warning but don't interrupt flow
+		if a.logger != nil {
+			a.logger.Warn("failed to extract reasoning", "error", err)
+		}
+		return nil
+	}
+
+	return reasoningContent
 }
 
 // scrubRunOutputWithContext applies filters to RunOutput based on storage configuration.

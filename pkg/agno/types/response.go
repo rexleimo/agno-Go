@@ -8,6 +8,10 @@ type ModelResponse struct {
 	Usage     Usage      `json:"usage,omitempty"`
 	Model     string     `json:"model,omitempty"`
 	Metadata  Metadata   `json:"metadata,omitempty"`
+
+	// ReasoningContent 包含模型的推理过程(仅推理模型)
+	// ReasoningContent contains the model's reasoning process (reasoning models only)
+	ReasoningContent *ReasoningContent `json:"reasoning_content,omitempty"`
 }
 
 // Usage contains token usage information

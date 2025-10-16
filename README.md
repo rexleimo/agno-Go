@@ -142,6 +142,52 @@ ollamaModel, err := ollama.New("llama2", ollama.Config{
 })
 ```
 
+### 推理模型支持 / Reasoning Model Support
+
+agno-Go 原生支持最新的推理模型 (Reasoning Models),能够自动提取和展示模型的"思考过程"。
+
+agno-Go natively supports the latest reasoning models, automatically extracting and displaying the model's "thinking process".
+
+**支持的推理模型 / Supported Reasoning Models:**
+- ✅ **OpenAI**: o1-preview, o1-mini, o3, o4 系列
+- ✅ **Google Gemini**: 2.5+ Flash Thinking 系列
+- ✅ **Anthropic Claude**: 需要显式配置 thinking 参数 / Requires explicit configuration
+
+```go
+// 使用 OpenAI o1 推理模型 / Use OpenAI o1 reasoning model
+model, _ := openai.New("o1-preview", openai.Config{
+    APIKey: os.Getenv("OPENAI_API_KEY"),
+})
+
+agent, _ := agent.New(agent.Config{
+    Name:  "ReasoningAgent",
+    Model: model,
+})
+
+// 推理内容自动提取 / Reasoning content automatically extracted
+output, _ := agent.Run(ctx, "Solve this complex problem...")
+
+// 访问推理过程 / Access reasoning process
+for _, msg := range output.Messages {
+    if msg.ReasoningContent != nil {
+        fmt.Println("🧠 Thinking:", msg.ReasoningContent.Content)
+
+        // 可选字段 / Optional fields
+        if msg.ReasoningContent.TokenCount != nil {
+            fmt.Printf("📊 Tokens: %d\n", *msg.ReasoningContent.TokenCount)
+        }
+    }
+}
+```
+
+**特性 / Features:**
+- 🎯 **零配置**: 自动检测推理模型,无需额外配置 / Zero-config: Auto-detects reasoning models
+- 🚀 **性能优化**: 仅对推理模型执行提取操作 / Performance-optimized: Extraction only for reasoning models
+- 🛡️ **优雅降级**: 提取失败不影响 Agent 执行 / Graceful degradation: Failures don't interrupt execution
+- 📦 **开箱即用**: 集成到 Agent 核心,无需手动处理 / Out-of-the-box: Integrated into Agent core
+
+📖 查看完整示例 / See full example: [examples/reasoning](examples/reasoning/)
+
 ### Tools
 Extend agent capabilities with custom functions.
 
@@ -293,6 +339,7 @@ agno-go/
 │   ├── agent/          # Agent core (74.7% coverage)
 │   ├── team/           # Multi-agent collaboration (92.3% coverage)
 │   ├── workflow/       # Workflow engine (80.4% coverage)
+│   ├── reasoning/      # Reasoning model support (96.9% coverage) ⭐ NEW
 │   ├── models/         # LLM providers (6 providers)
 │   │   ├── openai/     # OpenAI (44.6% coverage)
 │   │   ├── anthropic/  # Claude (50.9% coverage)
@@ -347,6 +394,7 @@ make lint
 
 **Current Coverage**:
 - Types: 100% ⭐
+- Reasoning: 96.9% ⭐ NEW
 - Memory: 93.1%
 - Team: 92.3%
 - Toolkit: 91.7%
@@ -358,10 +406,11 @@ make lint
 
 ## 📚 Examples
 
-See [`cmd/examples/`](cmd/examples/) for complete examples:
+See [`cmd/examples/`](cmd/examples/) and [`examples/`](examples/) for complete examples:
 - `simple_agent`: Basic agent with OpenAI and calculator tools
 - `claude_agent`: Anthropic Claude integration with tools
 - `ollama_agent`: Local model support with Ollama
+- `reasoning`: OpenAI o1/Gemini 2.5 reasoning models with automatic thinking extraction ⭐ NEW
 - `team_demo`: Multi-agent collaboration with 4 coordination modes
 - `workflow_demo`: Workflow engine with 5 control flow primitives
 
