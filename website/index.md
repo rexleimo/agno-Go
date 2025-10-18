@@ -149,7 +149,7 @@ curl http://localhost:8080/health
 - **MCP Integration**: Model Context Protocol support for connecting to any MCP server
 - **RAG**: ChromaDB integration + OpenAI embeddings
 - **AgentOS**: Production HTTP server (65.0% coverage)
-- **Examples**: 7 working examples covering all features
+- **Examples**: 8 working examples covering all features (Simple Agent, Claude Agent, Ollama Agent, Team Demo, Workflow Demo, RAG Demo, MCP Demo, Logfire Observability)
 - **Docs**: Complete guides, API reference, deployment instructions
 
 ## Community

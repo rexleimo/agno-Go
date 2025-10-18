@@ -143,6 +143,28 @@ go run cmd/examples/rag_demo/main.go
 
 ---
 
+### 7. Logfire Observability
+
+Stream reasoning metadata and token usage to Logfire via OpenTelemetry.
+
+**Location**: `cmd/examples/logfire_observability/`
+
+**Features**:
+- OTLP/HTTP exporter with configurable endpoint (EU/US)
+- Reasoning content and token metrics as span events
+- Works with any reasoning-capable model (OpenAI o-series, Gemini 2.5, Claude w/ thinking)
+
+**Run**:
+```bash
+export OPENAI_API_KEY=sk-your-key
+export LOGFIRE_WRITE_TOKEN=lf_your_token
+go run -tags logfire cmd/examples/logfire_observability/main.go
+```
+
+[View Source](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/logfire_observability)
+
+---
+
 ## Code Snippets
 
 ### Agent with Multiple Tools

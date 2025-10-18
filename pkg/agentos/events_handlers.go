@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // handleAgentRunStream 处理流式 Agent 运行请求（SSE）
@@ -96,11 +98,41 @@ func (s *Server) handleAgentRunStream(c *gin.Context) {
 			return
 		}
 
+		var reasoningSummary *ReasoningSummary
+		if output != nil {
+			modelProvider := ""
+			modelID := ""
+			if ag.Model != nil {
+				modelProvider = ag.Model.GetProvider()
+				modelID = ag.Model.GetID()
+			}
+
+			reasoningEvents, summary := buildReasoningEvents(output.Messages, modelProvider, modelID)
+			reasoningSummary = summary
+			for _, evt := range reasoningEvents {
+				evt.AgentID = agentID
+				evt.SessionID = req.SessionID
+				eventChan <- evt
+			}
+		}
+
+		usageSummary := buildUsageSummary(output.Metadata)
+		if usageSummary != nil && reasoningSummary != nil && reasoningSummary.TokenCount != nil {
+			usageSummary.ReasoningTokens = *reasoningSummary.TokenCount
+		}
+		tokenCount := 0
+		if usageSummary != nil {
+			tokenCount = usageSummary.TotalTokens
+		}
+
 		// 发送完成事件
 		// Send complete event
 		completeEvent := NewEvent(EventComplete, CompleteData{
-			Output:   output.Content,
-			Duration: time.Since(startTime).Seconds(),
+			Output:     output.Content,
+			Duration:   time.Since(startTime).Seconds(),
+			TokenCount: tokenCount,
+			Reasoning:  reasoningSummary,
+			Usage:      usageSummary,
 		})
 		completeEvent.AgentID = agentID
 		completeEvent.SessionID = req.SessionID
@@ -174,4 +206,75 @@ func (s *Server) sendSSE(w io.Writer, event *Event) error {
 	sseData := event.ToSSE()
 	_, err := fmt.Fprint(w, sseData)
 	return err
+}
+
+func buildReasoningEvents(messages []*types.Message, provider, modelID string) ([]*Event, *ReasoningSummary) {
+	if len(messages) == 0 {
+		return nil, nil
+	}
+
+	events := make([]*Event, 0)
+	var latestSummary *ReasoningSummary
+
+	for idx, msg := range messages {
+		if msg == nil || msg.ReasoningContent == nil {
+			continue
+		}
+
+		rc := msg.ReasoningContent
+		if strings.TrimSpace(rc.Content) == "" && rc.RedactedContent == nil {
+			continue
+		}
+
+		data := ReasoningData{
+			Content:         rc.Content,
+			TokenCount:      rc.TokenCount,
+			RedactedContent: rc.RedactedContent,
+			MessageIndex:    idx,
+			Model:           modelID,
+			Provider:        provider,
+		}
+
+		event := NewEvent(EventReasoning, data)
+		events = append(events, event)
+
+		latestSummary = &ReasoningSummary{
+			Content:         rc.Content,
+			TokenCount:      rc.TokenCount,
+			RedactedContent: rc.RedactedContent,
+			Model:           modelID,
+			Provider:        provider,
+		}
+	}
+
+	return events, latestSummary
+}
+
+func buildUsageSummary(metadata map[string]interface{}) *UsageMetrics {
+	if metadata == nil {
+		return nil
+	}
+
+	raw, ok := metadata["usage"]
+	if !ok {
+		return nil
+	}
+
+	var usage types.Usage
+	switch v := raw.(type) {
+	case types.Usage:
+		usage = v
+	case *types.Usage:
+		if v != nil {
+			usage = *v
+		}
+	default:
+		return nil
+	}
+
+	return &UsageMetrics{
+		PromptTokens:     usage.PromptTokens,
+		CompletionTokens: usage.CompletionTokens,
+		TotalTokens:      usage.TotalTokens,
+	}
 }

@@ -6,12 +6,18 @@ export default defineConfig({
   description: "High-performance multi-agent system framework built with Go",
   base: '/agno-Go/',
   ignoreDeadLinks: true,
+  sitemap: { hostname: 'https://rexleimo.github.io/agno-Go/' },
 
   head: [
-    ['link', { rel: 'icon', href: '/agno-Go/favicon.ico' }],
+    // Use existing logo as favicon to avoid 404s
+    ['link', { rel: 'icon', type: 'image/png', href: '/agno-Go/logo.png' }],
+    ['link', { rel: 'shortcut icon', href: '/agno-Go/logo.png' }],
+    ['link', { rel: 'apple-touch-icon', href: '/agno-Go/logo.png' }],
     ['meta', { name: 'theme-color', content: '#3eaf7c' }],
     ['meta', { name: 'og:type', content: 'website' }],
     ['meta', { name: 'og:site_name', content: 'Agno-Go' }],
+    ['meta', { name: 'og:image', content: '/agno-Go/logo.png' }],
+    ['meta', { name: 'og:url', content: 'https://rexleimo.github.io/agno-Go/' }],
   ],
 
   locales: {
@@ -85,6 +91,7 @@ export default defineConfig({
                 { text: 'Performance', link: '/advanced/performance' },
                 { text: 'Deployment', link: '/advanced/deployment' },
                 { text: 'Testing', link: '/advanced/testing' },
+                { text: 'Observability', link: '/advanced/observability' },
                 { text: 'Multi-Tenant', link: '/advanced/multi-tenant' }
               ]
             }
@@ -100,7 +107,8 @@ export default defineConfig({
                 { text: 'Team Demo', link: '/examples/team-demo' },
                 { text: 'Workflow Demo', link: '/examples/workflow-demo' },
                 { text: 'RAG Demo', link: '/examples/rag-demo' },
-                { text: 'MCP Demo', link: '/examples/mcp-demo' }
+                { text: 'MCP Demo', link: '/examples/mcp-demo' },
+                { text: 'Logfire Observability', link: '/examples/logfire-observability' }
               ]
             }
           ]
@@ -184,6 +192,7 @@ export default defineConfig({
                 { text: '性能', link: '/zh/advanced/performance' },
                 { text: '部署', link: '/zh/advanced/deployment' },
                 { text: '测试', link: '/zh/advanced/testing' },
+                { text: '可观测性', link: '/zh/advanced/observability' },
                 { text: '多租户', link: '/zh/advanced/multi-tenant' }
               ]
             }
@@ -199,7 +208,8 @@ export default defineConfig({
                 { text: '团队演示', link: '/zh/examples/team-demo' },
                 { text: '工作流演示', link: '/zh/examples/workflow-demo' },
                 { text: 'RAG 演示', link: '/zh/examples/rag-demo' },
-                { text: 'MCP 演示', link: '/zh/examples/mcp-demo' }
+                { text: 'MCP 演示', link: '/zh/examples/mcp-demo' },
+                { text: 'Logfire 可观测性', link: '/zh/examples/logfire-observability' }
               ]
             }
           ]
@@ -283,6 +293,7 @@ export default defineConfig({
                 { text: 'パフォーマンス', link: '/ja/advanced/performance' },
                 { text: 'デプロイ', link: '/ja/advanced/deployment' },
                 { text: 'テスト', link: '/ja/advanced/testing' },
+                { text: '可観測性', link: '/ja/advanced/observability' },
                 { text: 'マルチテナント', link: '/ja/advanced/multi-tenant' }
               ]
             }
@@ -298,7 +309,8 @@ export default defineConfig({
                 { text: 'チームデモ', link: '/ja/examples/team-demo' },
                 { text: 'ワークフローデモ', link: '/ja/examples/workflow-demo' },
                 { text: 'RAG デモ', link: '/ja/examples/rag-demo' },
-                { text: 'MCP デモ', link: '/ja/examples/mcp-demo' }
+                { text: 'MCP デモ', link: '/ja/examples/mcp-demo' },
+                { text: 'Logfire オブザーバビリティ', link: '/ja/examples/logfire-observability' }
               ]
             }
           ]
@@ -382,6 +394,7 @@ export default defineConfig({
                 { text: '성능', link: '/ko/advanced/performance' },
                 { text: '배포', link: '/ko/advanced/deployment' },
                 { text: '테스트', link: '/ko/advanced/testing' },
+                { text: '관측성', link: '/ko/advanced/observability' },
                 { text: '멀티 테넌트', link: '/ko/advanced/multi-tenant' }
               ]
             }
@@ -397,7 +410,8 @@ export default defineConfig({
                 { text: '팀 데모', link: '/ko/examples/team-demo' },
                 { text: '워크플로우 데모', link: '/ko/examples/workflow-demo' },
                 { text: 'RAG 데모', link: '/ko/examples/rag-demo' },
-                { text: 'MCP 데모', link: '/ko/examples/mcp-demo' }
+                { text: 'MCP 데모', link: '/ko/examples/mcp-demo' },
+                { text: 'Logfire 관측성', link: '/ko/examples/logfire-observability' }
               ]
             }
           ]

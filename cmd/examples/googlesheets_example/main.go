@@ -10,6 +10,7 @@ import (
 	"github.com/rexleimo/agno-go/pkg/agno/agent"
 	"github.com/rexleimo/agno-go/pkg/agno/models/openai"
 	"github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
+	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
 )
 
 // 本示例演示如何使用 Google Sheets 工具包
@@ -77,7 +78,7 @@ func main() {
 - append_rows: 追加新行到表格
 
 当用户要求操作电子表格时，使用相应的工具。`,
-		Toolkits: []interface{}{sheetsTool},
+		Toolkits: []toolkit.Toolkit{sheetsTool},
 	}
 
 	ag, err := agent.New(agentConfig)

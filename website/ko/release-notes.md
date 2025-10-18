@@ -43,7 +43,7 @@ outline: deep
 - 최소 지식 적재 엔드포인트
   - `POST /api/v1/knowledge/content` 는 `text/plain` 및 `application/json` 지원
 
-엔터프라이즈 검수 절차: `docs/ENTERPRISE_MIGRATION_PLAN.md` 참고.
+엔터프라이즈 검수 절차: [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md) 참고.
 
 ## 버전 1.1.0 (2025-10-08)
 

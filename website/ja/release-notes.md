@@ -43,7 +43,7 @@ outline: deep
 - 最小限のナレッジ取り込みエンドポイント
   - `POST /api/v1/knowledge/content` は `text/plain` と `application/json` をサポート
 
-企業向けの検収手順は `docs/ENTERPRISE_MIGRATION_PLAN.md` を参照してください。
+企業向けの検収手順は [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md) を参照してください。
 
 ## バージョン 1.1.0 (2025-10-08)
 

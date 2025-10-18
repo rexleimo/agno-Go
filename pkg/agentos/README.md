@@ -96,6 +96,28 @@ func main() {
 
 Full OpenAPI 3.0 specification is available in [openapi.yaml](openapi.yaml).
 
+### Streaming Events
+
+AgentOS supports Server-Sent Events (SSE) for monitoring agent execution in real time via:
+
+```
+POST /api/v1/agents/{agent_id}/run/stream
+```
+
+Query parameter `types` can be used to filter event categories (e.g. `types=token,complete,reasoning`).  
+Each event is delivered in the following structure:
+
+- `run_start`: Input payload and session metadata.
+- `reasoning`: Structured reasoning segments (`content`, `token_count`, `redacted_content`) produced by supported reasoning models.
+- `token`: Individual streaming tokens for response generation.
+- `tool_call`: Tool invocation details (name, arguments, result).
+- `complete`: Final response content, elapsed duration, aggregated token usage (including reasoning token estimates).
+- `error`: Rich error payload when execution fails.
+
+📦 需要将事件转发到 Logfire 或其他可观测性平台？请参考 [`cmd/examples/logfire_observability`](../../cmd/examples/logfire_observability) 示例（使用 `go run -tags logfire .`）以及文档 [`docs/release/logfire_observability.md`](../../docs/release/logfire_observability.md)。
+
+Refer to `pkg/agentos/events.go` for the latest schema definitions.
+
 ### Endpoints
 
 #### Health Check

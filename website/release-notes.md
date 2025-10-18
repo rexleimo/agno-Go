@@ -43,7 +43,7 @@ outline: deep
 - Minimal knowledge ingestion endpoint
   - `POST /api/v1/knowledge/content` supports `text/plain` and `application/json`
 
-Enterprise validation steps: see `docs/ENTERPRISE_MIGRATION_PLAN.md`.
+Enterprise validation steps: see [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md).
 
 ## Version 1.1.0 (2025-10-08)
 

@@ -15,6 +15,10 @@ const (
 	// EventRunStart indicates agent run has started
 	EventRunStart EventType = "run_start"
 
+	// EventReasoning 推理事件
+	// EventReasoning indicates reasoning content has been produced
+	EventReasoning EventType = "reasoning"
+
 	// EventToolCall 工具调用事件
 	// EventToolCall indicates a tool call event
 	EventToolCall EventType = "tool_call"
@@ -150,6 +154,42 @@ type CompleteData struct {
 	// TokenCount 令牌数量（可选）
 	// TokenCount is the token count (optional)
 	TokenCount int `json:"token_count,omitempty"`
+
+	// Reasoning 推理摘要（可选）
+	// Reasoning is an optional reasoning summary
+	Reasoning *ReasoningSummary `json:"reasoning,omitempty"`
+
+	// Usage 用量统计（可选）
+	// Usage provides usage statistics (optional)
+	Usage *UsageMetrics `json:"usage,omitempty"`
+}
+
+// ReasoningSummary provides a compact reasoning representation
+type ReasoningSummary struct {
+	Content         string  `json:"content"`
+	TokenCount      *int    `json:"token_count,omitempty"`
+	RedactedContent *string `json:"redacted_content,omitempty"`
+	Model           string  `json:"model,omitempty"`
+	Provider        string  `json:"provider,omitempty"`
+}
+
+// ReasoningData 推理事件数据
+// ReasoningData is the payload for reasoning events
+type ReasoningData struct {
+	Content         string  `json:"content"`
+	TokenCount      *int    `json:"token_count,omitempty"`
+	RedactedContent *string `json:"redacted_content,omitempty"`
+	MessageIndex    int     `json:"message_index"`
+	Model           string  `json:"model,omitempty"`
+	Provider        string  `json:"provider,omitempty"`
+}
+
+// UsageMetrics captures token usage details
+type UsageMetrics struct {
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
+	ReasoningTokens  int `json:"reasoning_tokens,omitempty"`
 }
 
 // ToSSE 将事件转换为 SSE 格式

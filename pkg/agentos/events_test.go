@@ -7,12 +7,15 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 func TestEventTypes(t *testing.T) {
 	// 测试所有事件类型常量
 	// Test all event type constants
 	assert.Equal(t, EventType("run_start"), EventRunStart)
+	assert.Equal(t, EventType("reasoning"), EventReasoning)
 	assert.Equal(t, EventType("tool_call"), EventToolCall)
 	assert.Equal(t, EventType("token"), EventToken)
 	assert.Equal(t, EventType("step_start"), EventStepStart)
@@ -162,6 +165,74 @@ func TestEventFilter_ShouldSend(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestBuildReasoningEvents(t *testing.T) {
+	messages := []*types.Message{
+		{
+			Role:             types.RoleAssistant,
+			Content:          "answer",
+			ReasoningContent: types.NewReasoningContent("step 1").WithTokenCount(42),
+		},
+		{
+			Role:             types.RoleAssistant,
+			Content:          "final answer",
+			ReasoningContent: types.NewReasoningContent("  ").WithTokenCount(10),
+		},
+	}
+
+	events, summary := buildReasoningEvents(messages, "provider", "model-x")
+	assert.Len(t, events, 1)
+	assert.NotNil(t, summary)
+	assert.Equal(t, "provider", summary.Provider)
+	assert.Equal(t, "model-x", summary.Model)
+	if summary.TokenCount == nil {
+		t.Fatal("expected summary to include token count")
+	}
+	assert.Equal(t, 42, *summary.TokenCount)
+
+	reasoningEvent := events[0]
+	assert.Equal(t, EventReasoning, reasoningEvent.Type)
+
+	data, ok := reasoningEvent.Data.(ReasoningData)
+	if !ok {
+		t.Fatalf("expected ReasoningData, got %T", reasoningEvent.Data)
+	}
+	assert.Equal(t, "step 1", data.Content)
+	assert.Equal(t, 0, data.MessageIndex)
+	assert.Equal(t, "provider", data.Provider)
+	assert.Equal(t, "model-x", data.Model)
+	if data.TokenCount == nil {
+		t.Fatal("expected token count in reasoning data")
+	}
+	assert.Equal(t, 42, *data.TokenCount)
+}
+
+func TestBuildUsageSummary(t *testing.T) {
+	usage := types.Usage{
+		PromptTokens:     12,
+		CompletionTokens: 34,
+		TotalTokens:      46,
+	}
+
+	metadata := map[string]interface{}{
+		"usage": usage,
+	}
+
+	summary := buildUsageSummary(metadata)
+	if assert.NotNil(t, summary) {
+		assert.Equal(t, 12, summary.PromptTokens)
+		assert.Equal(t, 34, summary.CompletionTokens)
+		assert.Equal(t, 46, summary.TotalTokens)
+	}
+
+	metadata["usage"] = &usage
+	summary = buildUsageSummary(metadata)
+	assert.NotNil(t, summary)
+
+	metadata["usage"] = "invalid"
+	summary = buildUsageSummary(metadata)
+	assert.Nil(t, summary)
 }
 
 func TestEventDataStructures(t *testing.T) {

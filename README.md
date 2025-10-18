@@ -5,472 +5,118 @@
 [![Test Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen.svg)](docs/DEVELOPMENT.md#testing-standards)
 [![Release](https://img.shields.io/badge/release-v1.2.1-blue.svg)](CHANGELOG.md)
 
-**Agno-Go** is a high-performance multi-agent system framework built with Go. Inheriting the Agno design philosophy, it leverages Go's concurrency model and performance advantages to build efficient, scalable AI agent systems.
+**Agno-Go** is a high-performance multi-agent framework written in Go. It keeps the KISS philosophy of the Agno project while embracing Go’s strengths: lightweight goroutines, a tiny memory footprint, single static binaries, and a batteries-included toolchain.
 
-## ✨ Highlights
+---
 
-- **🚀 High Performance**: 180ns agent instantiation, 1.2KB memory per agent ([16x faster than Python](website/advanced/performance.md))
-- **🛡️ Security First**: Built-in hooks & guardrails for input/output validation and prompt injection protection
-- **🤖 Production-Ready**: AgentOS HTTP server with RESTful API, session management, and agent registry
-- **🧩 Flexible Architecture**: Agent, Team (4 modes), Workflow (5 primitives)
-- **🔧 Extensible Tools**: Easy-to-extend toolkit system with built-in tools
-- **🔌 Multi-Model Support**: OpenAI, Anthropic Claude, GLM (智谱AI), Ollama (local models)
-- **💾 RAG Support**: ChromaDB integration with batch embeddings support
-- **✅ Well-Tested**: 80.8% test coverage, 85+ test cases, 100% pass rate
-- **📦 Easy Deployment**: Docker, Docker Compose, Kubernetes manifests included
-- **📚 Complete Documentation**: API docs (OpenAPI 3.0), deployment guides, VitePress website, examples
+## Feature Highlights
 
-## 📦 Installation
+- **🚀 Extreme performance** – agent instantiation in ~180 ns and (~1.2 KB) memory per agent, 16× faster than the Python version.
+- **🤖 Production ready** – AgentOS REST server (OpenAPI 3.0), session storage, health checks, structured logging, CORS, request timeouts.
+- **🧩 Flexible architecture** – build with Agents, Teams (4 coordination modes), or Workflows (5 primitives) and mix freely.
+- **🔌 Multi-provider models** – OpenAI (incl. o-series reasoning), Anthropic Claude, Google Gemini, DeepSeek, GLM, ModelScope, Ollama.
+- **🔧 Extensible tooling** – calculator, HTTP, file operations, search, plus an SDK for building bespoke toolkits or MCP connectors.
+- **💾 Knowledge & RAG** – ChromaDB integration, batching utilities, and ingestion helpers.
+- **🛡️ Guardrails & hooks** – prompt-injection guard, custom pre/post hooks, graceful degradation.
+- **📊 Observability** – rich SSE event stream with reasoning snapshots, Logfire / OpenTelemetry sample included.
+
+---
+
+## Getting Started
 
 ```bash
 go get github.com/rexleimo/agno-go
 ```
 
-## 🎯 Quick Start
-
 ```go
 package main
 
 import (
-    "context"
-    "fmt"
-    "log"
+	"context"
+	"fmt"
+	"os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+	"github.com/rexleimo/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/models/openai"
+	"github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
 )
 
 func main() {
-    // Create model
-    model, _ := openai.New("gpt-4o-mini", openai.Config{
-        APIKey: "your-api-key",
-    })
+	model, _ := openai.New("gpt-4o-mini", openai.Config{
+		APIKey: os.Getenv("OPENAI_API_KEY"),
+	})
 
-    // Create agent with tools
-    ag, _ := agent.New(agent.Config{
-        Name:     "Assistant",
-        Model:    model,
-        Toolkits: []toolkit.Toolkit{calculator.New()},
-    })
+	ag, _ := agent.New(agent.Config{
+		Name:     "Math Assistant",
+		Model:    model,
+		Toolkits: []toolkit.Toolkit{calculator.New()},
+	})
 
-    // Run agent
-    output, _ := ag.Run(context.Background(), "What is 25 * 4 + 15?")
-    fmt.Println(output.Content) // Output: 115
+	output, _ := ag.Run(context.Background(), "What is 25 * 4 + 15?")
+	fmt.Println(output.Content)
 }
 ```
 
-## 📖 Core Concepts
-
-### Agent
-An autonomous AI agent that can use tools, maintain conversation context, and validate inputs/outputs with hooks and guardrails.
-
-```go
-agent, err := agent.New(agent.Config{
-    Name:         "My Agent",
-    Model:        model,
-    Toolkits:     []toolkit.Toolkit{httpTools, calcTools},
-    Instructions: "You are a helpful assistant",
-    MaxLoops:     10,
-    PreHooks:     []hooks.Hook{promptInjectionGuard}, // Input validation
-    PostHooks:    []hooks.Hook{customOutputHook},     // Output validation
-})
-```
-
-### Hooks & Guardrails 🛡️
-
-Protect your agents with input/output validation hooks and built-in guardrails:
-
-```go
-// Built-in Guardrails
-promptGuard := guardrails.NewPromptInjectionGuardrail()
-
-// Custom Hooks
-customHook := func(ctx context.Context, input *hooks.HookInput) error {
-    if len(input.Input) < 5 {
-        return fmt.Errorf("input too short")
-    }
-    return nil
-}
-
-agent, _ := agent.New(agent.Config{
-    Model:     model,
-    PreHooks:  []hooks.Hook{customHook, promptGuard}, // Execute before processing
-    PostHooks: []hooks.Hook{outputValidator},         // Execute after response
-})
-```
-
-**Built-in Guardrails:**
-- `PromptInjectionGuardrail` - Detects jailbreak/prompt injection attempts
-- Custom guardrails - Implement the `Guardrail` interface
-
-See [examples/agent_with_guardrails](cmd/examples/agent_with_guardrails) for complete examples.
-
-### Models
-Abstraction over different LLM providers. We support 7 major providers:
-- ✅ **OpenAI** (GPT-4, GPT-3.5, etc.) - 44.6% test coverage
-- ✅ **Anthropic Claude** (Claude 3 Opus, Sonnet, Haiku) - 50.9% test coverage
-- ✅ **GLM** (智谱AI: GLM-4, GLM-4V, GLM-3-Turbo) - 57.2% test coverage ⭐ NEW
-- ✅ **Ollama** (Llama 2, Mistral, CodeLlama, all local models) - 43.8% test coverage
-- ✅ **DeepSeek** (DeepSeek-V2, DeepSeek-Coder)
-- ✅ **Google Gemini** (Gemini Pro, Flash)
-- ✅ **ModelScope** (Qwen, Yi models)
-
-```go
-// OpenAI
-model, err := openai.New("gpt-4o-mini", openai.Config{
-    APIKey:      os.Getenv("OPENAI_API_KEY"),
-    Temperature: 0.7,
-    MaxTokens:   1000,
-})
-
-// GLM (智谱AI) - Chinese domestic LLM
-glmModel, err := glm.New("glm-4", glm.Config{
-    APIKey:      os.Getenv("ZHIPUAI_API_KEY"), // Format: {key_id}.{key_secret}
-    Temperature: 0.7,
-    MaxTokens:   1024,
-})
-
-// Anthropic Claude
-claudeModel, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
-    APIKey: os.Getenv("ANTHROPIC_API_KEY"),
-})
-
-// Ollama (Local Models)
-ollamaModel, err := ollama.New("llama2", ollama.Config{
-    BaseURL: "http://localhost:11434",
-})
-```
-
-### 推理模型支持 / Reasoning Model Support
-
-agno-Go 原生支持最新的推理模型 (Reasoning Models),能够自动提取和展示模型的"思考过程"。
-
-agno-Go natively supports the latest reasoning models, automatically extracting and displaying the model's "thinking process".
-
-**支持的推理模型 / Supported Reasoning Models:**
-- ✅ **OpenAI**: o1-preview, o1-mini, o3, o4 系列
-- ✅ **Google Gemini**: 2.5+ Flash Thinking 系列
-- ✅ **Anthropic Claude**: 需要显式配置 thinking 参数 / Requires explicit configuration
-
-```go
-// 使用 OpenAI o1 推理模型 / Use OpenAI o1 reasoning model
-model, _ := openai.New("o1-preview", openai.Config{
-    APIKey: os.Getenv("OPENAI_API_KEY"),
-})
-
-agent, _ := agent.New(agent.Config{
-    Name:  "ReasoningAgent",
-    Model: model,
-})
-
-// 推理内容自动提取 / Reasoning content automatically extracted
-output, _ := agent.Run(ctx, "Solve this complex problem...")
-
-// 访问推理过程 / Access reasoning process
-for _, msg := range output.Messages {
-    if msg.ReasoningContent != nil {
-        fmt.Println("🧠 Thinking:", msg.ReasoningContent.Content)
-
-        // 可选字段 / Optional fields
-        if msg.ReasoningContent.TokenCount != nil {
-            fmt.Printf("📊 Tokens: %d\n", *msg.ReasoningContent.TokenCount)
-        }
-    }
-}
-```
-
-**特性 / Features:**
-- 🎯 **零配置**: 自动检测推理模型,无需额外配置 / Zero-config: Auto-detects reasoning models
-- 🚀 **性能优化**: 仅对推理模型执行提取操作 / Performance-optimized: Extraction only for reasoning models
-- 🛡️ **优雅降级**: 提取失败不影响 Agent 执行 / Graceful degradation: Failures don't interrupt execution
-- 📦 **开箱即用**: 集成到 Agent 核心,无需手动处理 / Out-of-the-box: Integrated into Agent core
-
-📖 查看完整示例 / See full example: [examples/reasoning](examples/reasoning/)
-
-### Tools
-Extend agent capabilities with custom functions.
-
-```go
-type MyToolkit struct {
-    *toolkit.BaseToolkit
-}
-
-func New() *MyToolkit {
-    t := &MyToolkit{
-        BaseToolkit: toolkit.NewBaseToolkit("my_tools"),
-    }
-
-    t.RegisterFunction(&toolkit.Function{
-        Name:        "my_function",
-        Description: "Does something useful",
-        Parameters: map[string]toolkit.Parameter{
-            "input": {Type: "string", Required: true},
-        },
-        Handler: t.myHandler,
-    })
-
-    return t
-}
-```
-
-### Memory
-Manages conversation history with automatic truncation.
-
-```go
-memory := memory.NewInMemory(100) // Keep last 100 messages
-```
-
-### Storage Control
-
-Control which messages are stored in Agent outputs:
-
-```go
-// Don't store tool messages (tool calls and tool responses)
-storeToolMessages := false
-agent, _ := agent.New(agent.Config{
-    Name:              "agent",
-    Model:             model,
-    Toolkits:          []toolkit.Toolkit{calculator.New()},
-    StoreToolMessages: &storeToolMessages, // Filter tool messages
-})
-
-// Don't store history messages (only keep current Run messages)
-storeHistoryMessages := false
-agent, _ := agent.New(agent.Config{
-    Name:                 "agent",
-    Model:                model,
-    StoreHistoryMessages: &storeHistoryMessages, // Only current messages
-})
-```
-
-**Use Cases:**
-- `StoreToolMessages=false`: Privacy-sensitive scenarios, hide tool call details
-- `StoreHistoryMessages=false`: Stateless scenarios, each Run is independent
-- Combined: Minimal storage for logging and audit purposes
-
-See [storage_control example](cmd/examples/storage_control) for complete examples.
-
-### Workflow History
-
-Enable multi-turn conversations by maintaining context across workflow runs. Each session independently stores its history, automatically injected into agents.
-
-```go
-// Create workflow with history enabled
-storage := workflow.NewMemoryStorage(100)
-wf, _ := workflow.New(workflow.Config{
-    ID:                "chat-workflow",
-    EnableHistory:     true,           // Enable history
-    HistoryStore:      storage,        // History storage
-    NumHistoryRuns:    5,              // Remember last 5 runs
-    AddHistoryToSteps: true,           // Auto-inject to steps
-    Steps:             []workflow.Node{chatStep},
-})
-
-// Multi-turn conversation with memory
-result1, _ := wf.Run(ctx, "Hello, my name is Alice", "session-123")
-// Assistant: Hello Alice! Nice to meet you.
-
-result2, _ := wf.Run(ctx, "What's my name?", "session-123")
-// Assistant: Your name is Alice!  (remembers from previous run)
-```
-
-**Features**:
-- 🔒 **Session Isolation**: Each session has independent history
-- ⚡ **High Performance**: <0.2ms overhead for 100 history entries
-- 🛡️ **Safe Injection**: Uses temporary instructions, doesn't modify agent config
-- 🔧 **Flexible Control**: Configure per-workflow or per-step
-
-📖 [Complete Documentation](website/guide/workflow-history.md) | [Examples](cmd/examples/workflow_history)
-
-## 🛠️ Built-in Tools
-
-Following KISS principle, we provide essential tools with high quality:
-- **Calculator**: Basic math operations (75.6% coverage)
-- **HTTP**: Make HTTP GET/POST requests (88.9% coverage)
-- **File Operations**: Read, write, list, delete files with security controls (76.2% coverage)
-- **Search**: DuckDuckGo web search (92.1% coverage)
-
-## 🧠 Knowledge & RAG
-
-Build intelligent agents with knowledge bases and semantic search:
-
-### Vector Database
-- **ChromaDB**: Full integration with local and cloud instances
-- Automatic embedding generation
-- Metadata filtering and semantic search
-
-### Embeddings
-- **OpenAI**: text-embedding-3-small/large support
-- Automatic batch processing
-- 1536/3072 dimensional embeddings
-
-### Example RAG Application
-
-```go
-// Create embedding function
-embedFunc, _ := openai.New(openai.Config{
-    APIKey: os.Getenv("OPENAI_API_KEY"),
-    Model:  "text-embedding-3-small",
-})
-
-// Create vector database
-db, _ := chromadb.New(chromadb.Config{
-    CollectionName:    "knowledge_base",
-    EmbeddingFunction: embedFunc,
-})
-
-// Add documents (embeddings generated automatically)
-db.Add(ctx, []vectordb.Document{
-    {ID: "doc1", Content: "AI is the future..."},
-})
-
-// Query with natural language
-results, _ := db.Query(ctx, "What is AI?", 5, nil)
-```
-
-See [RAG Demo](cmd/examples/rag_demo/) for a complete example.
-
-## 📁 Project Structure
-
-```
-agno-go/
-├── pkg/agno/
-│   ├── agent/          # Agent core (74.7% coverage)
-│   ├── team/           # Multi-agent collaboration (92.3% coverage)
-│   ├── workflow/       # Workflow engine (80.4% coverage)
-│   ├── reasoning/      # Reasoning model support (96.9% coverage) ⭐ NEW
-│   ├── models/         # LLM providers (6 providers)
-│   │   ├── openai/     # OpenAI (44.6% coverage)
-│   │   ├── anthropic/  # Claude (50.9% coverage)
-│   │   ├── ollama/     # Ollama (43.8% coverage)
-│   │   ├── deepseek/   # DeepSeek
-│   │   ├── gemini/     # Google Gemini
-│   │   ├── modelscope/ # ModelScope
-│   │   └── base.go     # Model interface
-│   ├── tools/          # Tool system
-│   │   ├── toolkit/    # Toolkit interface (91.7% coverage)
-│   │   ├── calculator/ # Math tools (75.6% coverage)
-│   │   ├── http/       # HTTP tools (88.9% coverage)
-│   │   ├── file/       # File operations (76.2% coverage)
-│   │   └── search/     # Web search (92.1% coverage)
-│   ├── vectordb/       # Vector database
-│   │   ├── base.go     # VectorDB interface
-│   │   └── chromadb/   # ChromaDB implementation
-│   ├── embeddings/     # Embedding functions
-│   │   └── openai/     # OpenAI embeddings
-│   ├── knowledge/      # Knowledge management
-│   ├── memory/         # Memory management (93.1% coverage)
-│   └── types/          # Core types (100% coverage ⭐)
-├── cmd/examples/       # Example programs
-│   ├── simple_agent/   # Basic agent example
-│   ├── team_demo/      # Multi-agent collaboration
-│   ├── workflow_demo/  # Workflow example
-│   └── rag_demo/       # RAG pipeline example
-├── docs/               # Internal docs (design/WIP/dev)
-│   ├── DEVELOPMENT.md  # Development guide
-│   ├── VITEPRESS.md    # Docs site setup
-│   ├── ENTERPRISE_MIGRATION_PLAN.md
-│   └── task/           # Task specs
-├── website/            # VitePress documentation (implemented features)
-├── Makefile            # Build commands
-└── go.mod              # Dependencies
-```
-
-## 🧪 Testing
-
-We maintain **>70% test coverage** for all core packages:
+Run the production server with Docker:
 
 ```bash
-# Run all tests
-make test
-
-# Generate coverage report (creates coverage.html)
-make coverage
-
-# Run linter
-make lint
+docker compose up -d
+curl http://localhost:8080/health
 ```
 
-**Current Coverage**:
-- Types: 100% ⭐
-- Reasoning: 96.9% ⭐ NEW
-- Memory: 93.1%
-- Team: 92.3%
-- Toolkit: 91.7%
-- HTTP Tools: 88.9%
-- Workflow: 80.4%
-- File Tools: 76.2%
-- Calculator: 75.6%
-- Agent: 74.7%
+---
 
-## 📚 Examples
+## Documentation
 
-See [`cmd/examples/`](cmd/examples/) and [`examples/`](examples/) for complete examples:
-- `simple_agent`: Basic agent with OpenAI and calculator tools
-- `claude_agent`: Anthropic Claude integration with tools
-- `ollama_agent`: Local model support with Ollama
-- `reasoning`: OpenAI o1/Gemini 2.5 reasoning models with automatic thinking extraction ⭐ NEW
-- `team_demo`: Multi-agent collaboration with 4 coordination modes
-- `workflow_demo`: Workflow engine with 5 control flow primitives
+| Resource | Link |
+| --- | --- |
+| Guides | https://rexleimo.github.io/agno-Go/guide/ |
+| API Reference | https://rexleimo.github.io/agno-Go/api/ |
+| Advanced Topics | https://rexleimo.github.io/agno-Go/advanced/ |
+| Examples | https://rexleimo.github.io/agno-Go/examples/ |
+| Release Notes | https://rexleimo.github.io/agno-Go/release-notes |
+| Internal / WIP Docs | [`docs/`](docs/) |
 
-## 🎯 Roadmap
+`docs/README.md` explains the split between the public site (`website/`) and internal design notes (`docs/`).
 
-> **KISS Principle**: Focus on quality over quantity. 3 core LLMs, 5 essential tools, 1 vector DB.
+---
 
-### ✅ M1: Core Framework (Week 1-2) - COMPLETED
-- [x] Agent core with Run method (74.7% coverage)
-- [x] OpenAI model integration (44.6% coverage)
-- [x] Basic tools: Calculator, HTTP, File Operations
-- [x] Memory management (93.1% coverage)
-- [x] Types package (100% coverage ⭐)
-- [x] Example programs
+## Observability & Reasoning
 
-### ✅ M2: Extensions (Week 3-4) - 100% COMPLETE
-- [x] Team (4 coordination modes, 92.3% coverage)
-- [x] Workflow (5 primitives, 80.4% coverage)
-- [x] Anthropic Claude integration (50.9% coverage)
-- [x] Ollama local model support (43.8% coverage)
-- [x] DuckDuckGo search tool (92.1% coverage)
-- [x] Performance benchmarks ([details](website/advanced/performance.md))
-- [x] Model provider refactoring (common utilities, 84.8% coverage)
-- [x] Documentation (README, CLAUDE.md, models/README.md)
+- **SSE Event Stream** – `POST /api/v1/agents/{id}/run/stream?types=run_start,reasoning,token,complete` emits structured events. `reasoning` events carry token counts, redacted transcripts, and provider metadata; `complete` events summarise the run.
+- **Logfire Integration** – `cmd/examples/logfire_observability` shows how to export spans with OpenTelemetry (build with `-tags logfire`). Detailed walkthrough: [`docs/release/logfire_observability.md`](docs/release/logfire_observability.md).
 
-**Performance Achieved**:
-- ⚡ Agent instantiation: **180ns** (5x better than 1μs target)
-- 💾 Memory per agent: **1.2KB** (60% better than 3KB target)
-- 🚀 16x faster than Python version
+---
 
-### ✅ M3: Knowledge & Storage (Week 5-6) - 100% COMPLETE
-- [x] VectorDB interface design
-- [x] Knowledge package - Document loaders (Text, Directory, Reader)
-- [x] Knowledge package - Chunkers (Character, Sentence, Paragraph)
- - [x] Vector DB implementation (ChromaDB)
- - [x] RAG workflow example
+## Example Catalogue
 
-### ✅ M4: Production Ready (Week 7-8) - 100% COMPLETE
-- [x] Performance optimization
-- [x] Complete documentation and examples (VitePress site under `website/`; design/WIP under `docs/`)
-- [x] v1.0.0 release (see CHANGELOG)
+| Example | Highlights | Run |
+| --- | --- | --- |
+| **Simple Agent** (`cmd/examples/simple_agent/`) | GPT‑4o mini, calculator toolkit, single agent | `go run cmd/examples/simple_agent/main.go` |
+| **Claude Agent** (`cmd/examples/claude_agent/`) | Anthropic Claude 3.5, HTTP + calculator tools | `go run cmd/examples/claude_agent/main.go` |
+| **Ollama Agent** (`cmd/examples/ollama_agent/`) | Local Llama 3 via Ollama, file operations | `go run cmd/examples/ollama_agent/main.go` |
+| **Team Demo** (`cmd/examples/team_demo/`) | 4 coordination modes, researcher + writer workflow | `go run cmd/examples/team_demo/main.go` |
+| **Workflow Demo** (`cmd/examples/workflow_demo/`) | Step / condition / loop / parallel orchestration | `go run cmd/examples/workflow_demo/main.go` |
+| **RAG Demo** (`cmd/examples/rag_demo/`) | ChromaDB, embeddings, document Q&A | `go run cmd/examples/rag_demo/main.go` |
+| **Reasoning Demo** (`examples/reasoning/`) | OpenAI o1 / Gemini 2.5 thinking extraction | `go run examples/reasoning/main.go` |
+| **Logfire Observability** (`cmd/examples/logfire_observability/`) | OpenTelemetry spans + reasoning metadata | `go run -tags logfire cmd/examples/logfire_observability/main.go` |
 
-## 🤝 Contributing
+More details live in the [Examples documentation](website/examples/index.md).
 
-Contributions are welcome! Please read:
-- [DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development guide and code standards
-- [Architecture](website/advanced/architecture.md) - System architecture and design
-- [Performance](website/advanced/performance.md) - Performance benchmarks
-- [VITEPRESS.md](docs/VITEPRESS.md) - Documentation website setup and deployment
-- [CLAUDE.md](CLAUDE.md) - Project overview and quick reference
+---
 
-## 📄 License
+## Development & Contribution
 
-MIT License - see [LICENSE](LICENSE) for details.
+1. Read [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for tooling, linting, and testing workflow.
+2. Docs: follow the structure in [`docs/README.md`](docs/README.md) and update the VitePress site (`website/`) when promoting features.
+3. Run targeted tests, then `go test ./...` (with `GOCACHE=$(pwd)/.gocache` when sandboxed).
+4. Submit PRs with lint/test evidence. Adhere to Conventional Commits.
 
-## 🙏 Acknowledgments
+For ongoing changes and release scope, see [`CHANGELOG.md`](CHANGELOG.md) and the VitePress site’s release notes (`website/release-notes.md`).
 
-Inspired by [Agno Python](https://github.com/agno-agi/agno) framework.
+---
 
-## 📞 Contact
+## License
 
-- Issues: [GitHub Issues](https://github.com/rexleimo/agno-go/issues)
-- Discussions: [GitHub Discussions](https://github.com/rexleimo/agno-go/discussions)
+MIT © [Contributors](https://github.com/rexleimo/agno-Go/graphs/contributors). Inspired by the [Agno (Python)](https://github.com/agno-agi/agno) framework.

@@ -43,7 +43,7 @@ outline: deep
 - 最小化知识入库端点
   - `POST /api/v1/knowledge/content` 支持 `text/plain` 与 `application/json`
 
-企业验收步骤请参考 `docs/ENTERPRISE_MIGRATION_PLAN.md`。
+企业验收步骤请参考 [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md)。
 
 ## Version 1.1.0 (2025-10-08)
 

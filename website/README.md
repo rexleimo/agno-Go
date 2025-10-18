@@ -34,7 +34,7 @@ The dev server will be available at `http://localhost:5173` with hot reload.
 ```
 website/
 ├── .vitepress/
-│   └── config.ts          # VitePress configuration
+│   └── config.mjs         # VitePress configuration (ESM). If using TypeScript, use config.ts
 ├── index.md               # Homepage (Hero + Features)
 ├── guide/                 # User guides
 │   ├── index.md          # What is Agno-Go?
@@ -69,7 +69,7 @@ website/
 
 ### Site Configuration
 
-Edit `.vitepress/config.ts` to modify:
+Edit `.vitepress/config.mjs` (or `.vitepress/config.ts` if using TypeScript) to modify:
 
 - Site title and description
 - Base URL (set to `/agno-Go/` for GitHub Pages)
@@ -80,7 +80,7 @@ Edit `.vitepress/config.ts` to modify:
 
 ### Important: Base URL
 
-The `base` option is set to `/agno-Go/` to match the GitHub repository name. If deploying elsewhere, update this value:
+The `base` option is set to `/agno-Go/` to match the GitHub repository name. If deploying elsewhere, update this value in `.vitepress/config.mjs`:
 
 ```ts
 export default defineConfig({
@@ -217,7 +217,24 @@ npm run docs:build
 
 ### Missing Sidebar Items
 
-Ensure your markdown files have proper frontmatter and are referenced in `.vitepress/config.ts` sidebar configuration.
+Ensure your markdown files have proper frontmatter and are referenced in `.vitepress/config.mjs` (or `.ts`) sidebar configuration.
+
+## Internationalization (i18n)
+
+This site is configured with multiple locales using VitePress v1.x `locales`.
+
+- Directories: create one per language, e.g. `website/zh`, `website/ja`, `website/ko`.
+- Each locale should have at least `index.md`, `guide/`, `api/`, `advanced/`, `examples/` as needed.
+- Add the locale to `locales` in `.vitepress/config.mjs`, with `label`, `lang`, `title`, `description`.
+- Provide locale-specific nav/sidebar in that locale’s `themeConfig` (already set up in this repo).
+
+To add a new language (e.g., Spanish `es`):
+
+1. Create folders and seed content:
+   - `website/es/index.md`
+   - `website/es/guide/index.md` (and other sections as needed)
+2. Update `.vitepress/config.mjs` → `locales.es = { label, lang, title, description, themeConfig }`.
+3. Run `npm run docs:build` and verify `website/.vitepress/dist/es/` is generated.
 
 ## Contributing
 

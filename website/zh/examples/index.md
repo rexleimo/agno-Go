@@ -143,6 +143,28 @@ go run cmd/examples/rag_demo/main.go
 
 ---
 
+### 7. Logfire 可观测性 / Logfire Observability
+
+通过 OpenTelemetry 将推理信息与 token 统计发送到 Logfire。
+
+**位置 / Location**: `cmd/examples/logfire_observability/`
+
+**功能 / Features**:
+- 可配置的 OTLP/HTTP 导出端点（支持 EU / US）
+- 将 reasoning 内容与 token 指标写入 span 事件
+- 兼容所有支持 reasoning 的模型（OpenAI o 系列、Gemini 2.5、开启 thinking 的 Claude）
+
+**运行 / Run**:
+```bash
+export OPENAI_API_KEY=sk-your-key
+export LOGFIRE_WRITE_TOKEN=lf_your_token
+go run -tags logfire cmd/examples/logfire_observability/main.go
+```
+
+[查看源码 / View Source](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/logfire_observability)
+
+---
+
 ## 代码片段 / Code Snippets
 
 ### 带多个工具的 Agent / Agent with Multiple Tools

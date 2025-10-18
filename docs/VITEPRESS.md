@@ -38,7 +38,7 @@ agno-Go/
 ├── package.json              # Node.js dependencies | 依赖配置
 ├── website/                  # VitePress documentation | 文档目录
 │   ├── .vitepress/
-│   │   └── config.ts        # Site configuration | 站点配置
+│   │   └── config.mjs       # Site configuration (ESM) | 站点配置（ESM）。如使用 TS，可用 config.ts
 │   ├── index.md             # Homepage | 首页
 │   ├── guide/               # User guides | 用户指南
 │   │   ├── index.md         # What is Agno-Go? | 什么是 Agno-Go？
@@ -125,7 +125,7 @@ npm run docs:preview
    touch website/guide/my-new-guide.md
    ```
 
-2. **Edit config | 编辑配置** (`website/.vitepress/config.ts`):
+2. **Edit config | 编辑配置** (`website/.vitepress/config.mjs` 或 `config.ts`):
    ```ts
    sidebar: {
      '/guide/': [
@@ -188,7 +188,7 @@ func main() { // highlighted lines | 高亮行
 
 ### Site Settings | 站点设置
 
-Edit | 编辑 `website/.vitepress/config.ts`:
+Edit | 编辑 `website/.vitepress/config.mjs`（或 `config.ts`）:
 
 ```ts
 export default defineConfig({
@@ -324,7 +324,7 @@ npm run docs:build
 
 **Check base config | 检查 base 配置**:
 ```ts
-// website/.vitepress/config.ts
+// website/.vitepress/config.mjs
 base: '/agno-Go/',  // Must be correct! | 必须正确！
 ```
 
@@ -410,7 +410,7 @@ Value: rexleimo.github.io
 
 ### Step 3: Update VitePress Config | 更新 VitePress 配置
 
-Edit | 编辑 `website/.vitepress/config.ts`:
+Edit | 编辑 `website/.vitepress/config.mjs`（或 `config.ts`）:
 
 ```ts
 export default defineConfig({
@@ -430,6 +430,11 @@ docs.agno-go.com
 ---
 
 ## 📚 Resources | 资源
+
+### i18n (Locales) | 多语言（Locales）
+- Configure locales under `locales` in `config.mjs` with `root` and language keys (e.g., `zh`, `ja`, `ko`).
+- Provide per-locale `themeConfig` for nav and sidebar (already present in this repo).
+- Create matching content folders: `website/<lang>/` with `index.md`, `guide/`, `api/`, etc.
 
 ### Official Documentation | 官方文档
 - [VitePress Docs](https://vitepress.dev/)

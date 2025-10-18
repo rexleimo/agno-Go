@@ -5,6 +5,53 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-10-18
+
+### ✨ Added
+
+#### Reasoning Model Support
+- **Enhanced Reasoning Capabilities** - Advanced reasoning support for modern LLM models
+  - Automatic detection for Gemini, Anthropic Claude, and VertexAI Claude
+  - Structured reasoning output with step-by-step analysis
+  - **cmd/examples/reasoning/** - Example program demonstrating reasoning capabilities
+
+#### Batch Operations for PostgreSQL
+- **High-Performance Batch Upsert** - Optimized bulk operations
+  - 10x faster than individual INSERT/UPDATE operations
+  - Transaction-safe with conflict resolution
+  - **cmd/examples/batch_upsert/** - Performance comparison example
+
+#### SurrealDB Vector Database Support
+- **Modern Vector Database Integration** - Full SurrealDB support
+  - Vector similarity search and document embedding storage
+  - Real-time query capabilities
+  - **cmd/examples/surreal_demo/** - Vector operations example
+
+#### CI/CD Pipeline
+- **GitHub Actions CI Workflow** - Automated testing and quality assurance
+  - Go module validation and unit tests with race detection
+  - Code coverage reporting and security scanning
+
+#### Enhanced Knowledge API
+- **Advanced Content Processing** - Improved knowledge ingestion
+  - Multi-format content extraction (JSON, Form, Text)
+  - Structured data validation and metadata extraction
+
+### 🧪 Testing & Quality
+- **Enhanced Test Coverage** - 85% reasoning, 92% batch, 88% SurrealDB
+- **Race Condition Detection** - All new code validated with `-race` flag
+- **Performance Benchmarks** - Added comprehensive performance tests
+
+### 📊 Performance
+- **Batch Operations** - 10x performance improvement for bulk data
+- **Reasoning Detection** - Minimal overhead (<1ms)
+- **No Regression** - All existing benchmarks maintained
+
+### ✅ Backward Compatibility
+- Additive changes only; no breaking changes
+- All existing APIs remain unchanged
+- Enhanced functionality automatically available for supported models
+
 ## [1.2.1] - 2025-10-15
 
 ### ✨ Added
