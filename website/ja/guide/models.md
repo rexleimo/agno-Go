@@ -27,6 +27,21 @@ Agno-Goは統一されたインターフェースで複数のLLMプロバイダ�
 - プライバシー重視
 - APIコストなし
 
+### Groq ⭐ v1.1.0で追加
+- 超高速推論 (LLaMA 3.1、Mixtral、Gemma)
+- 速度に最適化
+- 低遅延応答
+
+### 推論モデル ⭐ v1.2.1で追加
+- Gemini、Anthropic、VertexAI Claudeの推論機能サポート
+- 強化された推論能力
+- 構造化された推論出力
+
+### Groq ⭐ v1.1.0で追加
+- 超高速推論 (LLaMA 3.1、Mixtral、Gemma)
+- 速度に最適化
+- 低遅延応答
+
 ---
 
 ## OpenAI
@@ -583,6 +598,73 @@ if messageCount > 50 {
 
 ---
 
+## 推論モデルサポート ⭐ 新機能
+
+Agno-Go v1.2.1 は高度なモデルに推論サポートを追加しました:
+
+### サポートされているモデル
+- **Gemini** - 高度な推論能力
+- **Anthropic Claude** - 構造化出力による強化された推論
+- **VertexAI Claude** - Google CloudのClaude推論機能
+
+### 使用方法
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/reasoning"
+
+// 推論をサポートするモデルの推論を有効にする
+model, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+    APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+})
+
+// 推論は利用可能な場合に自動的に検出され使用される
+output, _ := agent.Run(ctx, "この複雑な問題を段階的に解決してください...")
+```
+
+### 特徴
+- **自動検出** - 推論はサポートされているモデルで自動的に有効化
+- **構造化出力** - 推論ステップがキャプチャされ構造化される
+- **強化された能力** - より良い問題解決と複雑な推論
+
+### 例
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+)
+
+func main() {
+    model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+        APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    agent, _ := agent.New(agent.Config{
+        Name:  "推論アシスタント",
+        Model: model,
+    })
+
+    // 複雑な推論タスク
+    output, _ := agent.Run(context.Background(),
+        "量子計算の概念を段階的に説明してください。重ね合わせと量子もつれを含めて。")
+
+    fmt.Println(output.Content)
+    // 出力には構造化された推論ステップが含まれる
+}
+```
+
+---
+
 ## 環境設定
 
 `.env`ファイルを作成:
@@ -619,6 +701,7 @@ func init() {
 - 会話履歴については[Memory](/guide/memory)を参照
 - 混合モデルで[Teams](/guide/team)を構築
 - 実際の使用法については[Examples](/examples/)を参照
+- 推論機能については[Reasoning](/guide/reasoning)を参照
 
 ---
 
@@ -628,3 +711,4 @@ func init() {
 - [Claude Agent](/examples/claude-agent) - Anthropicの例
 - [GLM Agent](/examples/glm-agent) - GLM (智谱AI)の例
 - [Ollama Agent](/examples/ollama-agent) - ローカルモデルの例
+- [Reasoning Agent](/examples/reasoning-agent) - 推論モデルの例

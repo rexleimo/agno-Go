@@ -13,6 +13,7 @@
 - **Calculator**: 基本的な数学演算
 - **HTTP**: Webリクエストを実行
 - **File**: 安全制御付きのファイル読み書き
+- **Google Sheets** ⭐ 新機能: Google Sheetsデータの読み書き (v1.2.1)
 
 ---
 
@@ -420,6 +421,104 @@ args := map[string]interface{}{
 
 ---
 
+## Google Sheets ツール ⭐ 新機能
+
+サービスアカウント認証を使用してGoogle Sheetsデータを読み書きします。
+
+### 操作
+
+- `read_range(spreadsheet_id, range)` - 指定された範囲からデータを読み取り
+- `write_range(spreadsheet_id, range, values)` - 指定された範囲にデータを書き込み
+- `append_rows(spreadsheet_id, range, values)` - スプレッドシートに行を追加
+
+### 設定
+
+1. **サービスアカウントを作成**:
+   - Google Cloud Consoleにアクセス
+   - サービスアカウントを作成
+   - JSON認証情報ファイルをダウンロード
+
+2. **スプレッドシートを共有**:
+   - Google Sheetをサービスアカウントのメールアドレスと共有
+   - "編集者"権限を付与
+
+### 使用方法
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
+
+// JSONファイルから認証情報を読み込み
+sheetsTool, err := googlesheets.New(googlesheets.Config{
+    CredentialsFile: "./service-account.json",
+})
+
+// またはJSON文字列を使用
+sheetsTool, err := googlesheets.New(googlesheets.Config{
+    CredentialsJSON: os.Getenv("GOOGLE_SHEETS_CREDENTIALS"),
+})
+
+agent, _ := agent.New(agent.Config{
+    Model:    model,
+    Toolkits: []toolkit.Toolkit{sheetsTool},
+})
+```
+
+### 例
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+)
+
+func main() {
+    model, _ := openai.New("gpt-4o-mini", openai.Config{
+        APIKey: os.Getenv("OPENAI_API_KEY"),
+    })
+
+    sheetsTool, err := googlesheets.New(googlesheets.Config{
+        CredentialsFile: "./service-account.json",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    agent, _ := agent.New(agent.Config{
+        Name:     "データアナリスト",
+        Model:    model,
+        Toolkits: []toolkit.Toolkit{sheetsTool},
+    })
+
+    // Agentはスプレッドシートデータを読み取り分析可能
+    output, _ := agent.Run(context.Background(),
+        "Sheet1!A1:D100から売上データを読み取り、総収入を要約してください")
+
+    fmt.Println(output.Content)
+}
+```
+
+### 範囲表記
+
+範囲には標準のA1表記を使用：
+- `Sheet1!A1:B10` - Sheet1のA1からB10セル
+- `Sheet2!A:A` - Sheet2のA列全体
+- `Sheet1!1:5` - Sheet1の1から5行
+
+### セキュリティ
+
+- サービスアカウント認証（ユーザー操作不要）
+- スプレッドシートレベルの権限
+- 共有設定による読み書きアクセスの制御
+
 ## 次のステップ
 
 - 会話状態については[Memory](/guide/memory)を参照
@@ -434,3 +533,4 @@ args := map[string]interface{}{
 - [Simple Agent](/examples/simple-agent) - Calculator toolの使用
 - [Search Agent](/examples/search-agent) - Web検索用のHTTP tool
 - [File Agent](/examples/file-agent) - ファイル操作
+- [Google Sheets Agent](/examples/googlesheets-agent) - Google Sheets統合

@@ -13,6 +13,7 @@ Tools are functions that agents can call to interact with external systems, perf
 - **Calculator**: Basic math operations
 - **HTTP**: Make web requests
 - **File**: Read/write files with safety controls
+- **Google Sheets** ⭐ NEW: Read/write Google Sheets data (v1.2.1)
 
 ---
 
@@ -419,6 +420,104 @@ args := map[string]interface{}{
 ```
 
 ---
+
+## Google Sheets Tool ⭐ NEW
+
+Read and write data to Google Sheets using service account authentication.
+
+### Operations
+
+- `read_range(spreadsheet_id, range)` - Read data from specified range
+- `write_range(spreadsheet_id, range, values)` - Write data to specified range
+- `append_rows(spreadsheet_id, range, values)` - Append rows to spreadsheet
+
+### Setup
+
+1. **Create Service Account**:
+   - Go to Google Cloud Console
+   - Create a service account
+   - Download JSON credentials file
+
+2. **Share Spreadsheet**:
+   - Share your Google Sheet with the service account email
+   - Grant "Editor" permissions
+
+### Usage
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
+
+// Load credentials from JSON file
+sheetsTool, err := googlesheets.New(googlesheets.Config{
+    CredentialsFile: "./service-account.json",
+})
+
+// Or use JSON string
+sheetsTool, err := googlesheets.New(googlesheets.Config{
+    CredentialsJSON: os.Getenv("GOOGLE_SHEETS_CREDENTIALS"),
+})
+
+agent, _ := agent.New(agent.Config{
+    Model:    model,
+    Toolkits: []toolkit.Toolkit{sheetsTool},
+})
+```
+
+### Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+)
+
+func main() {
+    model, _ := openai.New("gpt-4o-mini", openai.Config{
+        APIKey: os.Getenv("OPENAI_API_KEY"),
+    })
+
+    sheetsTool, err := googlesheets.New(googlesheets.Config{
+        CredentialsFile: "./service-account.json",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    agent, _ := agent.New(agent.Config{
+        Name:     "Data Analyst",
+        Model:    model,
+        Toolkits: []toolkit.Toolkit{sheetsTool},
+    })
+
+    // Agent can read and analyze spreadsheet data
+    output, _ := agent.Run(context.Background(),
+        "Read the sales data from Sheet1!A1:D100 and summarize the total revenue")
+
+    fmt.Println(output.Content)
+}
+```
+
+### Range Notation
+
+Use standard A1 notation for ranges:
+- `Sheet1!A1:B10` - Cells A1 to B10 in Sheet1
+- `Sheet2!A:A` - Entire column A in Sheet2
+- `Sheet1!1:5` - Rows 1 to 5 in Sheet1
+
+### Security
+
+- Service account authentication (no user interaction)
+- Spreadsheet-level permissions
+- Read/write access controlled by sharing settings
 
 ## Next Steps
 

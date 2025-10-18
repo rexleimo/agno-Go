@@ -13,6 +13,7 @@ Tools 是 Agent 可以调用的函数,用于与外部系统交互、执行计算
 - **Calculator**: 基础数学运算
 - **HTTP**: 发起网络请求
 - **File**: 带安全控制的读写文件
+- **Google Sheets** ⭐ 新增: 读写 Google Sheets 数据 (v1.2.1)
 
 ---
 
@@ -419,6 +420,104 @@ args := map[string]interface{}{
 ```
 
 ---
+
+## Google Sheets 工具 ⭐ 新增
+
+使用服务账号认证读写 Google Sheets 数据。
+
+### 操作
+
+- `read_range(spreadsheet_id, range)` - 从指定范围读取数据
+- `write_range(spreadsheet_id, range, values)` - 向指定范围写入数据
+- `append_rows(spreadsheet_id, range, values)` - 向电子表格追加行
+
+### 设置
+
+1. **创建服务账号**:
+   - 前往 Google Cloud Console
+   - 创建服务账号
+   - 下载 JSON 凭据文件
+
+2. **共享电子表格**:
+   - 将您的 Google Sheet 共享给服务账号邮箱
+   - 授予"编辑者"权限
+
+### 使用方法
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
+
+// 从 JSON 文件加载凭据
+sheetsTool, err := googlesheets.New(googlesheets.Config{
+    CredentialsFile: "./service-account.json",
+})
+
+// 或使用 JSON 字符串
+sheetsTool, err := googlesheets.New(googlesheets.Config{
+    CredentialsJSON: os.Getenv("GOOGLE_SHEETS_CREDENTIALS"),
+})
+
+agent, _ := agent.New(agent.Config{
+    Model:    model,
+    Toolkits: []toolkit.Toolkit{sheetsTool},
+})
+```
+
+### 示例
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+)
+
+func main() {
+    model, _ := openai.New("gpt-4o-mini", openai.Config{
+        APIKey: os.Getenv("OPENAI_API_KEY"),
+    })
+
+    sheetsTool, err := googlesheets.New(googlesheets.Config{
+        CredentialsFile: "./service-account.json",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    agent, _ := agent.New(agent.Config{
+        Name:     "数据分析师",
+        Model:    model,
+        Toolkits: []toolkit.Toolkit{sheetsTool},
+    })
+
+    // Agent 可以读取和分析电子表格数据
+    output, _ := agent.Run(context.Background(),
+        "从 Sheet1!A1:D100 读取销售数据并总结总收入")
+
+    fmt.Println(output.Content)
+}
+```
+
+### 范围表示法
+
+使用标准 A1 表示法表示范围：
+- `Sheet1!A1:B10` - Sheet1 中的 A1 到 B10 单元格
+- `Sheet2!A:A` - Sheet2 中的整个 A 列
+- `Sheet1!1:5` - Sheet1 中的 1 到 5 行
+
+### 安全性
+
+- 服务账号认证（无需用户交互）
+- 电子表格级别权限
+- 通过共享设置控制读写访问
 
 ## 下一步
 

@@ -27,6 +27,16 @@ Agno-Go는 통합 인터페이스로 여러 LLM 제공업체를 지원합니다.
 - 프라이버시 우선
 - API 비용 없음
 
+### Groq ⭐ v1.1.0에 추가됨
+- 초고속 추론 (LLaMA 3.1, Mixtral, Gemma)
+- 속도 최적화
+- 낮은 지연 응답
+
+### 추론 모델 ⭐ v1.2.1에 추가됨
+- Gemini, Anthropic, VertexAI Claude의 추론 기능 지원
+- 향상된 추론 능력
+- 구조화된 추론 출력
+
 ---
 
 ## OpenAI
@@ -583,6 +593,73 @@ if messageCount > 50 {
 
 ---
 
+## 추론 모델 지원 ⭐ 새로운 기능
+
+Agno-Go v1.2.1은 고급 모델에 추론 지원을 추가했습니다:
+
+### 지원 모델
+- **Gemini** - 고급 추론 능력
+- **Anthropic Claude** - 구조화된 출력으로 향상된 추론
+- **VertexAI Claude** - Google Cloud의 Claude 추론 기능
+
+### 사용 방법
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/reasoning"
+
+// 추론을 지원하는 모델의 추론 활성화
+model, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+    APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+})
+
+// 추론은 사용 가능한 경우 자동으로 감지되고 사용됨
+output, _ := agent.Run(ctx, "이 복잡한 문제를 단계별로 해결하세요...")
+```
+
+### 기능
+- **자동 감지** - 추론은 지원되는 모델에서 자동으로 활성화됨
+- **구조화된 출력** - 추론 단계가 캡처되고 구조화됨
+- **향상된 능력** - 더 나은 문제 해결과 복잡한 추론
+
+### 예제
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+)
+
+func main() {
+    model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+        APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    agent, _ := agent.New(agent.Config{
+        Name:  "추론 도우미",
+        Model: model,
+    })
+
+    // 복잡한 추론 작업
+    output, _ := agent.Run(context.Background(),
+        "양자 컴퓨팅 개념을 단계별로 설명하세요. 중첩과 얽힘을 포함하여.")
+
+    fmt.Println(output.Content)
+    // 출력에는 구조화된 추론 단계가 포함됨
+}
+```
+
+---
+
 ## 환경 설정
 
 `.env` 파일 생성:
@@ -619,6 +696,7 @@ func init() {
 - 대화 히스토리를 위한 [Memory](/guide/memory) 배우기
 - 혼합 모델로 [Teams](/guide/team) 구축
 - 실제 사용을 위한 [Examples](/examples/) 탐색
+- 추론 기능을 위한 [Reasoning](/guide/reasoning) 참조
 
 ---
 
@@ -628,3 +706,4 @@ func init() {
 - [Claude Agent](/examples/claude-agent) - Anthropic 예제
 - [GLM Agent](/examples/glm-agent) - GLM (智谱AI) 예제
 - [Ollama Agent](/examples/ollama-agent) - 로컬 모델 예제
+- [Reasoning Agent](/examples/reasoning-agent) - 추론 모델 예제

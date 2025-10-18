@@ -27,6 +27,16 @@ Agno-Go 通过统一接口支持多个 LLM 提供商。
 - 隐私优先
 - 无 API 费用
 
+### Groq ⭐ v1.1.0 新增
+- 超快速推理 (LLaMA 3.1、Mixtral、Gemma)
+- 为速度优化
+- 低延迟响应
+
+### 推理模型 ⭐ v1.2.1 新增
+- 支持 Gemini、Anthropic 和 VertexAI Claude 的推理功能
+- 增强的推理能力
+- 结构化推理输出
+
 ---
 
 ## OpenAI
@@ -584,6 +594,71 @@ func init() {
 ```
 
 ---
+
+## 推理模型支持 ⭐ 新增
+
+Agno-Go v1.2.1 为高级模型添加了推理支持：
+
+### 支持的模型
+- **Gemini** - 高级推理能力
+- **Anthropic Claude** - 增强推理与结构化输出
+- **VertexAI Claude** - Google Cloud 的 Claude 推理功能
+
+### 使用方法
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/reasoning"
+
+// 为支持推理的模型启用推理功能
+model, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+    APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+})
+
+// 推理在可用时自动检测和使用
+output, _ := agent.Run(ctx, "逐步解决这个复杂问题...")
+```
+
+### 特性
+- **自动检测** - 推理自动为支持的模型启用
+- **结构化输出** - 推理步骤被捕获并结构化
+- **增强能力** - 更好的问题解决和复杂推理
+
+### 示例
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+)
+
+func main() {
+    model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+        APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    agent, _ := agent.New(agent.Config{
+        Name:  "推理助手",
+        Model: model,
+    })
+
+    // 复杂推理任务
+    output, _ := agent.Run(context.Background(),
+        "逐步解释量子计算概念，包括叠加和纠缠。")
+
+    fmt.Println(output.Content)
+    // 输出包含结构化推理步骤
+}
+```
 
 ## 下一步
 

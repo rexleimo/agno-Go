@@ -27,6 +27,16 @@ Agno-Go supports multiple LLM providers with a unified interface.
 - Privacy-first
 - No API costs
 
+### Groq ⭐ NEW in v1.1.0
+- Ultra-fast inference (LLaMA 3.1, Mixtral, Gemma)
+- Optimized for speed
+- Low latency responses
+
+### Reasoning Models ⭐ NEW in v1.2.1
+- Support for reasoning in Gemini, Anthropic, and VertexAI Claude
+- Enhanced reasoning capabilities
+- Structured reasoning output
+
 ---
 
 ## OpenAI
@@ -584,6 +594,71 @@ func init() {
 ```
 
 ---
+
+## Reasoning Model Support ⭐ NEW
+
+Agno-Go v1.2.1 adds reasoning support for advanced models:
+
+### Supported Models
+- **Gemini** - Advanced reasoning capabilities
+- **Anthropic Claude** - Enhanced reasoning with structured output
+- **VertexAI Claude** - Google Cloud's Claude with reasoning
+
+### Usage
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/reasoning"
+
+// Enable reasoning for models that support it
+model, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+    APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+})
+
+// Reasoning is automatically detected and used when available
+output, _ := agent.Run(ctx, "Solve this complex problem step by step...")
+```
+
+### Features
+- **Automatic Detection** - Reasoning is automatically enabled for supported models
+- **Structured Output** - Reasoning steps are captured and structured
+- **Enhanced Capabilities** - Better problem-solving and complex reasoning
+
+### Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+)
+
+func main() {
+    model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
+        APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    agent, _ := agent.New(agent.Config{
+        Name:  "Reasoning Assistant",
+        Model: model,
+    })
+
+    // Complex reasoning task
+    output, _ := agent.Run(context.Background(),
+        "Explain quantum computing concepts step by step, including superposition and entanglement.")
+
+    fmt.Println(output.Content)
+    // Output includes structured reasoning steps
+}
+```
 
 ## Next Steps
 

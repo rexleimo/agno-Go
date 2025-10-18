@@ -13,6 +13,7 @@
 - **Calculator**: 기본 수학 연산
 - **HTTP**: 웹 요청 만들기
 - **File**: 안전 제어를 갖춘 파일 읽기/쓰기
+- **Google Sheets** ⭐ 새로운 기능: Google Sheets 데이터 읽기/쓰기 (v1.2.1)
 
 ---
 
@@ -419,6 +420,104 @@ args := map[string]interface{}{
 ```
 
 ---
+
+## Google Sheets 도구 ⭐ 새로운 기능
+
+서비스 계정 인증을 사용하여 Google Sheets 데이터를 읽고 씁니다.
+
+### 연산
+
+- `read_range(spreadsheet_id, range)` - 지정된 범위에서 데이터 읽기
+- `write_range(spreadsheet_id, range, values)` - 지정된 범위에 데이터 쓰기
+- `append_rows(spreadsheet_id, range, values)` - 스프레드시트에 행 추가
+
+### 설정
+
+1. **서비스 계정 생성**:
+   - Google Cloud Console로 이동
+   - 서비스 계정 생성
+   - JSON 자격 증명 파일 다운로드
+
+2. **스프레드시트 공유**:
+   - Google Sheet를 서비스 계정 이메일과 공유
+   - "편집자" 권한 부여
+
+### 사용 방법
+
+```go
+import "github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
+
+// JSON 파일에서 자격 증명 로드
+sheetsTool, err := googlesheets.New(googlesheets.Config{
+    CredentialsFile: "./service-account.json",
+})
+
+// 또는 JSON 문자열 사용
+sheetsTool, err := googlesheets.New(googlesheets.Config{
+    CredentialsJSON: os.Getenv("GOOGLE_SHEETS_CREDENTIALS"),
+})
+
+agent, _ := agent.New(agent.Config{
+    Model:    model,
+    Toolkits: []toolkit.Toolkit{sheetsTool},
+})
+```
+
+### 예제
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
+    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+)
+
+func main() {
+    model, _ := openai.New("gpt-4o-mini", openai.Config{
+        APIKey: os.Getenv("OPENAI_API_KEY"),
+    })
+
+    sheetsTool, err := googlesheets.New(googlesheets.Config{
+        CredentialsFile: "./service-account.json",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    agent, _ := agent.New(agent.Config{
+        Name:     "데이터 분석가",
+        Model:    model,
+        Toolkits: []toolkit.Toolkit{sheetsTool},
+    })
+
+    // 에이전트는 스프레드시트 데이터를 읽고 분석 가능
+    output, _ := agent.Run(context.Background(),
+        "Sheet1!A1:D100에서 판매 데이터를 읽고 총 수익을 요약하세요")
+
+    fmt.Println(output.Content)
+}
+```
+
+### 범위 표기법
+
+범위에는 표준 A1 표기법 사용:
+- `Sheet1!A1:B10` - Sheet1의 A1부터 B10 셀
+- `Sheet2!A:A` - Sheet2의 A열 전체
+- `Sheet1!1:5` - Sheet1의 1부터 5행
+
+### 보안
+
+- 서비스 계정 인증 (사용자 상호작용 없음)
+- 스프레드시트 수준 권한
+- 공유 설정으로 읽기/쓰기 액세스 제어
 
 ## 다음 단계
 
