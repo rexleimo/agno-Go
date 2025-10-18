@@ -39,7 +39,7 @@ Total: 957 lines of Go code
 1. **BatchWriter Interface** (`batch.go`)
    - `UpsertSessions()` - 批量插入或更新会话
    - `Close()` - 释放资源
-   - 默认配置: BatchSize=5000, MaxRetries=3, TimeoutSeconds=30
+   - 默认配置: BatchSize=5000, MinBatchSize=500, MaxRetries=3, TimeoutSeconds=30, ThrottleInterval=0
 
 2. **PostgresBatchWriter** (`postgres.go`)
    - 使用 PostgreSQL COPY 协议实现高性能批量写入

@@ -3,7 +3,7 @@ package middleware
 import (
 	"bytes"
 	"encoding/json"
-	"io"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -319,20 +319,147 @@ func TestGetContent_NotExists(t *testing.T) {
 	assert.Empty(t, content)
 }
 
-func TestBytesReader(t *testing.T) {
-	data := []byte("Hello, World!")
-	reader := newBytesReader(data)
+func TestExtractContentMiddleware_PreProcessor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 
-	// 读取所有数据
-	// Read all data
-	result, err := io.ReadAll(reader)
-	assert.NoError(t, err)
-	assert.Equal(t, data, result)
+	config := ExtractContentConfig{
+		PreProcessors: []ContentPreProcessor{
+			func(ctx *gin.Context, data map[string]interface{}) (map[string]interface{}, error) {
+				data["content"] = "preprocessed"
+				data["user_id"] = "from_pre"
+				return data, nil
+			},
+		},
+	}
 
-	// 再次读取应该返回 EOF
-	// Reading again should return EOF
-	buf := make([]byte, 10)
-	n, err := reader.Read(buf)
-	assert.Equal(t, io.EOF, err)
-	assert.Equal(t, 0, n)
+	router := gin.New()
+	router.Use(ExtractContentMiddleware(config))
+	router.POST("/test", func(c *gin.Context) {
+		extracted, exists := GetExtractedContent(c)
+		assert.True(t, exists)
+		c.JSON(http.StatusOK, gin.H{
+			"content":  extracted.Content,
+			"user_id":  extracted.UserID,
+			"metadata": extracted.Metadata,
+		})
+	})
+
+	requestData := map[string]interface{}{
+		"content": "original",
+		"user_id": "original_user",
+	}
+	body, _ := json.Marshal(requestData)
+	req := httptest.NewRequest(http.MethodPost, "/test", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "preprocessed", resp["content"])
+	assert.Equal(t, "from_pre", resp["user_id"])
+}
+
+func TestExtractContentMiddleware_ValidatorError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	config := ExtractContentConfig{
+		Validators: []ContentValidator{
+			func(ctx *gin.Context, data map[string]interface{}) error {
+				return errors.New("schema validation failed")
+			},
+		},
+	}
+
+	router := gin.New()
+	router.Use(ExtractContentMiddleware(config))
+	router.POST("/test", func(c *gin.Context) {
+		t.Fatal("handler should not be reached when validation fails")
+	})
+
+	body, _ := json.Marshal(map[string]interface{}{"content": "hello"})
+	req := httptest.NewRequest(http.MethodPost, "/test", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	var resp map[string]string
+	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "invalid_payload", resp["error"])
+}
+
+func TestToolOutputPreProcessor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	config := ExtractContentConfig{
+		PreProcessors: []ContentPreProcessor{
+			ToolOutputPreProcessor("tool_output"),
+		},
+	}
+
+	router := gin.New()
+	router.Use(ExtractContentMiddleware(config))
+	router.POST("/test", func(c *gin.Context) {
+		extracted, _ := GetExtractedContent(c)
+		c.JSON(http.StatusOK, extracted)
+	})
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"tool_output": map[string]interface{}{
+			"content": "result from tool",
+			"metadata": map[string]interface{}{
+				"tool": "search",
+			},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/test", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var extracted ExtractedContent
+	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &extracted))
+	assert.Equal(t, "result from tool", extracted.Content)
+	assert.Equal(t, "search", extracted.Metadata["tool"])
+}
+
+func TestCustomExtractor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	config := ExtractContentConfig{
+		CustomExtractors: []ContentExtractor{
+			func(ctx *gin.Context, body []byte, contentType string) (*ExtractedContent, map[string]interface{}, bool, error) {
+				if contentType != "text/plain" {
+					return nil, nil, false, nil
+				}
+				return &ExtractedContent{
+					Content: string(body),
+				}, nil, true, nil
+			},
+		},
+	}
+
+	router := gin.New()
+	router.Use(ExtractContentMiddleware(config))
+	router.POST("/plain", func(c *gin.Context) {
+		content, exists := GetContent(c)
+		assert.True(t, exists)
+		c.JSON(http.StatusOK, gin.H{"content": content})
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/plain", bytes.NewBufferString("plain text body"))
+	req.Header.Set("Content-Type", "text/plain")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]string
+	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "plain text body", resp["content"])
 }

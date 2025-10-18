@@ -9,6 +9,7 @@ import (
 	"github.com/rexleimo/agno-go/pkg/agno/reasoning/anthropic"
 	"github.com/rexleimo/agno-go/pkg/agno/reasoning/gemini"
 	"github.com/rexleimo/agno-go/pkg/agno/reasoning/openai"
+	"github.com/rexleimo/agno-go/pkg/agno/reasoning/vertexai"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
@@ -135,4 +136,9 @@ func init() {
 	// Register Anthropic reasoning support
 	DefaultRegistry.RegisterDetector(&anthropic.Detector{})
 	DefaultRegistry.RegisterExtractor(&anthropic.Extractor{})
+
+	// 注册 VertexAI 推理支持
+	// Register VertexAI reasoning support
+	DefaultRegistry.RegisterDetector(&vertexai.Detector{})
+	DefaultRegistry.RegisterExtractor(&vertexai.Extractor{})
 }

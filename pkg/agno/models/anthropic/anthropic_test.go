@@ -63,6 +63,134 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestAnthropicSupportsReasoning(t *testing.T) {
+	modelWithThinking, err := New("claude-3-5-sonnet", Config{
+		APIKey: "test-key",
+		Thinking: &ThinkingConfig{
+			Type:         "enabled",
+			BudgetTokens: 1024,
+		},
+	})
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	if !modelWithThinking.SupportsReasoning() {
+		t.Errorf("SupportsReasoning() = false, want true")
+	}
+
+	modelWithoutThinking, err := New("claude-3-5-sonnet", Config{APIKey: "test-key"})
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	if modelWithoutThinking.SupportsReasoning() {
+		t.Errorf("SupportsReasoning() = true, want false")
+	}
+
+	nonThinkingModel, err := New("claude-3-5-haiku-20241022", Config{
+		APIKey:   "test-key",
+		Thinking: &ThinkingConfig{Type: "enabled", BudgetTokens: 1024},
+	})
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	if nonThinkingModel.SupportsReasoning() {
+		t.Errorf("SupportsReasoning() for non-thinking model = true, want false")
+	}
+}
+
+func TestAnthropicBuildRequestThinkingConfig(t *testing.T) {
+	model, err := New("claude-3-5-sonnet", Config{
+		APIKey:   "test-key",
+		Thinking: &ThinkingConfig{Type: "enabled", BudgetTokens: 512},
+	})
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	req := &models.InvokeRequest{}
+	claudeReq := model.buildClaudeRequest(req)
+	if claudeReq.Thinking == nil {
+		t.Fatal("Thinking config should be propagated from model config")
+	}
+	if claudeReq.Thinking.BudgetTokens != 512 {
+		t.Errorf("BudgetTokens = %d, want %d", claudeReq.Thinking.BudgetTokens, 512)
+	}
+	if claudeReq.Thinking.Type != "enabled" {
+		t.Errorf("Type = %s, want enabled", claudeReq.Thinking.Type)
+	}
+
+	reqOverride := &models.InvokeRequest{
+		Extra: map[string]interface{}{
+			"thinking": map[string]interface{}{
+				"type":              "enabled",
+				"budget_tokens":     2048,
+				"max_output_tokens": 1024,
+			},
+		},
+	}
+	claudeReqOverride := model.buildClaudeRequest(reqOverride)
+	if claudeReqOverride.Thinking == nil {
+		t.Fatal("Thinking config should be set via request override")
+	}
+	if claudeReqOverride.Thinking.BudgetTokens != 2048 {
+		t.Errorf("Override BudgetTokens = %d, want %d", claudeReqOverride.Thinking.BudgetTokens, 2048)
+	}
+	if claudeReqOverride.Thinking.MaxOutputTokens != 1024 {
+		t.Errorf("Override MaxOutputTokens = %d, want %d", claudeReqOverride.Thinking.MaxOutputTokens, 1024)
+	}
+}
+
+func TestAnthropicConvertResponseReasoning(t *testing.T) {
+	model := &Anthropic{
+		BaseModel: models.BaseModel{ID: "claude-3-5-sonnet", Provider: "anthropic"},
+	}
+
+	resp := &ClaudeResponse{
+		ID:    "resp-1",
+		Model: "claude-3-5-sonnet",
+		Content: []ContentBlock{
+			{Type: "text", Text: "Final answer"},
+			{Type: "thinking", Thinking: "Chain of thought", Signature: "sig-123"},
+			{Type: "redacted_thinking", Data: "redacted-value"},
+		},
+		StopReason: "end_turn",
+		Usage: ClaudeUsage{
+			InputTokens:    10,
+			OutputTokens:   5,
+			ThinkingTokens: 3,
+		},
+	}
+
+	result := model.convertResponse(resp)
+	if result.ReasoningContent == nil {
+		t.Fatal("Expected reasoning content, got nil")
+	}
+	if result.ReasoningContent.Content != "Chain of thought" {
+		t.Errorf("Reasoning content = %q, want %q", result.ReasoningContent.Content, "Chain of thought")
+	}
+	if result.ReasoningContent.RedactedContent == nil || *result.ReasoningContent.RedactedContent != "redacted-value" {
+		t.Errorf("Redacted reasoning mismatch: %v", result.ReasoningContent.RedactedContent)
+	}
+	if result.ReasoningContent.TokenCount == nil || *result.ReasoningContent.TokenCount != 3 {
+		t.Errorf("TokenCount = %v, want 3", result.ReasoningContent.TokenCount)
+	}
+	if result.Content != "Final answer" {
+		t.Errorf("Content = %q, want %q", result.Content, "Final answer")
+	}
+	if result.Metadata.Extra == nil {
+		t.Fatal("Expected metadata extra to be populated")
+	}
+	if v, ok := result.Metadata.Extra["reasoning_signature"]; !ok || v.(string) != "sig-123" {
+		t.Errorf("reasoning_signature metadata missing or incorrect: %v", result.Metadata.Extra)
+	}
+	if v, ok := result.Metadata.Extra["thinking_tokens"]; !ok || v.(int) != 3 {
+		t.Errorf("thinking_tokens metadata missing or incorrect: %v", result.Metadata.Extra)
+	}
+}
+
 func TestBuildClaudeRequest(t *testing.T) {
 	model, _ := New("claude-3-opus-20240229", Config{
 		APIKey:      "test-key",

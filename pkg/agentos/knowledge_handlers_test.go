@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -135,8 +136,12 @@ func TestHandleKnowledgeSearch_Success(t *testing.T) {
 	// 创建知识库服务
 	// Create knowledge service
 	knowledgeSvc := NewKnowledgeService(mockVectorDB, mockEmbedding, KnowledgeServiceConfig{
-		DefaultLimit: 10,
-		MaxLimit:     100,
+		DefaultLimit:         10,
+		MaxLimit:             100,
+		DefaultCollection:    "default",
+		EnableSearch:         true,
+		EnableIngestion:      true,
+		AllowedSourceSchemes: []string{"http", "https", "mcp"},
 	})
 
 	// 创建服务器
@@ -173,6 +178,9 @@ func TestHandleKnowledgeSearch_Success(t *testing.T) {
 	assert.Equal(t, 2, len(response.Results))
 	assert.Equal(t, "doc1", response.Results[0].ID)
 	assert.Equal(t, "test content 1", response.Results[0].Content)
+	assert.Equal(t, 0, response.Meta.Offset)
+	assert.False(t, response.Meta.HasMore)
+	assert.Equal(t, 5, response.Meta.PageSize)
 
 	mockVectorDB.AssertExpectations(t)
 }
@@ -259,6 +267,9 @@ func TestHandleKnowledgeSearch_Pagination(t *testing.T) {
 	assert.Equal(t, "doc3", response.Results[1].ID)
 	assert.Equal(t, 3, response.Meta.TotalCount)
 	assert.Equal(t, 1, response.Meta.Page) // page = (offset / limit) + 1 = (1 / 2) + 1 = 1 (整数除法)
+	assert.Equal(t, 2, response.Meta.PageSize)
+	assert.Equal(t, 1, response.Meta.Offset)
+	assert.False(t, response.Meta.HasMore)
 
 	mockVectorDB.AssertExpectations(t)
 }
@@ -301,6 +312,7 @@ func TestHandleKnowledgeConfig_Success(t *testing.T) {
 		EmbeddingProvider:   "openai",
 		EmbeddingModel:      "text-embedding-3-small",
 		EmbeddingDimensions: 1536,
+		DefaultCollection:   "demo",
 	})
 
 	server := &Server{
@@ -328,6 +340,14 @@ func TestHandleKnowledgeConfig_Success(t *testing.T) {
 	assert.Equal(t, "openai", response.EmbeddingModel.Provider)
 	assert.Equal(t, "text-embedding-3-small", response.EmbeddingModel.Model)
 	assert.Equal(t, 1536, response.EmbeddingModel.Dimensions)
+	assert.True(t, response.Features.SearchEnabled)
+	assert.True(t, response.Features.IngestionEnabled)
+	assert.False(t, response.Features.HealthEnabled)
+	assert.Equal(t, knowledgeSvc.config.DefaultLimit, response.Limits.DefaultLimit)
+	assert.Equal(t, knowledgeSvc.config.MaxLimit, response.Limits.MaxLimit)
+	assert.Equal(t, "demo", response.DefaultCollection)
+	assert.Contains(t, response.AllowedCollections, "demo")
+	assert.Contains(t, response.AllowedSourceSchemes, "http")
 }
 
 func TestHandleKnowledgeConfig_ServiceNotConfigured(t *testing.T) {
@@ -365,4 +385,211 @@ func TestNewKnowledgeService_Defaults(t *testing.T) {
 	assert.Equal(t, "openai", svc.config.EmbeddingProvider)
 	assert.Equal(t, "text-embedding-3-small", svc.config.EmbeddingModel)
 	assert.Equal(t, 1536, svc.config.EmbeddingDimensions)
+}
+
+func TestHandleKnowledgeSearch_Disabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockVectorDB := new(MockVectorDB)
+	mockEmbedding := new(MockEmbeddingFunc)
+
+	knowledgeSvc := NewKnowledgeService(mockVectorDB, mockEmbedding, KnowledgeServiceConfig{
+		EnableSearch:    false,
+		EnableIngestion: true,
+		DefaultLimit:    10,
+		MaxLimit:        100,
+	})
+
+	server := &Server{
+		knowledgeService: knowledgeSvc,
+		logger:           slog.Default(),
+	}
+
+	router := gin.New()
+	router.POST("/search", server.handleKnowledgeSearch)
+
+	reqBody, _ := json.Marshal(VectorSearchRequest{Query: "test"})
+	httpReq := httptest.NewRequest(http.MethodPost, "/search", bytes.NewBuffer(reqBody))
+	httpReq.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, httpReq)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	mockVectorDB.AssertExpectations(t)
+}
+
+func TestHandleAddContent_Disabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockVectorDB := new(MockVectorDB)
+	mockEmbedding := new(MockEmbeddingFunc)
+
+	knowledgeSvc := NewKnowledgeService(mockVectorDB, mockEmbedding, KnowledgeServiceConfig{
+		EnableSearch:    true,
+		EnableIngestion: false,
+	})
+
+	server := &Server{
+		knowledgeService: knowledgeSvc,
+		logger:           slog.Default(),
+	}
+
+	router := gin.New()
+	router.POST("/content", server.handleAddContent)
+
+	body, _ := json.Marshal(AddContentRequest{Content: "hello world"})
+	httpReq := httptest.NewRequest(http.MethodPost, "/content", bytes.NewBuffer(body))
+	httpReq.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, httpReq)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	mockVectorDB.AssertExpectations(t)
+}
+
+func TestHandleAddContent_InvalidSourceScheme(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockVectorDB := new(MockVectorDB)
+	mockEmbedding := new(MockEmbeddingFunc)
+
+	knowledgeSvc := NewKnowledgeService(mockVectorDB, mockEmbedding, KnowledgeServiceConfig{
+		AllowedSourceSchemes: []string{"https"},
+	})
+
+	server := &Server{
+		knowledgeService: knowledgeSvc,
+		logger:           slog.Default(),
+	}
+
+	router := gin.New()
+	router.POST("/content", server.handleAddContent)
+
+	body, _ := json.Marshal(AddContentRequest{
+		Content: "hello",
+		Metadata: map[string]interface{}{
+			"source_url": "ftp://example.com",
+		},
+	})
+	httpReq := httptest.NewRequest(http.MethodPost, "/content", bytes.NewBuffer(body))
+	httpReq.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, httpReq)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	mockVectorDB.AssertExpectations(t)
+}
+
+func TestHandleAddContent_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockVectorDB := new(MockVectorDB)
+	mockEmbedding := new(MockEmbeddingFunc)
+
+	mockVectorDB.On("Add", mock.Anything, mock.Anything).Return(nil)
+
+	knowledgeSvc := NewKnowledgeService(mockVectorDB, mockEmbedding, KnowledgeServiceConfig{
+		DefaultCollection:    "demo",
+		AllowedSourceSchemes: []string{"https"},
+	})
+
+	server := &Server{
+		knowledgeService: knowledgeSvc,
+		logger:           slog.Default(),
+	}
+
+	router := gin.New()
+	router.POST("/content", server.handleAddContent)
+
+	body, _ := json.Marshal(AddContentRequest{
+		Content: "hello world",
+		Metadata: map[string]interface{}{
+			"source_url": "https://example.com",
+		},
+	})
+	httpReq := httptest.NewRequest(http.MethodPost, "/content", bytes.NewBuffer(body))
+	httpReq.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, httpReq)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	var resp AddContentResponse
+	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "demo", resp.Collection)
+	assert.Equal(t, 1, resp.ChunkCount)
+	mockVectorDB.AssertExpectations(t)
+}
+
+func TestHandleKnowledgeHealth_OK(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockVectorDB := new(MockVectorDB)
+	mockEmbedding := new(MockEmbeddingFunc)
+
+	mockVectorDB.On("Count", mock.Anything).Return(2, nil)
+
+	knowledgeSvc := NewKnowledgeService(mockVectorDB, mockEmbedding, KnowledgeServiceConfig{
+		EnableHealth:      true,
+		DefaultCollection: "demo",
+	})
+
+	server := &Server{
+		knowledgeService: knowledgeSvc,
+		logger:           slog.Default(),
+	}
+
+	router := gin.New()
+	router.GET("/health", server.handleKnowledgeHealth)
+
+	httpReq := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, httpReq)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "ok", resp["status"])
+	assert.Equal(t, float64(2), resp["documents"])
+	assert.Equal(t, "demo", resp["collection"])
+	mockVectorDB.AssertExpectations(t)
+}
+
+func TestHandleKnowledgeHealth_Degraded(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockVectorDB := new(MockVectorDB)
+	mockEmbedding := new(MockEmbeddingFunc)
+
+	mockVectorDB.On("Count", mock.Anything).Return(0, errors.New("unreachable"))
+
+	knowledgeSvc := NewKnowledgeService(mockVectorDB, mockEmbedding, KnowledgeServiceConfig{
+		EnableHealth: true,
+	})
+
+	server := &Server{
+		knowledgeService: knowledgeSvc,
+		logger:           slog.Default(),
+	}
+
+	router := gin.New()
+	router.GET("/health", server.handleKnowledgeHealth)
+
+	httpReq := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, httpReq)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "degraded", resp["status"])
+	assert.Equal(t, "unreachable", resp["error"])
+	mockVectorDB.AssertExpectations(t)
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +18,8 @@ type KnowledgeService struct {
 	vectorDB      vectordb.VectorDB
 	embeddingFunc vectordb.EmbeddingFunction
 	config        KnowledgeServiceConfig
+	collections   map[string]struct{}
+	schemes       map[string]struct{}
 }
 
 // KnowledgeServiceConfig 知识库服务配置
@@ -52,6 +56,36 @@ type KnowledgeServiceConfig struct {
 	// EmbeddingDimensions 嵌入维度
 	// EmbeddingDimensions is the embedding dimensions
 	EmbeddingDimensions int
+
+	// EnableSearch 是否启用搜索
+	EnableSearch bool
+
+	// EnableIngestion 是否启用知识入库
+	EnableIngestion bool
+
+	// EnableHealth 是否启用健康检查
+	EnableHealth bool
+
+	// SearchTimeout 搜索超时时间
+	SearchTimeout time.Duration
+
+	// IngestionTimeout 入库超时时间
+	IngestionTimeout time.Duration
+
+	// HealthTimeout 健康检查超时时间
+	HealthTimeout time.Duration
+
+	// DefaultCollection 默认集合名称
+	DefaultCollection string
+
+	// AllowedCollections 允许访问的集合列表
+	AllowedCollections []string
+
+	// AllowAllCollections 是否允许任意集合
+	AllowAllCollections bool
+
+	// AllowedSourceSchemes 允许的来源 URL scheme
+	AllowedSourceSchemes []string
 }
 
 // NewKnowledgeService 创建知识库服务
@@ -83,17 +117,136 @@ func NewKnowledgeService(vdb vectordb.VectorDB, embFunc vectordb.EmbeddingFuncti
 	if config.EmbeddingDimensions <= 0 {
 		config.EmbeddingDimensions = 1536
 	}
+	if config.SearchTimeout <= 0 {
+		config.SearchTimeout = 30 * time.Second
+	}
+	if config.IngestionTimeout <= 0 {
+		config.IngestionTimeout = 60 * time.Second
+	}
+	if config.HealthTimeout <= 0 {
+		config.HealthTimeout = 5 * time.Second
+	}
+	if !config.EnableSearch && !config.EnableIngestion && !config.EnableHealth {
+		config.EnableSearch = true
+		config.EnableIngestion = true
+	}
+	if len(config.AllowedSourceSchemes) == 0 {
+		config.AllowedSourceSchemes = []string{"http", "https", "mcp"}
+	}
+
+	collectionSet := make(map[string]struct{})
+	if config.DefaultCollection != "" {
+		collectionSet[strings.ToLower(config.DefaultCollection)] = struct{}{}
+	}
+	for _, name := range config.AllowedCollections {
+		if name == "" {
+			continue
+		}
+		collectionSet[strings.ToLower(name)] = struct{}{}
+	}
+
+	schemeSet := make(map[string]struct{})
+	for _, scheme := range config.AllowedSourceSchemes {
+		if scheme == "" {
+			continue
+		}
+		schemeSet[strings.ToLower(scheme)] = struct{}{}
+	}
 
 	return &KnowledgeService{
 		vectorDB:      vdb,
 		embeddingFunc: embFunc,
 		config:        config,
+		collections:   collectionSet,
+		schemes:       schemeSet,
 	}
+}
+
+func (s *KnowledgeService) searchTimeout() time.Duration {
+	return s.config.SearchTimeout
+}
+
+func (s *KnowledgeService) ingestionTimeout() time.Duration {
+	return s.config.IngestionTimeout
+}
+
+func (s *KnowledgeService) healthTimeout() time.Duration {
+	return s.config.HealthTimeout
+}
+
+func (s *KnowledgeService) isCollectionAllowed(name string) bool {
+	if name == "" || s.config.AllowAllCollections {
+		return true
+	}
+	_, ok := s.collections[strings.ToLower(name)]
+	return ok
+}
+
+func (s *KnowledgeService) validateSourceMetadata(metadata map[string]interface{}) error {
+	if metadata == nil || len(s.schemes) == 0 {
+		return nil
+	}
+	keys := []string{"source_url", "sourceUrl", "source_uri", "sourceUri", "source"}
+	for _, key := range keys {
+		raw, ok := metadata[key]
+		if !ok {
+			continue
+		}
+		str, ok := raw.(string)
+		if !ok {
+			continue
+		}
+		str = strings.TrimSpace(str)
+		if str == "" {
+			continue
+		}
+		if key == "source" && !strings.Contains(str, "://") {
+			continue
+		}
+		if err := s.validateSourceURL(str); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *KnowledgeService) validateSourceURL(raw string) error {
+	if len(s.schemes) == 0 {
+		return nil
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid source_url: %w", err)
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme == "" {
+		return fmt.Errorf("invalid source_url: missing scheme")
+	}
+	if _, ok := s.schemes[scheme]; !ok {
+		return fmt.Errorf("source_url scheme %q is not allowed", scheme)
+	}
+	return nil
 }
 
 // handleKnowledgeSearch 处理知识库搜索请求
 // handleKnowledgeSearch handles knowledge search requests
 func (s *Server) handleKnowledgeSearch(c *gin.Context) {
+	knowledgeSvc := s.getKnowledgeService()
+	if knowledgeSvc == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "service_unavailable",
+			"message": "knowledge service not configured",
+		})
+		return
+	}
+	if !knowledgeSvc.config.EnableSearch {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "search_disabled",
+			"message": "knowledge search endpoint is disabled",
+		})
+		return
+	}
+
 	var req VectorSearchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -103,36 +256,27 @@ func (s *Server) handleKnowledgeSearch(c *gin.Context) {
 		return
 	}
 
-	// 参数验证和默认值
-	// Validate and set default values
-	if req.Limit <= 0 {
-		req.Limit = 10
+	if req.CollectionName != "" && !knowledgeSvc.isCollectionAllowed(req.CollectionName) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid_collection",
+			"message": fmt.Sprintf("collection %q is not allowed", req.CollectionName),
+		})
+		return
 	}
-	if req.Limit > 100 {
-		req.Limit = 100
+
+	if req.Limit <= 0 {
+		req.Limit = knowledgeSvc.config.DefaultLimit
+	}
+	if req.Limit > knowledgeSvc.config.MaxLimit {
+		req.Limit = knowledgeSvc.config.MaxLimit
 	}
 	if req.Offset < 0 {
 		req.Offset = 0
 	}
 
-	// 获取知识库服务
-	// Get knowledge service
-	knowledgeSvc := s.getKnowledgeService()
-	if knowledgeSvc == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error":   "service_unavailable",
-			"message": "knowledge service not configured",
-		})
-		return
-	}
-
-	// 创建超时上下文
-	// Create timeout context
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), knowledgeSvc.searchTimeout())
 	defer cancel()
 
-	// 执行向量搜索
-	// Perform vector search
 	results, err := knowledgeSvc.vectorDB.Query(ctx, req.Query, req.Limit+req.Offset, req.Filters)
 	if err != nil {
 		s.logger.Error("knowledge search failed", "error", err, "query", req.Query)
@@ -143,8 +287,6 @@ func (s *Server) handleKnowledgeSearch(c *gin.Context) {
 		return
 	}
 
-	// 应用分页（向量数据库返回的是前 N 条，我们需要切片）
-	// Apply pagination (vector DB returns top N, we need to slice)
 	totalCount := len(results)
 	paginatedResults := results
 	if req.Offset < len(results) {
@@ -156,8 +298,6 @@ func (s *Server) handleKnowledgeSearch(c *gin.Context) {
 		paginatedResults = []vectordb.SearchResult{}
 	}
 
-	// 转换为响应格式
-	// Convert to response format
 	searchResults := make([]VectorSearchResult, len(paginatedResults))
 	for i, r := range paginatedResults {
 		searchResults[i] = VectorSearchResult{
@@ -169,13 +309,22 @@ func (s *Server) handleKnowledgeSearch(c *gin.Context) {
 		}
 	}
 
-	// 计算分页元数据
-	// Calculate pagination metadata
 	pageSize := req.Limit
-	page := (req.Offset / pageSize) + 1
-	totalPages := (totalCount + pageSize - 1) / pageSize
-	if totalPages == 0 {
-		totalPages = 1
+	page := 1
+	if pageSize > 0 {
+		page = (req.Offset / pageSize) + 1
+	}
+	totalPages := 0
+	if pageSize > 0 {
+		totalPages = (totalCount + pageSize - 1) / pageSize
+		if totalPages == 0 && totalCount > 0 {
+			totalPages = 1
+		}
+	}
+	hasMore := req.Offset+len(paginatedResults) < totalCount
+	nextOffset := req.Offset
+	if hasMore {
+		nextOffset = req.Offset + len(paginatedResults)
 	}
 
 	response := VectorSearchResponse{
@@ -185,7 +334,12 @@ func (s *Server) handleKnowledgeSearch(c *gin.Context) {
 			Page:       page,
 			PageSize:   pageSize,
 			TotalPages: totalPages,
+			Offset:     req.Offset,
+			HasMore:    hasMore,
 		},
+	}
+	if hasMore {
+		response.Meta.NextOffset = nextOffset
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -234,6 +388,86 @@ func (s *Server) handleKnowledgeConfig(c *gin.Context) {
 			Model:      knowledgeSvc.config.EmbeddingModel,
 			Dimensions: knowledgeSvc.config.EmbeddingDimensions,
 		},
+		DefaultCollection: knowledgeSvc.config.DefaultCollection,
+		Features: KnowledgeFeatures{
+			SearchEnabled:    knowledgeSvc.config.EnableSearch,
+			IngestionEnabled: knowledgeSvc.config.EnableIngestion,
+			HealthEnabled:    knowledgeSvc.config.EnableHealth,
+		},
+		Limits: KnowledgeLimits{
+			DefaultLimit: knowledgeSvc.config.DefaultLimit,
+			MaxLimit:     knowledgeSvc.config.MaxLimit,
+		},
+		AllowedSourceSchemes: knowledgeSvc.config.AllowedSourceSchemes,
+	}
+
+	if knowledgeSvc.config.AllowAllCollections {
+		response.AllowedCollections = []string{"*"}
+	} else {
+		unique := make(map[string]struct{})
+		list := []string{}
+		if knowledgeSvc.config.DefaultCollection != "" {
+			unique[strings.ToLower(knowledgeSvc.config.DefaultCollection)] = struct{}{}
+			list = append(list, knowledgeSvc.config.DefaultCollection)
+		}
+		for _, name := range knowledgeSvc.config.AllowedCollections {
+			if name == "" {
+				continue
+			}
+			key := strings.ToLower(name)
+			if _, exists := unique[key]; exists {
+				continue
+			}
+			unique[key] = struct{}{}
+			list = append(list, name)
+		}
+		if len(list) > 0 {
+			response.AllowedCollections = list
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// handleKnowledgeHealth 返回知识库健康状态
+func (s *Server) handleKnowledgeHealth(c *gin.Context) {
+	knowledgeSvc := s.getKnowledgeService()
+	if knowledgeSvc == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "service_unavailable",
+			"message": "knowledge service not configured",
+		})
+		return
+	}
+	if !knowledgeSvc.config.EnableHealth {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "health_disabled",
+			"message": "knowledge health endpoint is disabled",
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), knowledgeSvc.healthTimeout())
+	defer cancel()
+
+	count, err := knowledgeSvc.vectorDB.Count(ctx)
+	status := "ok"
+	response := gin.H{
+		"status":        status,
+		"collection":    knowledgeSvc.config.DefaultCollection,
+		"timestamp":     time.Now().UTC().Format(time.RFC3339),
+		"documents":     count,
+		"search":        knowledgeSvc.config.EnableSearch,
+		"ingestion":     knowledgeSvc.config.EnableIngestion,
+		"health":        knowledgeSvc.config.EnableHealth,
+		"max_limit":     knowledgeSvc.config.MaxLimit,
+		"default_limit": knowledgeSvc.config.DefaultLimit,
+	}
+
+	if err != nil {
+		response["status"] = "degraded"
+		response["error"] = err.Error()
+		delete(response, "documents")
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -247,6 +481,13 @@ func (s *Server) handleAddContent(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error":   "service_unavailable",
 			"message": "knowledge service not configured",
+		})
+		return
+	}
+	if !knowledgeSvc.config.EnableIngestion {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   "ingestion_disabled",
+			"message": "knowledge ingestion endpoint is disabled",
 		})
 		return
 	}
@@ -305,6 +546,21 @@ func (s *Server) handleAddContent(c *gin.Context) {
 		return
 	}
 
+	if req.CollectionName != "" && !knowledgeSvc.isCollectionAllowed(req.CollectionName) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid_collection",
+			"message": fmt.Sprintf("collection %q is not allowed", req.CollectionName),
+		})
+		return
+	}
+	if err := knowledgeSvc.validateSourceMetadata(req.Metadata); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid_metadata",
+			"message": err.Error(),
+		})
+		return
+	}
+
 	// 设置默认值
 	// Set defaults
 	if req.ChunkerType == "" {
@@ -316,7 +572,7 @@ func (s *Server) handleAddContent(c *gin.Context) {
 
 	// 创建超时上下文
 	// Create timeout context
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), knowledgeSvc.ingestionTimeout())
 	defer cancel()
 
 	// 执行知识入库
@@ -353,6 +609,10 @@ type AddContentResponse struct {
 	// ChunkerType is the chunker type used
 	ChunkerType string `json:"chunker_type"`
 
+	// Collection 使用的集合名称
+	// Collection is the collection that stored the documents
+	Collection string `json:"collection,omitempty"`
+
 	// Message 处理消息
 	// Message is the processing message
 	Message string `json:"message"`
@@ -361,6 +621,14 @@ type AddContentResponse struct {
 // ingestContent 执行内容入库流程：分块 → 嵌入 → 存储
 // ingestContent performs content ingestion: chunking → embedding → storage
 func (s *Server) ingestContent(ctx context.Context, knowledgeSvc *KnowledgeService, req *AddContentRequest) (*AddContentResponse, error) {
+	if req.CollectionName != "" && !knowledgeSvc.isCollectionAllowed(req.CollectionName) {
+		return nil, fmt.Errorf("collection %q is not allowed", req.CollectionName)
+	}
+
+	collectionName := knowledgeSvc.config.DefaultCollection
+	if req.CollectionName != "" {
+		collectionName = req.CollectionName
+	}
 	// 注意：这里简化实现，实际应从 knowledge 包导入 Chunker
 	// Note: Simplified implementation, should import Chunker from knowledge package
 	chunks := []string{req.Content} // 简化版：不分块，直接使用整个内容
@@ -392,6 +660,9 @@ func (s *Server) ingestContent(ctx context.Context, knowledgeSvc *KnowledgeServi
 				metadata[k] = v
 			}
 		}
+		if collectionName != "" {
+			metadata["collection_name"] = collectionName
+		}
 		metadata["chunk_index"] = i
 		metadata["chunk_count"] = len(chunks)
 		metadata["chunker_type"] = req.ChunkerType
@@ -422,6 +693,7 @@ func (s *Server) ingestContent(ctx context.Context, knowledgeSvc *KnowledgeServi
 		ChunkCount:  len(chunks),
 		ChunkerType: req.ChunkerType,
 		Message:     fmt.Sprintf("successfully ingested %d chunks", len(chunks)),
+		Collection:  collectionName,
 	}, nil
 }
 

@@ -335,6 +335,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Search endpoint disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Search failed
           content:
@@ -407,8 +413,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Ingestion disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Ingestion failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Knowledge service not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/knowledge/health:
+    get:
+      tags:
+        - Knowledge
+      summary: Get knowledge base health
+      description: Returns health status and basic metrics for the knowledge subsystem
+      operationId: getKnowledgeHealth
+      responses:
+        '200':
+          description: Health information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeHealthResponse'
+        '404':
+          description: Health endpoint disabled
           content:
             application/json:
               schema:
@@ -628,6 +667,18 @@ components:
           type: integer
           description: Total number of pages
           example: 5
+        offset:
+          type: integer
+          description: Current offset applied to the query
+          example: 0
+        has_more:
+          type: boolean
+          description: Whether more results are available beyond this page
+          example: false
+        next_offset:
+          type: integer
+          description: Offset for the next page when available
+          example: 10
 
     KnowledgeConfigResponse:
       type: object
@@ -651,6 +702,26 @@ components:
           example: "chromadb"
         embedding_model:
           $ref: '#/components/schemas/EmbeddingModelInfo'
+        features:
+          $ref: '#/components/schemas/KnowledgeFeatures'
+        limits:
+          $ref: '#/components/schemas/KnowledgeLimits'
+        default_collection:
+          type: string
+          description: Default collection name used for storage/search
+          example: "demo"
+        allowed_collections:
+          type: array
+          description: Collections allowed via the API (\"*\" denotes all)
+          items:
+            type: string
+          example: ["demo"]
+        allowed_source_schemes:
+          type: array
+          description: Allowed URL schemes for metadata fields such as source_url
+          items:
+            type: string
+          example: ["http", "https", "mcp"]
 
     ChunkerInfo:
       type: object
@@ -688,6 +759,79 @@ components:
           description: Embedding dimensions
           example: 1536
 
+    KnowledgeFeatures:
+      type: object
+      properties:
+        search_enabled:
+          type: boolean
+          description: Whether the search endpoint is enabled
+          example: true
+        ingestion_enabled:
+          type: boolean
+          description: Whether the ingestion endpoint is enabled
+          example: true
+        health_enabled:
+          type: boolean
+          description: Whether the health endpoint is enabled
+          example: false
+
+    KnowledgeLimits:
+      type: object
+      properties:
+        default_limit:
+          type: integer
+          description: Default number of results returned when limit is omitted
+          example: 10
+        max_limit:
+          type: integer
+          description: Maximum number of results allowed per request
+          example: 100
+
+    KnowledgeHealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Health status (`ok` or `degraded`)
+          example: "ok"
+        documents:
+          type: integer
+          description: Number of documents tracked in the backing vector store
+          example: 42
+        collection:
+          type: string
+          description: Default collection name
+          example: "demo"
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the health check
+          example: "2024-10-18T00:00:00Z"
+        search:
+          type: boolean
+          description: Whether search is enabled
+          example: true
+        ingestion:
+          type: boolean
+          description: Whether ingestion is enabled
+          example: true
+        health:
+          type: boolean
+          description: Whether health endpoint is enabled
+          example: true
+        max_limit:
+          type: integer
+          description: Configured maximum limit per query
+          example: 100
+        default_limit:
+          type: integer
+          description: Configured default limit per query
+          example: 10
+        error:
+          type: string
+          description: Optional error message when status is degraded
+          example: "vector db unreachable"
+
     AddContentResponse:
       type: object
       properties:
@@ -705,6 +849,10 @@ components:
           type: string
           description: Chunker type used
           example: "character"
+        collection:
+          type: string
+          description: Collection documents were stored in
+          example: "demo"
         message:
           type: string
           description: Success message

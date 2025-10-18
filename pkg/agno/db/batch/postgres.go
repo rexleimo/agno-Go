@@ -26,6 +26,8 @@ func NewPostgresBatchWriter(db *sql.DB, config *Config) (*PostgresBatchWriter, e
 	}
 	if config == nil {
 		config = DefaultConfig()
+	} else {
+		config = normalizeConfig(config)
 	}
 
 	return &PostgresBatchWriter{
@@ -45,24 +47,112 @@ func (w *PostgresBatchWriter) UpsertSessions(
 		return nil
 	}
 
-	// 开启事务 / Start transaction
+	batchSize := w.config.BatchSize
+	if batchSize <= 0 {
+		batchSize = len(sessions)
+	}
+
+	minBatch := w.config.MinBatchSize
+	if minBatch <= 0 {
+		minBatch = 1
+	}
+	if minBatch > batchSize {
+		minBatch = batchSize
+	}
+
+	maxRetries := w.config.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 1
+	}
+
+	throttle := w.config.ThrottleInterval
+	if throttle < 0 {
+		throttle = 0
+	}
+
+	for start := 0; start < len(sessions); {
+		remaining := len(sessions) - start
+		currentSize := batchSize
+		if currentSize > remaining {
+			currentSize = remaining
+		}
+		if currentSize < minBatch {
+			currentSize = remaining
+		}
+		if currentSize < minBatch {
+			currentSize = minBatch
+		}
+		if currentSize > remaining {
+			currentSize = remaining
+		}
+
+		attemptSize := currentSize
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			if attemptSize <= 0 {
+				attemptSize = 1
+			}
+			if attemptSize > remaining {
+				attemptSize = remaining
+			}
+
+			batchCtx := ctx
+			var cancel context.CancelFunc
+			if w.config.TimeoutSeconds > 0 {
+				batchCtx, cancel = context.WithTimeout(ctx, time.Duration(w.config.TimeoutSeconds)*time.Second)
+			}
+
+			err := w.writeBatch(batchCtx, sessions[start:start+attemptSize], preserveUpdatedAt)
+			if cancel != nil {
+				cancel()
+			}
+			if err == nil {
+				start += attemptSize
+				if throttle > 0 && start < len(sessions) {
+					time.Sleep(throttle)
+				}
+				break
+			}
+
+			if attempt == maxRetries-1 || attemptSize <= minBatch {
+				return err
+			}
+
+			newSize := attemptSize / 2
+			if newSize < minBatch {
+				newSize = minBatch
+			}
+			if newSize >= attemptSize {
+				return err
+			}
+			attemptSize = newSize
+		}
+	}
+
+	return nil
+}
+
+func (w *PostgresBatchWriter) writeBatch(
+	ctx context.Context,
+	sessions []*session.Session,
+	preserveUpdatedAt bool,
+) error {
+	if len(sessions) == 0 {
+		return nil
+	}
+
 	tx, err := w.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback() // 自动回滚 / Auto rollback
+	defer tx.Rollback()
 
-	// 使用 COPY + temp table 策略
-	// Use COPY + temp table strategy
 	if err := w.upsertViaTemp(ctx, tx, sessions, preserveUpdatedAt); err != nil {
 		return fmt.Errorf("failed to upsert sessions: %w", err)
 	}
 
-	// 提交事务 / Commit transaction
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
-
 	return nil
 }
 
@@ -196,4 +286,29 @@ func (w *PostgresBatchWriter) Close() error {
 	// PostgreSQL 连接由外部管理,这里不关闭
 	// PostgreSQL connection is managed externally, don't close here
 	return nil
+}
+
+func normalizeConfig(cfg *Config) *Config {
+	defaults := DefaultConfig()
+	normalized := *cfg
+
+	if normalized.BatchSize <= 0 {
+		normalized.BatchSize = defaults.BatchSize
+	}
+	if normalized.MinBatchSize <= 0 {
+		normalized.MinBatchSize = defaults.MinBatchSize
+	}
+	if normalized.MinBatchSize > normalized.BatchSize {
+		normalized.MinBatchSize = normalized.BatchSize
+	}
+	if normalized.MaxRetries <= 0 {
+		normalized.MaxRetries = defaults.MaxRetries
+	}
+	if normalized.TimeoutSeconds < 0 {
+		normalized.TimeoutSeconds = defaults.TimeoutSeconds
+	}
+	if normalized.ThrottleInterval < 0 {
+		normalized.ThrottleInterval = 0
+	}
+	return &normalized
 }

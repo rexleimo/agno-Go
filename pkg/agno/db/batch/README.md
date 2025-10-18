@@ -106,9 +106,11 @@ func main() {
 
 ```go
 config := &batch.Config{
-    BatchSize:      1000,  // 每批处理 1000 条记录 / Process 1000 records per batch
-    MaxRetries:     5,     // 失败时最多重试 5 次 / Retry up to 5 times on failure
-    TimeoutSeconds: 60,    // 每批超时 60 秒 / 60 seconds timeout per batch
+    BatchSize:        1000,               // 每批处理 1000 条记录 / Process 1000 records per batch
+    MinBatchSize:     200,                // 动态缩小时的下限 / Minimum batch size when shrinking
+    MaxRetries:       5,                  // 失败时最多重试 5 次 / Retry up to 5 times on failure
+    TimeoutSeconds:   60,                 // 每批超时 60 秒 / 60 seconds timeout per batch
+    ThrottleInterval: 100 * time.Millisecond, // 批次之间休眠 100ms / Sleep 100ms between batches
 }
 
 writer, err := batch.NewPostgresBatchWriter(db, config)
@@ -150,9 +152,11 @@ type BatchWriter interface {
 
 ```go
 type Config struct {
-    BatchSize      int  // 批量大小,默认 5000 / Batch size, default 5000
-    MaxRetries     int  // 最大重试次数,默认 3 / Max retries, default 3
-    TimeoutSeconds int  // 超时时间(秒),默认 30 / Timeout (seconds), default 30
+    BatchSize        int           // 批量大小,默认 5000 / Batch size, default 5000
+    MinBatchSize     int           // 最小批量大小,默认 500 / Minimum batch size, default 500
+    MaxRetries       int           // 最大重试次数,默认 3 / Max retries, default 3
+    TimeoutSeconds   int           // 超时时间(秒),默认 30 / Timeout (seconds), default 30
+    ThrottleInterval time.Duration // 批次间休眠时间,默认 0 / Sleep duration between batches, default 0
 }
 ```
 

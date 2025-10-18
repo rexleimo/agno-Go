@@ -467,6 +467,118 @@ func TestBuildGeminiRequest(t *testing.T) {
 	}
 }
 
+func TestGeminiSupportsReasoning(t *testing.T) {
+	includeThoughts := true
+	modelWithThinking, err := New("gemini-custom", Config{
+		APIKey:          "test-key",
+		ThinkingBudget:  256,
+		IncludeThoughts: &includeThoughts,
+	})
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	if !modelWithThinking.SupportsReasoning() {
+		t.Errorf("SupportsReasoning() = false, want true")
+	}
+
+	modelWithoutThinking, err := New("gemini-basic", Config{APIKey: "test-key"})
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	if modelWithoutThinking.SupportsReasoning() {
+		t.Errorf("SupportsReasoning() = true, want false")
+	}
+}
+
+func TestGeminiBuildRequestThinkingConfig(t *testing.T) {
+	includeThoughts := false
+	model, err := New("gemini-config", Config{
+		APIKey:          "test-key",
+		ThinkingBudget:  256,
+		IncludeThoughts: &includeThoughts,
+	})
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	req := &models.InvokeRequest{}
+	geminiReq := model.buildGeminiRequest(req)
+	if geminiReq.ThinkingConfig == nil {
+		t.Fatal("ThinkingConfig not set from config")
+	}
+	if geminiReq.ThinkingConfig.BudgetTokens != 256 {
+		t.Errorf("BudgetTokens = %d, want %d", geminiReq.ThinkingConfig.BudgetTokens, 256)
+	}
+	if geminiReq.ThinkingConfig.IncludeThoughts == nil || *geminiReq.ThinkingConfig.IncludeThoughts != includeThoughts {
+		t.Errorf("IncludeThoughts not preserved from config")
+	}
+
+	reqOverride := &models.InvokeRequest{
+		Extra: map[string]interface{}{
+			"thinking_budget":  1024,
+			"include_thoughts": true,
+		},
+	}
+	geminiReqOverride := model.buildGeminiRequest(reqOverride)
+	if geminiReqOverride.ThinkingConfig == nil {
+		t.Fatal("ThinkingConfig not set from request override")
+	}
+	if geminiReqOverride.ThinkingConfig.BudgetTokens != 1024 {
+		t.Errorf("Override BudgetTokens = %d, want %d", geminiReqOverride.ThinkingConfig.BudgetTokens, 1024)
+	}
+	if geminiReqOverride.ThinkingConfig.IncludeThoughts == nil || !*geminiReqOverride.ThinkingConfig.IncludeThoughts {
+		t.Errorf("Override IncludeThoughts not applied")
+	}
+}
+
+func TestGeminiConvertResponseReasoning(t *testing.T) {
+	model := &Gemini{
+		BaseModel: models.BaseModel{ID: "gemini-2.5", Provider: "gemini"},
+	}
+
+	resp := &GeminiResponse{
+		Candidates: []Candidate{
+			{
+				Content: Content{
+					Parts: []Part{
+						{Text: "Step 1", Thought: true},
+						{Text: "Final answer"},
+					},
+				},
+				FinishReason: "STOP",
+			},
+		},
+		UsageMetadata: UsageMetadata{
+			PromptTokenCount:     10,
+			CandidatesTokenCount: 5,
+			TotalTokenCount:      15,
+			ThoughtsTokenCount:   3,
+		},
+	}
+
+	result := model.convertResponse(resp)
+	if result.ReasoningContent == nil {
+		t.Fatal("Expected reasoning content, got nil")
+	}
+	if result.ReasoningContent.Content != "Step 1" {
+		t.Errorf("ReasoningContent = %q, want %q", result.ReasoningContent.Content, "Step 1")
+	}
+	if result.Content != "Final answer" {
+		t.Errorf("Content = %q, want %q", result.Content, "Final answer")
+	}
+	if result.ReasoningContent.TokenCount == nil || *result.ReasoningContent.TokenCount != 3 {
+		t.Errorf("TokenCount = %v, want %d", result.ReasoningContent.TokenCount, 3)
+	}
+	if result.Metadata.Extra == nil {
+		t.Fatal("Expected metadata extra to include thoughts token count")
+	}
+	if v, ok := result.Metadata.Extra["thoughts_token_count"]; !ok || v.(int) != 3 {
+		t.Errorf("thoughts_token_count metadata missing or incorrect: %v", result.Metadata.Extra)
+	}
+}
+
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
 		name    string

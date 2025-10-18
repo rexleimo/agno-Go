@@ -24,6 +24,16 @@ func (m *MockModel) InvokeStream(ctx context.Context, req *models.InvokeRequest)
 	return nil, nil
 }
 
+// MockReasoningModel 支持模拟 SupportsReasoning 接口
+type MockReasoningModel struct {
+	MockModel
+	reasoningEnabled bool
+}
+
+func (m *MockReasoningModel) SupportsReasoning() bool {
+	return m.reasoningEnabled
+}
+
 func TestIsReasoningModel_OpenAI(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -76,41 +86,51 @@ func TestIsReasoningModel_OpenAI(t *testing.T) {
 
 func TestIsReasoningModel_Gemini(t *testing.T) {
 	tests := []struct {
-		name     string
-		modelID  string
-		provider string
-		want     bool
+		name  string
+		model models.Model
+		want  bool
 	}{
 		{
-			name:     "Gemini 2.5 Flash Thinking",
-			modelID:  "gemini-2.5-flash-thinking",
-			provider: "gemini",
-			want:     true,
+			name:  "Gemini 2.5 Flash Thinking",
+			model: &MockModel{id: "gemini-2.5-flash-thinking", provider: "gemini"},
+			want:  true,
 		},
 		{
-			name:     "Gemini with thinking keyword",
-			modelID:  "gemini-thinking-exp",
-			provider: "gemini",
-			want:     true,
+			name:  "Gemini with thinking keyword",
+			model: &MockModel{id: "gemini-thinking-exp", provider: "gemini"},
+			want:  true,
 		},
 		{
-			name:     "Gemini 2.0",
-			modelID:  "gemini-2.0-flash",
-			provider: "gemini",
-			want:     false,
+			name:  "Gemini 2.0",
+			model: &MockModel{id: "gemini-2.0-flash", provider: "gemini"},
+			want:  false,
 		},
 		{
-			name:     "Non-Gemini",
-			modelID:  "gemini-2.5-flash-thinking",
-			provider: "openai",
-			want:     false,
+			name: "SupportsReasoning interface enabled",
+			model: &MockReasoningModel{
+				MockModel:        MockModel{id: "gemini-custom", provider: "gemini"},
+				reasoningEnabled: true,
+			},
+			want: true,
+		},
+		{
+			name: "SupportsReasoning interface disabled",
+			model: &MockReasoningModel{
+				MockModel:        MockModel{id: "gemini-custom", provider: "gemini"},
+				reasoningEnabled: false,
+			},
+			want: false,
+		},
+		{
+			name:  "Non-Gemini",
+			model: &MockModel{id: "gemini-2.5-flash-thinking", provider: "openai"},
+			want:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			model := &MockModel{id: tt.modelID, provider: tt.provider}
-			got := IsReasoningModel(model)
+			got := IsReasoningModel(tt.model)
 			if got != tt.want {
 				t.Errorf("IsReasoningModel() = %v, want %v", got, tt.want)
 			}
@@ -120,29 +140,83 @@ func TestIsReasoningModel_Gemini(t *testing.T) {
 
 func TestIsReasoningModel_Anthropic(t *testing.T) {
 	tests := []struct {
-		name     string
-		modelID  string
-		provider string
-		want     bool
+		name  string
+		model models.Model
+		want  bool
 	}{
 		{
-			name:     "Anthropic Claude",
-			modelID:  "claude-3-opus",
-			provider: "anthropic",
-			want:     false, // 默认关闭，需要显式配置
+			name: "Anthropic thinking enabled",
+			model: &MockReasoningModel{
+				MockModel:        MockModel{id: "claude-3-5-sonnet", provider: "anthropic"},
+				reasoningEnabled: true,
+			},
+			want: true,
 		},
 		{
-			name:     "Non-Anthropic",
-			modelID:  "claude-3-opus",
-			provider: "openai",
-			want:     false,
+			name: "Anthropic thinking disabled",
+			model: &MockReasoningModel{
+				MockModel:        MockModel{id: "claude-3-5-sonnet", provider: "anthropic"},
+				reasoningEnabled: false,
+			},
+			want: false,
+		},
+		{
+			name:  "Non-Anthropic provider",
+			model: &MockReasoningModel{MockModel: MockModel{id: "claude-3-opus", provider: "openai"}, reasoningEnabled: true},
+			want:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			model := &MockModel{id: tt.modelID, provider: tt.provider}
-			got := IsReasoningModel(model)
+			got := IsReasoningModel(tt.model)
+			if got != tt.want {
+				t.Errorf("IsReasoningModel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsReasoningModel_VertexAI(t *testing.T) {
+	tests := []struct {
+		name  string
+		model models.Model
+		want  bool
+	}{
+		{
+			name: "VertexAI thinking enabled",
+			model: &MockReasoningModel{
+				MockModel:        MockModel{id: "claude-3-5-sonnet@20240620", provider: "vertexai"},
+				reasoningEnabled: true,
+			},
+			want: true,
+		},
+		{
+			name: "VertexAI alias provider",
+			model: &MockReasoningModel{
+				MockModel:        MockModel{id: "claude-3-5-sonnet@20240620", provider: "vertex-ai"},
+				reasoningEnabled: true,
+			},
+			want: true,
+		},
+		{
+			name: "VertexAI thinking disabled",
+			model: &MockReasoningModel{
+				MockModel:        MockModel{id: "claude-3-5-sonnet@20240620", provider: "vertexai"},
+				reasoningEnabled: false,
+			},
+			want: false,
+		},
+		{
+			name:  "Non-Vertex provider",
+			model: &MockReasoningModel{MockModel: MockModel{id: "claude-3-5-sonnet@20240620", provider: "anthropic"}, reasoningEnabled: true},
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsReasoningModel(tt.model)
 			if got != tt.want {
 				t.Errorf("IsReasoningModel() = %v, want %v", got, tt.want)
 			}
@@ -206,6 +280,68 @@ func TestExtractReasoning_OpenAI(t *testing.T) {
 			}
 			if !tt.wantNil && got != nil && got.Content == "" {
 				t.Error("ExtractReasoning() returned non-nil but empty content")
+			}
+		})
+	}
+}
+
+func TestExtractReasoning_ReasoningProviders(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		name     string
+		model    models.Model
+		response *types.ModelResponse
+		wantNil  bool
+	}{
+		{
+			name:  "Gemini reasoning content",
+			model: &MockModel{id: "gemini-2.5-flash", provider: "gemini"},
+			response: &types.ModelResponse{
+				ReasoningContent: types.NewReasoningContent("gemini thoughts"),
+			},
+			wantNil: false,
+		},
+		{
+			name: "Anthropic reasoning content",
+			model: &MockReasoningModel{
+				MockModel:        MockModel{id: "claude-3-5-sonnet", provider: "anthropic"},
+				reasoningEnabled: true,
+			},
+			response: &types.ModelResponse{
+				ReasoningContent: types.NewReasoningContent("anthropic thinking"),
+			},
+			wantNil: false,
+		},
+		{
+			name: "VertexAI reasoning content",
+			model: &MockReasoningModel{
+				MockModel:        MockModel{id: "claude-3-5-sonnet@20240620", provider: "vertexai"},
+				reasoningEnabled: true,
+			},
+			response: &types.ModelResponse{
+				ReasoningContent: types.NewReasoningContent("vertex reasoning"),
+			},
+			wantNil: false,
+		},
+		{
+			name:     "Gemini without reasoning",
+			model:    &MockModel{id: "gemini-2.5-flash", provider: "gemini"},
+			response: &types.ModelResponse{},
+			wantNil:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ExtractReasoning(ctx, tt.model, tt.response)
+			if err != nil {
+				t.Fatalf("ExtractReasoning() unexpected error = %v", err)
+			}
+			if (got == nil) != tt.wantNil {
+				t.Fatalf("ExtractReasoning() nil = %v, wantNil = %v", got == nil, tt.wantNil)
+			}
+			if !tt.wantNil && got.Content == "" {
+				t.Errorf("ExtractReasoning() returned empty content")
 			}
 		})
 	}

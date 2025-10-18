@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/rexleimo/agno-go/pkg/agno/models"
@@ -26,10 +27,12 @@ type Gemini struct {
 
 // Config contains Gemini-specific configuration
 type Config struct {
-	APIKey      string
-	BaseURL     string
-	Temperature float64
-	MaxTokens   int
+	APIKey          string
+	BaseURL         string
+	Temperature     float64
+	MaxTokens       int
+	ThinkingBudget  int
+	IncludeThoughts *bool
 }
 
 // New creates a new Gemini model instance
@@ -38,11 +41,9 @@ func New(modelID string, config Config) (*Gemini, error) {
 		return nil, types.NewInvalidConfigError("Gemini API key is required", nil)
 	}
 
-	baseURL := config.BaseURL
-	if baseURL == "" {
-		baseURL = defaultBaseURL
+	if config.BaseURL == "" {
+		config.BaseURL = defaultBaseURL
 	}
-
 	if config.MaxTokens == 0 {
 		config.MaxTokens = 8192
 	}
@@ -56,6 +57,30 @@ func New(modelID string, config Config) (*Gemini, error) {
 		config:     config,
 		httpClient: &http.Client{},
 	}, nil
+}
+
+// SupportsReasoning returns whether the current configuration enables reasoning features
+func (g *Gemini) SupportsReasoning() bool {
+	if g == nil {
+		return false
+	}
+
+	modelID := strings.ToLower(g.ID)
+	if strings.Contains(modelID, "2.5") ||
+		strings.Contains(modelID, "thinking") ||
+		strings.Contains(modelID, "reasoning") {
+		return true
+	}
+
+	if g.config.ThinkingBudget > 0 {
+		return true
+	}
+
+	if g.config.IncludeThoughts != nil && *g.config.IncludeThoughts {
+		return true
+	}
+
+	return false
 }
 
 // Invoke calls the Gemini API synchronously
@@ -184,6 +209,69 @@ func (g *Gemini) buildGeminiRequest(req *models.InvokeRequest) *GeminiRequest {
 		geminiReq.GenerationConfig.MaxOutputTokens = g.config.MaxTokens
 	}
 
+	var thinkingBudget int
+	var includeThoughtsPtr *bool
+
+	if g.config.ThinkingBudget > 0 {
+		thinkingBudget = g.config.ThinkingBudget
+	}
+	if g.config.IncludeThoughts != nil {
+		includeThoughtsPtr = g.config.IncludeThoughts
+	}
+
+	if req.Extra != nil {
+		if val, ok := req.Extra["thinking_budget"]; ok {
+			if budget, ok := toInt(val); ok {
+				thinkingBudget = budget
+			}
+		}
+		if val, ok := req.Extra["include_thoughts"]; ok {
+			if include, ok := toBool(val); ok {
+				includeThoughtsPtr = &include
+			}
+		}
+		if val, ok := req.Extra["includeThoughts"]; ok {
+			if include, ok := toBool(val); ok {
+				includeThoughtsPtr = &include
+			}
+		}
+		if cfgRaw, ok := req.Extra["thinking_config"]; ok {
+			if cfg, ok := cfgRaw.(map[string]interface{}); ok {
+				if v, ok := cfg["budget_tokens"]; ok {
+					if budget, ok := toInt(v); ok {
+						thinkingBudget = budget
+					}
+				}
+				if v, ok := cfg["budgetTokens"]; ok {
+					if budget, ok := toInt(v); ok {
+						thinkingBudget = budget
+					}
+				}
+				if v, ok := cfg["include_thoughts"]; ok {
+					if include, ok := toBool(v); ok {
+						includeThoughtsPtr = &include
+					}
+				}
+				if v, ok := cfg["includeThoughts"]; ok {
+					if include, ok := toBool(v); ok {
+						includeThoughtsPtr = &include
+					}
+				}
+			}
+		}
+	}
+
+	if thinkingBudget > 0 || includeThoughtsPtr != nil {
+		tc := &ThinkingConfig{}
+		if thinkingBudget > 0 {
+			tc.BudgetTokens = thinkingBudget
+		}
+		if includeThoughtsPtr != nil {
+			tc.IncludeThoughts = includeThoughtsPtr
+		}
+		geminiReq.ThinkingConfig = tc
+	}
+
 	// Convert messages to Gemini format
 	var systemInstruction string
 	for _, msg := range req.Messages {
@@ -269,9 +357,14 @@ func (g *Gemini) buildGeminiRequest(req *models.InvokeRequest) *GeminiRequest {
 
 // convertResponse converts Gemini response to ModelResponse
 func (g *Gemini) convertResponse(resp *GeminiResponse) *types.ModelResponse {
+	if resp == nil {
+		return &types.ModelResponse{
+			Model: g.ID,
+		}
+	}
+
 	modelResp := &types.ModelResponse{
-		Model:   g.ID,
-		Content: "",
+		Model: g.ID,
 		Usage: types.Usage{
 			PromptTokens:     resp.UsageMetadata.PromptTokenCount,
 			CompletionTokens: resp.UsageMetadata.CandidatesTokenCount,
@@ -285,11 +378,27 @@ func (g *Gemini) convertResponse(resp *GeminiResponse) *types.ModelResponse {
 
 	candidate := resp.Candidates[0]
 	modelResp.Metadata.FinishReason = candidate.FinishReason
+	if resp.UsageMetadata.ThoughtsTokenCount > 0 {
+		if modelResp.Metadata.Extra == nil {
+			modelResp.Metadata.Extra = make(map[string]interface{})
+		}
+		modelResp.Metadata.Extra["thoughts_token_count"] = resp.UsageMetadata.ThoughtsTokenCount
+	}
 
-	// Extract content and tool calls
+	var contentBuilder strings.Builder
+	var reasoningBuilder strings.Builder
+
+	// Extract content, reasoning and tool calls
 	for _, part := range candidate.Content.Parts {
 		if part.Text != "" {
-			modelResp.Content += part.Text
+			if part.Thought {
+				if reasoningBuilder.Len() > 0 {
+					reasoningBuilder.WriteString("\n")
+				}
+				reasoningBuilder.WriteString(part.Text)
+			} else {
+				contentBuilder.WriteString(part.Text)
+			}
 		}
 
 		if part.FunctionCall != nil {
@@ -302,6 +411,22 @@ func (g *Gemini) convertResponse(resp *GeminiResponse) *types.ModelResponse {
 					Arguments: string(argsJSON),
 				},
 			})
+		}
+	}
+
+	content := strings.TrimSpace(contentBuilder.String())
+	if content != "" {
+		modelResp.Content = content
+	}
+
+	if reasoningBuilder.Len() > 0 {
+		reasoning := strings.TrimSpace(reasoningBuilder.String())
+		if reasoning != "" {
+			rc := types.NewReasoningContent(reasoning)
+			if resp.UsageMetadata.ThoughtsTokenCount > 0 {
+				rc = rc.WithTokenCount(resp.UsageMetadata.ThoughtsTokenCount)
+			}
+			modelResp.ReasoningContent = rc
 		}
 	}
 
@@ -353,6 +478,7 @@ type GeminiRequest struct {
 	SystemInstruction *Content          `json:"systemInstruction,omitempty"`
 	Tools             []Tool            `json:"tools,omitempty"`
 	GenerationConfig  *GenerationConfig `json:"generationConfig,omitempty"`
+	ThinkingConfig    *ThinkingConfig   `json:"thinkingConfig,omitempty"`
 }
 
 // Content represents content in the request/response
@@ -366,6 +492,7 @@ type Part struct {
 	Text             string            `json:"text,omitempty"`
 	FunctionCall     *FunctionCall     `json:"functionCall,omitempty"`
 	FunctionResponse *FunctionResponse `json:"functionResponse,omitempty"`
+	Thought          bool              `json:"thought,omitempty"`
 }
 
 // FunctionCall represents a function call
@@ -400,6 +527,12 @@ type GenerationConfig struct {
 	TopK            int     `json:"topK,omitempty"`
 }
 
+// ThinkingConfig represents reasoning configuration for Gemini thinking models
+type ThinkingConfig struct {
+	IncludeThoughts *bool `json:"includeThoughts,omitempty"`
+	BudgetTokens    int   `json:"budgetTokens,omitempty"`
+}
+
 // GeminiResponse represents the Gemini API response
 type GeminiResponse struct {
 	Candidates    []Candidate   `json:"candidates"`
@@ -418,6 +551,7 @@ type UsageMetadata struct {
 	PromptTokenCount     int `json:"promptTokenCount"`
 	CandidatesTokenCount int `json:"candidatesTokenCount"`
 	TotalTokenCount      int `json:"totalTokenCount"`
+	ThoughtsTokenCount   int `json:"thoughtsTokenCount,omitempty"`
 }
 
 // SSEDecoder decodes Server-Sent Events
@@ -481,6 +615,90 @@ func (d *SSEDecoder) Next() ([]byte, error) {
 // generateToolCallID generates a unique tool call ID
 func generateToolCallID() string {
 	return fmt.Sprintf("call_%d", len(strings.Repeat("x", 24)))
+}
+
+func toInt(value interface{}) (int, bool) {
+	switch v := value.(type) {
+	case int:
+		return v, true
+	case int8:
+		return int(v), true
+	case int16:
+		return int(v), true
+	case int32:
+		return int(v), true
+	case int64:
+		return int(v), true
+	case uint:
+		return int(v), true
+	case uint8:
+		return int(v), true
+	case uint16:
+		return int(v), true
+	case uint32:
+		return int(v), true
+	case uint64:
+		return int(v), true
+	case float32:
+		return int(v), true
+	case float64:
+		return int(v), true
+	case string:
+		if v == "" {
+			return 0, false
+		}
+		if i, err := strconv.Atoi(v); err == nil {
+			return i, true
+		}
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return int(i), true
+		}
+	}
+	return 0, false
+}
+
+func toBool(value interface{}) (bool, bool) {
+	switch v := value.(type) {
+	case bool:
+		return v, true
+	case string:
+		if v == "" {
+			return false, false
+		}
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b, true
+		}
+	case int:
+		return v != 0, true
+	case int8:
+		return v != 0, true
+	case int16:
+		return v != 0, true
+	case int32:
+		return v != 0, true
+	case int64:
+		return v != 0, true
+	case uint:
+		return v != 0, true
+	case uint8:
+		return v != 0, true
+	case uint16:
+		return v != 0, true
+	case uint32:
+		return v != 0, true
+	case uint64:
+		return v != 0, true
+	case float32:
+		return v != 0, true
+	case float64:
+		return v != 0, true
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return i != 0, true
+		}
+	}
+	return false, false
 }
 
 // ValidateConfig validates the Gemini configuration

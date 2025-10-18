@@ -78,6 +78,15 @@ type PaginationMeta struct {
 	// TotalPages 总页数（基于 total_count 和 page_size 计算）
 	// TotalPages is the total number of pages
 	TotalPages int `json:"total_pages"`
+
+	// Offset 当前偏移量
+	Offset int `json:"offset"`
+
+	// HasMore 是否还有更多结果
+	HasMore bool `json:"has_more"`
+
+	// NextOffset 下一页的偏移量
+	NextOffset int `json:"next_offset,omitempty"`
 }
 
 // KnowledgeConfigResponse 表示知识库配置响应
@@ -102,6 +111,34 @@ type KnowledgeConfigResponse struct {
 	// EmbeddingModel 嵌入模型信息
 	// EmbeddingModel is the embedding model information
 	EmbeddingModel EmbeddingModelInfo `json:"embedding_model"`
+
+	// Features 功能开关
+	Features KnowledgeFeatures `json:"features"`
+
+	// Limits 搜索限制
+	Limits KnowledgeLimits `json:"limits"`
+
+	// DefaultCollection 默认集合
+	DefaultCollection string `json:"default_collection"`
+
+	// AllowedCollections 允许的集合列表
+	AllowedCollections []string `json:"allowed_collections,omitempty"`
+
+	// AllowedSourceSchemes 允许的来源 URL scheme
+	AllowedSourceSchemes []string `json:"allowed_source_schemes,omitempty"`
+}
+
+// KnowledgeFeatures describes enabled capabilities.
+type KnowledgeFeatures struct {
+	SearchEnabled    bool `json:"search_enabled"`
+	IngestionEnabled bool `json:"ingestion_enabled"`
+	HealthEnabled    bool `json:"health_enabled"`
+}
+
+// KnowledgeLimits captures pagination defaults and caps.
+type KnowledgeLimits struct {
+	DefaultLimit int `json:"default_limit"`
+	MaxLimit     int `json:"max_limit"`
 }
 
 // ChunkerInfo 表示分块器信息

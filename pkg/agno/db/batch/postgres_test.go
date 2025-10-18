@@ -103,11 +103,17 @@ func TestDefaultConfig(t *testing.T) {
 	if config.BatchSize != 5000 {
 		t.Errorf("DefaultConfig().BatchSize = %d, want 5000", config.BatchSize)
 	}
+	if config.MinBatchSize != 500 {
+		t.Errorf("DefaultConfig().MinBatchSize = %d, want 500", config.MinBatchSize)
+	}
 	if config.MaxRetries != 3 {
 		t.Errorf("DefaultConfig().MaxRetries = %d, want 3", config.MaxRetries)
 	}
 	if config.TimeoutSeconds != 30 {
 		t.Errorf("DefaultConfig().TimeoutSeconds = %d, want 30", config.TimeoutSeconds)
+	}
+	if config.ThrottleInterval != 0 {
+		t.Errorf("DefaultConfig().ThrottleInterval = %s, want 0", config.ThrottleInterval)
 	}
 }
 
@@ -204,11 +210,17 @@ func TestPostgresBatchWriter_ConfigDefaults(t *testing.T) {
 	if writer.config.BatchSize != 5000 {
 		t.Errorf("Default BatchSize = %d, want 5000", writer.config.BatchSize)
 	}
+	if writer.config.MinBatchSize != 500 {
+		t.Errorf("Default MinBatchSize = %d, want 500", writer.config.MinBatchSize)
+	}
 	if writer.config.MaxRetries != 3 {
 		t.Errorf("Default MaxRetries = %d, want 3", writer.config.MaxRetries)
 	}
 	if writer.config.TimeoutSeconds != 30 {
 		t.Errorf("Default TimeoutSeconds = %d, want 30", writer.config.TimeoutSeconds)
+	}
+	if writer.config.ThrottleInterval != 0 {
+		t.Errorf("Default ThrottleInterval = %s, want 0", writer.config.ThrottleInterval)
 	}
 }
 
@@ -220,9 +232,11 @@ func TestPostgresBatchWriter_CustomConfig(t *testing.T) {
 	defer db.Close()
 
 	customConfig := &Config{
-		BatchSize:      1000,
-		MaxRetries:     5,
-		TimeoutSeconds: 60,
+		BatchSize:        1000,
+		MinBatchSize:     100,
+		MaxRetries:       5,
+		TimeoutSeconds:   60,
+		ThrottleInterval: 10 * time.Millisecond,
 	}
 
 	writer, err := NewPostgresBatchWriter(db, customConfig)
@@ -233,11 +247,44 @@ func TestPostgresBatchWriter_CustomConfig(t *testing.T) {
 	if writer.config.BatchSize != 1000 {
 		t.Errorf("Custom BatchSize = %d, want 1000", writer.config.BatchSize)
 	}
+	if writer.config.MinBatchSize != 100 {
+		t.Errorf("Custom MinBatchSize = %d, want 100", writer.config.MinBatchSize)
+	}
 	if writer.config.MaxRetries != 5 {
 		t.Errorf("Custom MaxRetries = %d, want 5", writer.config.MaxRetries)
 	}
 	if writer.config.TimeoutSeconds != 60 {
 		t.Errorf("Custom TimeoutSeconds = %d, want 60", writer.config.TimeoutSeconds)
+	}
+	if writer.config.ThrottleInterval != 10*time.Millisecond {
+		t.Errorf("Custom ThrottleInterval = %s, want 10ms", writer.config.ThrottleInterval)
+	}
+}
+
+func TestNormalizeConfig(t *testing.T) {
+	cfg := &Config{
+		BatchSize:        -1,
+		MinBatchSize:     -1,
+		MaxRetries:       0,
+		TimeoutSeconds:   -5,
+		ThrottleInterval: -1 * time.Second,
+	}
+
+	n := normalizeConfig(cfg)
+	if n.BatchSize != 5000 {
+		t.Errorf("Expected normalized BatchSize=5000, got %d", n.BatchSize)
+	}
+	if n.MinBatchSize != 500 {
+		t.Errorf("Expected normalized MinBatchSize=500, got %d", n.MinBatchSize)
+	}
+	if n.MaxRetries != 3 {
+		t.Errorf("Expected normalized MaxRetries=3, got %d", n.MaxRetries)
+	}
+	if n.TimeoutSeconds != 30 {
+		t.Errorf("Expected normalized TimeoutSeconds=30, got %d", n.TimeoutSeconds)
+	}
+	if n.ThrottleInterval != 0 {
+		t.Errorf("Expected normalized ThrottleInterval=0, got %s", n.ThrottleInterval)
 	}
 }
 

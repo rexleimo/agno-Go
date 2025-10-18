@@ -6,6 +6,10 @@ import (
 	"github.com/rexleimo/agno-go/pkg/agno/models"
 )
 
+type reasoningCapable interface {
+	SupportsReasoning() bool
+}
+
 // Detector 检测 Gemini 推理模型
 // Detector detects Gemini reasoning models
 type Detector struct{}
@@ -13,12 +17,20 @@ type Detector struct{}
 // IsReasoningModel 检查是否为 Gemini 推理模型
 // Checks if this is a Gemini reasoning model
 func (d *Detector) IsReasoningModel(model models.Model) bool {
-	// 检查提供商 / Check provider
-	if model.GetProvider() != "gemini" {
+	if model == nil {
 		return false
 	}
 
-	// 检查模型 ID 是否为 2.5+ / Check if model ID is 2.5+
+	if !strings.EqualFold(model.GetProvider(), "gemini") {
+		return false
+	}
+
+	if capable, ok := model.(reasoningCapable); ok {
+		if capable.SupportsReasoning() {
+			return true
+		}
+	}
+
 	modelID := strings.ToLower(model.GetID())
 	if strings.Contains(modelID, "2.5") ||
 		strings.Contains(modelID, "thinking") ||

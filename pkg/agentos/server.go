@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -70,6 +71,10 @@ type Config struct {
 	// EmbeddingConfig 嵌入模型配置（新增）
 	// EmbeddingConfig is the embedding model configuration (new)
 	EmbeddingConfig *EmbeddingConfig
+
+	// KnowledgeAPI 知识 API 行为控制
+	// KnowledgeAPI configures knowledge endpoints behaviour
+	KnowledgeAPI *KnowledgeAPIOptions
 }
 
 // VectorDBConfig 向量数据库配置
@@ -116,6 +121,85 @@ type EmbeddingConfig struct {
 	BaseURL string
 }
 
+// KnowledgeAPIOptions controls knowledge endpoint behaviour
+type KnowledgeAPIOptions struct {
+	// DisableSearch 禁用搜索端点
+	DisableSearch bool
+
+	// DisableIngestion 禁用入库端点
+	DisableIngestion bool
+
+	// EnableHealth 暴露健康检查端点
+	EnableHealth bool
+
+	// DefaultLimit 搜索默认条数
+	DefaultLimit int
+
+	// MaxLimit 搜索最大条数
+	MaxLimit int
+
+	// SearchTimeout 搜索超时时间
+	SearchTimeout time.Duration
+
+	// IngestionTimeout 入库超时时间
+	IngestionTimeout time.Duration
+
+	// HealthTimeout 健康检查超时时间
+	HealthTimeout time.Duration
+
+	// AllowedCollections 允许的集合列表 (为空时仅默认集合)
+	AllowedCollections []string
+
+	// AllowAllCollections 是否允许任意集合
+	AllowAllCollections bool
+
+	// AllowedSourceSchemes 允许的来源 URL scheme（为空表示不限制）
+	AllowedSourceSchemes []string
+}
+
+func normalizeKnowledgeOptions(opts *KnowledgeAPIOptions) {
+	if opts == nil {
+		return
+	}
+
+	if opts.DefaultLimit <= 0 {
+		opts.DefaultLimit = 10
+	}
+	if opts.MaxLimit <= 0 {
+		opts.MaxLimit = 100
+	}
+	if opts.MaxLimit < opts.DefaultLimit {
+		opts.MaxLimit = opts.DefaultLimit
+	}
+	if opts.SearchTimeout <= 0 {
+		opts.SearchTimeout = 30 * time.Second
+	}
+	if opts.IngestionTimeout <= 0 {
+		opts.IngestionTimeout = 60 * time.Second
+	}
+	if opts.HealthTimeout <= 0 {
+		opts.HealthTimeout = 5 * time.Second
+	}
+	if len(opts.AllowedSourceSchemes) == 0 {
+		opts.AllowedSourceSchemes = []string{"http", "https", "mcp"}
+	} else {
+		seen := make(map[string]struct{}, len(opts.AllowedSourceSchemes))
+		normalized := make([]string, 0, len(opts.AllowedSourceSchemes))
+		for _, scheme := range opts.AllowedSourceSchemes {
+			if scheme == "" {
+				continue
+			}
+			lower := strings.ToLower(scheme)
+			if _, exists := seen[lower]; exists {
+				continue
+			}
+			seen[lower] = struct{}{}
+			normalized = append(normalized, lower)
+		}
+		opts.AllowedSourceSchemes = normalized
+	}
+}
+
 // NewServer creates a new AgentOS server
 func NewServer(config *Config) (*Server, error) {
 	if config == nil {
@@ -142,6 +226,11 @@ func NewServer(config *Config) (*Server, error) {
 	if config.MaxRequestSize == 0 {
 		config.MaxRequestSize = 10 * 1024 * 1024 // 10MB
 	}
+
+	if config.KnowledgeAPI == nil {
+		config.KnowledgeAPI = &KnowledgeAPIOptions{}
+	}
+	normalizeKnowledgeOptions(config.KnowledgeAPI)
 
 	// Set Gin mode
 	if config.Debug {
@@ -273,14 +362,18 @@ func (s *Server) registerRoutes() {
 			agents.POST("/:id/run/stream", s.handleAgentRunStream) // P1: SSE 流式输出
 		}
 
-		// Knowledge endpoints（新增）
-		// Knowledge endpoints (new)
+		// Knowledge endpoints
 		if s.knowledgeService != nil {
 			knowledge := v1.Group("/knowledge")
-			{
+			knowledge.GET("/config", s.handleKnowledgeConfig)
+			if s.knowledgeService.config.EnableSearch {
 				knowledge.POST("/search", s.handleKnowledgeSearch)
-				knowledge.GET("/config", s.handleKnowledgeConfig)
-				knowledge.POST("/content", s.handleAddContent) // P2: 知识入库 API
+			}
+			if s.knowledgeService.config.EnableIngestion {
+				knowledge.POST("/content", s.handleAddContent)
+			}
+			if s.knowledgeService.config.EnableHealth {
+				knowledge.GET("/health", s.handleKnowledgeHealth)
 			}
 		}
 	}
@@ -419,17 +512,28 @@ func initKnowledgeService(config *Config, logger *slog.Logger) (*KnowledgeServic
 		return nil, fmt.Errorf("unsupported vector db type: %s", config.VectorDBConfig.Type)
 	}
 
-	// 创建知识库服务
-	// Create knowledge service
+	opts := config.KnowledgeAPI
+
 	svcConfig := KnowledgeServiceConfig{
-		DefaultLimit:        10,
-		MaxLimit:            100,
-		DefaultChunkerType:  "character",
-		DefaultChunkSize:    1000,
-		DefaultOverlap:      100,
-		EmbeddingProvider:   config.EmbeddingConfig.Provider,
-		EmbeddingModel:      config.EmbeddingConfig.Model,
-		EmbeddingDimensions: 1536, // OpenAI text-embedding-3-small 默认维度
+		DefaultLimit:         opts.DefaultLimit,
+		MaxLimit:             opts.MaxLimit,
+		DefaultChunkerType:   "character",
+		DefaultChunkSize:     1000,
+		DefaultOverlap:       100,
+		EmbeddingProvider:    config.EmbeddingConfig.Provider,
+		EmbeddingModel:       config.EmbeddingConfig.Model,
+		EmbeddingDimensions:  1536, // OpenAI text-embedding-3-small 默认维度
+		EnableSearch:         !opts.DisableSearch,
+		EnableIngestion:      !opts.DisableIngestion,
+		EnableHealth:         opts.EnableHealth,
+		SearchTimeout:        opts.SearchTimeout,
+		IngestionTimeout:     opts.IngestionTimeout,
+		HealthTimeout:        opts.HealthTimeout,
+		DefaultCollection:    config.VectorDBConfig.CollectionName,
+		AllowedCollections:   opts.AllowedCollections,
+		AllowAllCollections:  opts.AllowAllCollections,
+		AllowedSourceSchemes: opts.AllowedSourceSchemes,
 	}
+
 	return NewKnowledgeService(vdb, embFunc, svcConfig), nil
 }
