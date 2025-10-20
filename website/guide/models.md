@@ -675,3 +675,57 @@ func main() {
 - [Claude Agent](/examples/claude-agent) - Anthropic example
 - [GLM Agent](/examples/glm-agent) - GLM (智谱AI) example
 - [Ollama Agent](/examples/ollama-agent) - Local model example
+
+---
+
+## Additional Providers (NEW in v1.2.5)
+
+This release adds several providers with OpenAI-compatible or native integrations. All support synchronous `Invoke` and streaming `InvokeStream`, and most support function calling.
+
+### Cohere
+```go
+import cohere "github.com/rexleimo/agno-go/pkg/agno/models/cohere"
+model, err := cohere.New("command", cohere.Config{ APIKey: os.Getenv("COHERE_API_KEY") })
+```
+
+### Together AI
+```go
+import together "github.com/rexleimo/agno-go/pkg/agno/models/together"
+model, err := together.New("meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", together.Config{ APIKey: os.Getenv("TOGETHER_API_KEY") })
+```
+
+### OpenRouter
+```go
+import openrouter "github.com/rexleimo/agno-go/pkg/agno/models/openrouter"
+model, err := openrouter.New("openrouter/auto", openrouter.Config{ APIKey: os.Getenv("OPENROUTER_API_KEY") })
+```
+
+### LM Studio (local)
+```go
+import lmstudio "github.com/rexleimo/agno-go/pkg/agno/models/lmstudio"
+model, err := lmstudio.New("local-model", lmstudio.Config{}) // default base: http://localhost:1234/v1
+```
+
+### Vercel AI
+```go
+import vercel "github.com/rexleimo/agno-go/pkg/agno/models/vercel"
+model, err := vercel.New("gpt-4o-mini", vercel.Config{ APIKey: os.Getenv("VERCEL_API_KEY"), BaseURL: "https://example.com/v1" })
+```
+
+### Portkey
+```go
+import portkey "github.com/rexleimo/agno-go/pkg/agno/models/portkey"
+model, err := portkey.New("gpt-4o-mini", portkey.Config{ APIKey: os.Getenv("PORTKEY_API_KEY") })
+```
+
+### InternLM
+```go
+import internlm "github.com/rexleimo/agno-go/pkg/agno/models/internlm"
+model, err := internlm.New("internlm2.5", internlm.Config{ APIKey: os.Getenv("INTERNLM_API_KEY"), BaseURL: "https://your-internlm-endpoint/v1" })
+```
+
+### SambaNova
+```go
+import sambanova "github.com/rexleimo/agno-go/pkg/agno/models/sambanova"
+model, err := sambanova.New("Meta-Llama-3.1-70B-Instruct", sambanova.Config{ APIKey: os.Getenv("SAMBANOVA_API_KEY") })
+```

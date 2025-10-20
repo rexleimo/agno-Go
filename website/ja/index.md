@@ -6,7 +6,7 @@ hero:
   text: "高性能マルチエージェントフレームワーク"
   tagline: "Python より 16 倍高速 | 180ns インスタンス化 | エージェントあたり 1.2KB メモリ"
   image:
-    src: /logo.svg
+    src: /logo.png
     alt: Agno-Go
   actions:
     - theme: brand

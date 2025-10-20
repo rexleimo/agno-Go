@@ -3,7 +3,7 @@
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Test Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen.svg)](docs/DEVELOPMENT.md#testing-standards)
-[![Release](https://img.shields.io/badge/release-v1.2.1-blue.svg)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v1.2.5-blue.svg)](CHANGELOG.md)
 
 **Agno-Go** is a high-performance multi-agent framework written in Go. It keeps the KISS philosophy of the Agno project while embracing Go’s strengths: lightweight goroutines, a tiny memory footprint, single static binaries, and a batteries-included toolchain.
 
@@ -14,7 +14,7 @@
 - **🚀 Extreme performance** – agent instantiation in ~180 ns and (~1.2 KB) memory per agent, 16× faster than the Python version.
 - **🤖 Production ready** – AgentOS REST server (OpenAPI 3.0), session storage, health checks, structured logging, CORS, request timeouts.
 - **🧩 Flexible architecture** – build with Agents, Teams (4 coordination modes), or Workflows (5 primitives) and mix freely.
-- **🔌 Multi-provider models** – OpenAI (incl. o-series reasoning), Anthropic Claude, Google Gemini, DeepSeek, GLM, ModelScope, Ollama.
+- **🔌 Multi-provider models** – OpenAI (incl. o-series reasoning), Anthropic Claude, Google Gemini, DeepSeek, GLM, ModelScope, Ollama, Cohere, Groq, Together, OpenRouter, LM Studio, Vercel, Portkey, InternLM, SambaNova.
 - **🔧 Extensible tooling** – calculator, HTTP, file operations, search, plus an SDK for building bespoke toolkits or MCP connectors.
 - **💾 Knowledge & RAG** – ChromaDB integration, batching utilities, and ingestion helpers.
 - **🛡️ Guardrails & hooks** – prompt-injection guard, custom pre/post hooks, graceful degradation.

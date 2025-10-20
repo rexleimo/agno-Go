@@ -6,7 +6,7 @@ hero:
   text: "高性能多智能体框架"
   tagline: "比 Python 快 16 倍 | 180ns 实例化 | 每个智能体仅 1.2KB 内存"
   image:
-    src: /logo.svg
+    src: /logo.png
     alt: Agno-Go
   actions:
     - theme: brand

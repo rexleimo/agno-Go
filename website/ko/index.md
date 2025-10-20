@@ -6,7 +6,7 @@ hero:
   text: "고성능 멀티 에이전트 프레임워크"
   tagline: "Python보다 16배 빠름 | 180ns 인스턴스화 | 에이전트당 1.2KB 메모리"
   image:
-    src: /logo.svg
+    src: /logo.png
     alt: Agno-Go
   actions:
     - theme: brand

@@ -6,7 +6,7 @@ hero:
   text: "High-Performance Multi-Agent Framework"
   tagline: "16x faster than Python | 180ns instantiation | 1.2KB memory per agent"
   image:
-    src: /logo.svg
+    src: /logo.png
     alt: Agno-Go
   actions:
     - theme: brand

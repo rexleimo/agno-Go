@@ -6,6 +6,23 @@ outline: deep
 
 # 版本发布说明
 
+## Version 1.2.5 (2025-10-20)
+
+### ✨ 新增
+- 模型提供商：Cohere、Together、OpenRouter、LM Studio、Vercel、Portkey、InternLM、SambaNova（支持同步/流式与函数调用）
+- 核心模块：评估系统（场景评测、指标汇总、多模型对比）、媒体处理（图片元数据；音/视频占位）、调试工具（请求/响应转储）、云部署占位（NoopDeployer）
+- 集成与生态：集成注册表（注册/列表/健康检查）、通用 utils（JSONPretty、Retry）
+
+### 🔧 修复
+- Airflow 工具返回结构对齐 Airflow REST API v2：`total_entries`、`dag_run_id`、`logical_date`
+- 站点图片缺失：将首页 hero 图片从 `/logo.svg` 更换为 `/logo.png`
+
+### 🧪 测试
+- 为新增模型与模块补充了聚焦单测；保留现有基准测试
+
+### ✅ 兼容性
+- 完全向后兼容（增量变更）
+
 ## Version 1.2.1 (2025-10-15)
 
 ### 🧭 文档重组

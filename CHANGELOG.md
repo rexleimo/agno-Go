@@ -5,6 +5,30 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2025-10-20
+
+### ✨ Added
+- Model providers: Cohere, Together, OpenRouter, LM Studio, Vercel, Portkey, InternLM, SambaNova (Invoke/Stream + function calling)
+- Core modules:
+  - Evaluation system (scenario runner, per-run metrics, aggregated summary, multi-model comparison)
+  - Media processing: image metadata (DecodeConfig), audio/video probe占位
+  - Debug helpers: request/response compact dump
+  - Cloud: NoopDeployer interface for simple deployments
+- Integrations registry: register/list/health-check for third‑party services
+
+### 🛠️ Changed
+- Airflow toolkit mock schema aligned with Airflow REST API v2 (Context7): `total_entries`, `dag_run_id`, `logical_date`
+- Website hero image uses `/logo.png` (fix broken asset)
+- README “Multi-provider models” list updated
+
+### 🧪 Tests
+- Focused unit tests for new providers and modules (cohere, together, openrouter, lmstudio, vercel, portkey, internlm, sambanova, eval/media/debug/integrations/utils)
+
+### ✅ Compatibility
+- Additive features; no breaking changes
+
+---
+
 ## [1.2.2] - 2025-10-18
 
 ### ✨ Added
