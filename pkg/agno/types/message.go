@@ -69,9 +69,7 @@ func NewAssistantMessage(content string) *Message {
 
 // NewToolMessage creates a tool response message
 func NewToolMessage(toolCallID, content string) *Message {
-	return &Message{
-		Role:       RoleTool,
-		Content:    content,
-		ToolCallID: toolCallID,
-	}
+    msg := NewMessage(RoleTool, content)
+    msg.ToolCallID = toolCallID
+    return msg
 }
