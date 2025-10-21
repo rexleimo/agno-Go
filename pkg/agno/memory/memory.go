@@ -1,9 +1,10 @@
 package memory
 
 import (
-	"sync"
+    "sync"
 
-	"github.com/rexleimo/agno-go/pkg/agno/types"
+    "github.com/rexleimo/agno-go/pkg/agno/types"
+    "github.com/google/uuid"
 )
 
 // Memory manages conversation history
@@ -64,10 +65,15 @@ func getUserID(userID ...string) string {
 // Add appends a message to memory for a specific user
 // Add 为特定用户添加消息到内存
 func (m *InMemory) Add(message *types.Message, userID ...string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+    m.mu.Lock()
+    defer m.mu.Unlock()
 
-	uid := getUserID(userID...)
+    uid := getUserID(userID...)
+
+    // Ensure message has an ID for traceability
+    if message != nil && message.ID == "" {
+        message.ID = "msg-" + uuid.NewString()
+    }
 
 	// Initialize user's message list if not exists
 	// 如果用户的消息列表不存在则初始化

@@ -221,3 +221,19 @@ func TestInMemory_MaxSizePerUser(t *testing.T) {
 		t.Errorf("user2 should have 1 message, got %d", mem.Size("user2"))
 	}
 }
+
+func TestInMemory_AssignsIDIfMissing(t *testing.T) {
+    mem := NewInMemory(10)
+
+    // Manually construct a message without ID
+    msg := &types.Message{Role: types.RoleUser, Content: "hi"}
+    mem.Add(msg)
+
+    messages := mem.GetMessages()
+    if len(messages) != 1 {
+        t.Fatalf("expected 1 message, got %d", len(messages))
+    }
+    if messages[0].ID == "" {
+        t.Error("expected memory.Add to assign an ID to message with empty ID")
+    }
+}

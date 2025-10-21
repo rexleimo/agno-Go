@@ -33,14 +33,17 @@ func TestNewMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NewMessage(tt.role, tt.content)
-			if got.Role != tt.want.Role {
-				t.Errorf("Role = %v, want %v", got.Role, tt.want.Role)
-			}
-			if got.Content != tt.want.Content {
-				t.Errorf("Content = %v, want %v", got.Content, tt.want.Content)
-			}
-		})
+		got := NewMessage(tt.role, tt.content)
+		if got.Role != tt.want.Role {
+			t.Errorf("Role = %v, want %v", got.Role, tt.want.Role)
+		}
+		if got.Content != tt.want.Content {
+			t.Errorf("Content = %v, want %v", got.Content, tt.want.Content)
+		}
+		if got.ID == "" {
+			t.Error("expected message ID to be generated, got empty string")
+		}
+	})
 	}
 }
 
@@ -66,6 +69,10 @@ func TestNewUserMessage(t *testing.T) {
 	if msg.Content != content {
 		t.Errorf("expected content %v, got %v", content, msg.Content)
 	}
+
+	if msg.ID == "" {
+		t.Error("expected message ID to be generated for user message")
+	}
 }
 
 func TestNewAssistantMessage(t *testing.T) {
@@ -77,6 +84,10 @@ func TestNewAssistantMessage(t *testing.T) {
 	}
 	if msg.Content != content {
 		t.Errorf("expected content %v, got %v", content, msg.Content)
+	}
+
+	if msg.ID == "" {
+		t.Error("expected message ID to be generated for assistant message")
 	}
 }
 
@@ -94,4 +105,17 @@ func TestNewToolMessage(t *testing.T) {
 	if msg.Content != content {
 		t.Errorf("expected content %v, got %v", content, msg.Content)
 	}
+
+	if msg.ID == "" {
+		t.Error("expected message ID to be generated for tool message")
+	}
+}
+
+func TestMessageIDUniqueness(t *testing.T) {
+    msg1 := NewUserMessage("hello")
+    msg2 := NewUserMessage("hello again")
+
+    if msg1.ID == msg2.ID {
+        t.Errorf("expected different IDs for different messages, got same: %s", msg1.ID)
+    }
 }
