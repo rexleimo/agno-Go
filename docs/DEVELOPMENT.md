@@ -325,6 +325,81 @@ func (t *MyToolkit) myHandler(args map[string]interface{}) (interface{}, error) 
 }
 ```
 
+### Built-in Tool Integrations | 内置工具集成
+
+Agno-Go ships with several production-ready toolkits. They can be imported directly from `pkg/agno/tools/...` or registered via configuration builders.
+
+| Toolkit | Package | Configuration Notes |
+| --- | --- | --- |
+| Claude Agent Skills | `pkg/agno/tools/claude` | Requires an Anthropic API key (`ANTHROPIC_API_KEY`); optional custom base URL for self-hosted gateways. |
+| Tavily Search + Reader | `pkg/agno/tools/tavily` | Requires `TAVILY_API_KEY`; supports quick answers and reader mode with `extract=true`. |
+| PPTX Reader | `pkg/agno/tools/file` (`read_pptx`) | No external credentials; parses slide text for ingestion pipelines. |
+| Jira Worklogs | `pkg/agno/tools/jira` | Provide Jira base URL and a PAT/Bearer token; adds worklogs via REST v3. |
+| Gmail Mark-as-Read | `pkg/agno/tools/gmail` | Requires OAuth access token; removes the `UNREAD` label for a message. |
+| ElevenLabs Speech | `pkg/agno/tools/elevenlabs` | Requires `ELEVENLABS_API_KEY`; exposes `generate_speech` with stability/similarity controls. |
+
+Each toolkit includes contract tests (`*_test.go`) demonstrating expected payloads. When wiring them into an agent, pass the configuration struct (e.g. `claude.Config`, `jira.Config`) with the required keys and the shared `toolkit.ToModelToolDefinitions` helper will expose them to LLMs.
+
+---
+
+## Runtime Parity & Configuration | 运行时功能对等配置
+
+### Session Runtime | 会话运行时
+
+- **Shared sessions** – `POST /api/v1/sessions/{id}/reuse` attaches existing sessions to new agents, teams, workflows, or users, matching Python semantics. | **会话复用** – 通过 `POST /api/v1/sessions/{id}/reuse` 将现有会话绑定到新的代理、团队、工作流或用户，语义与 Python 版本一致。
+- **Summaries** – `GET`/`POST /api/v1/sessions/{id}/summary` call `session.SummaryManager`; `POST` queues async generation and persists the latest snapshot. | **会话摘要** – 使用 `GET`/`POST /api/v1/sessions/{id}/summary` 调用 `session.SummaryManager`；`POST` 会异步生成并持久化最新摘要。
+- **History filters** – `GET /api/v1/sessions/{id}/history?num_messages=N&stream_events=true` limits messages and mirrors the `stream_events` toggle used by Python SSE streams. | **历史过滤** – `GET /api/v1/sessions/{id}/history?num_messages=N&stream_events=true` 限制消息数量，并与 Python SSE 的 `stream_events` 开关保持一致。
+- **Run metadata** – API payloads expose `runs[*].cache_hit`, `runs[*].status`, timestamps, and `cancellation_reason` for audit/resume flows. | **运行元数据** – API 返回中包含 `runs[*].cache_hit`、`runs[*].status`、时间戳以及 `cancellation_reason`，用于审计与恢复。
+
+```bash
+curl -X POST \
+  http://localhost:8080/api/v1/sessions/SESSION_ID/reuse \
+  -H 'Content-Type: application/json' \
+  -d '{"agent_id":"agent-writer","team_id":"team-research"}'
+```
+
+```go
+db, _ := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+store, _ := postgres.NewStorage(db, postgres.WithSchema("agentos"))
+
+summaryModel, _ := openai.New("gpt-4o-mini", openai.Config{APIKey: os.Getenv("OPENAI_API_KEY")})
+summary := session.NewSummaryManager(
+    session.WithSummaryModel(summaryModel),
+    session.WithSummaryTimeout(45*time.Second),
+)
+
+server, _ := agentos.NewServer(&agentos.Config{
+    Address:        ":8080",
+    SessionStorage: store,
+    SummaryManager: summary,
+})
+```
+
+### Storage Adapters | 存储适配器
+
+| Backend | Package | Notes |
+| --- | --- | --- |
+| Postgres | `pkg/agno/db/postgres` | Batch writer + `jsonb` columns keep sessions, runs, summaries, and cancellation snapshots consistent.<br>批量写入器与 `jsonb` 列确保会话、运行、摘要与取消快照保持一致。 |
+| MongoDB | `pkg/agno/db/mongo` | `ReplaceOne` with `upsert=true`, 200 ms default timeout, cancellations stored under `cancellations[run_id]`.<br>`ReplaceOne` 使用 `upsert=true`，默认超时 200 ms，取消信息存储在 `cancellations[run_id]` 中。 |
+| SQLite | `pkg/agno/db/sqlite` | `modernc.org/sqlite` driver, `busy_timeout=200ms`, JSON persisted as text with helpers for marshal/unmarshal.<br>基于 `modernc.org/sqlite`，设置 `busy_timeout=200ms`，JSON 以文本形式存储并辅以编解码工具。 |
+
+All adapters honour context cancellation via the shared `ensureContext` helper, so always propagate `context.Context` from HTTP handlers or background jobs. | 所有适配器通过 `ensureContext` 共享辅助函数响应取消，因此请始终从 HTTP 处理器或后台任务传递 `context.Context`。
+
+### Response Cache & Cancellation | 响应缓存与取消
+
+- Enable agent caching via `agent.Config{EnableCache: true, CacheTTL: 5 * time.Minute}` or provide a custom `cache.Provider` implementation. | 通过 `agent.Config{EnableCache: true, CacheTTL: 5 * time.Minute}` 启用代理缓存，或自定义 `cache.Provider` 实现。
+- When a context is cancelled, `agent.Run` persists `RunStatusCancelled` with `cancellation_reason`; downstream stores capture the snapshot for recovery. | 当上下文被取消时，`agent.Run` 会持久化 `RunStatusCancelled` 及 `cancellation_reason`，存储层将捕获快照以便恢复。
+
+### Teams & Workflows | 团队与工作流
+
+- `team.Config.SharedModel` and `InheritModel` let teams default to a shared provider, while `DisableInheritanceFor` and `ModelOverrides` mirror Python’s inheritance matrix. | `team.Config.SharedModel` 与 `InheritModel` 允许团队默认共享模型，`DisableInheritanceFor` 与 `ModelOverrides` 复刻 Python 继承矩阵。
+- Workflows accept `workflow.WithResumeFrom(stepID)` and `workflow.WithSessionState(snapshot)` to resume partial runs; `WithMediaPayload` validates image/audio/video inputs before execution. | 工作流支持 `workflow.WithResumeFrom(stepID)` 与 `workflow.WithSessionState(snapshot)` 以恢复部分运行；`WithMediaPayload` 会在执行前验证图像/音频/视频输入。
+
+### Media & Guardrails | 媒体与防护
+
+- Media attachments flow through `media.Normalize` and surface in workflow/session history while preventing empty payloads. | 媒体附件由 `media.Normalize` 处理后写入工作流/会话历史，同时禁止空载荷。
+- Stream hooks respect the `stream_events` flag so SSE topics match the Python runtime (`run_start`, `reasoning`, `token`, `tool_call`, `complete`, `error`). | 流式钩子遵循 `stream_events` 标志，SSE 主题与 Python 运行时一致（`run_start`、`reasoning`、`token`、`tool_call`、`complete`、`error`）。
+
 ---
 
 ## Git Workflow | Git 工作流

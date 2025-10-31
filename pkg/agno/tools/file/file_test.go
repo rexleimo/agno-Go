@@ -1,7 +1,9 @@
 package file
 
 import (
+	"archive/zip"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,7 +16,7 @@ func TestNew(t *testing.T) {
 	}
 
 	funcs := ft.Functions()
-	expectedFuncs := []string{"read_file", "write_file", "list_files", "delete_file", "file_exists"}
+	expectedFuncs := []string{"read_file", "write_file", "list_files", "delete_file", "file_exists", "read_pptx"}
 
 	for _, name := range expectedFuncs {
 		if _, exists := funcs[name]; !exists {
@@ -170,6 +172,72 @@ func TestFileExists(t *testing.T) {
 	if !resultMap["exists"].(bool) {
 		t.Error("fileExists() = false for existing file")
 	}
+}
+
+func TestReadPPTX(t *testing.T) {
+	tmpDir := t.TempDir()
+	pptxPath := filepath.Join(tmpDir, "deck.pptx")
+
+	if err := createTestPPTX(pptxPath, []string{"Title Slide", "Second slide content"}); err != nil {
+		t.Fatalf("failed to create test pptx: %v", err)
+	}
+
+	ft := New()
+	result, err := ft.readPPTX(context.Background(), map[string]interface{}{
+		"path": pptxPath,
+	})
+	if err != nil {
+		t.Fatalf("readPPTX error: %v", err)
+	}
+
+	resultMap := result.(map[string]interface{})
+	slides := resultMap["slides"].([]map[string]interface{})
+	if len(slides) != 2 {
+		t.Fatalf("expected 2 slides, got %d", len(slides))
+	}
+	if slides[0]["text"] != "Title Slide" {
+		t.Fatalf("unexpected first slide text %v", slides[0]["text"])
+	}
+	if slides[1]["text"] != "Second slide content" {
+		t.Fatalf("unexpected second slide text %v", slides[1]["text"])
+	}
+}
+
+func createTestPPTX(path string, slides []string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	zw := zip.NewWriter(file)
+	defer zw.Close()
+
+	for idx, content := range slides {
+		name := fmt.Sprintf("ppt/slides/slide%d.xml", idx+1)
+		writer, err := zw.Create(name)
+		if err != nil {
+			return err
+		}
+		xml := fmt.Sprintf(`<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>%s</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>`, content)
+		if _, err := writer.Write([]byte(xml)); err != nil {
+			return err
+		}
+	}
+
+	// Add minimal content types to keep structure valid for other tools
+	ct, err := zw.Create("[Content_Types].xml")
+	if err != nil {
+		return err
+	}
+	if _, err := ct.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="xml" ContentType="application/xml"/>
+</Types>`)); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func TestValidatePath(t *testing.T) {

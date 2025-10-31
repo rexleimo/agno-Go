@@ -204,7 +204,13 @@ Content-Type: application/json
 
 {
   "input": "What is the weather in SF?",
-  "session_id": "optional-session-id"
+  "session_id": "optional-session-id",
+  "media": [
+    {
+      "type": "image",
+      "url": "https://example.com/photo.png"
+    }
+  ]
 }
 ```
 
@@ -214,10 +220,18 @@ Content-Type: application/json
   "content": "I don't have access to real-time weather data...",
   "session_id": "optional-session-id",
   "metadata": {
-    "agent_id": "assistant"
+    "agent_id": "assistant",
+    "media": [
+      {
+        "type": "image",
+        "url": "https://example.com/photo.png"
+      }
+    ]
   }
 }
 ```
+
+> **Media support**: when `media` attachments are supplied, AgentOS validates the payload and keeps the attachment metadata alongside the run so downstream consumers can render or audit the original assets. Pure-media requests (no `input` text) are accepted as long as at least one attachment is present.
 
 ## Configuration
 

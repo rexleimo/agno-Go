@@ -215,6 +215,21 @@ func TestMemoryStorage_List(t *testing.T) {
 	}
 }
 
+func TestMemoryStorage_ContextCancellation(t *testing.T) {
+	storage := NewMemoryStorage()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := storage.Create(ctx, NewSession("ctx-session", "agent"))
+	if err == nil {
+		t.Fatalf("expected context cancellation error, got nil")
+	}
+
+	if err != context.Canceled && err != context.DeadlineExceeded {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestMemoryStorage_List_WithFilters(t *testing.T) {
 	storage := NewMemoryStorage()
 	ctx := context.Background()

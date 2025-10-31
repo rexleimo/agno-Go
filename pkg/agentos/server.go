@@ -25,6 +25,7 @@ type Server struct {
 	logger           *slog.Logger
 	httpServer       *http.Server
 	knowledgeService *KnowledgeService // 知识库服务
+	summaryManager   *session.SummaryManager
 }
 
 // Config holds server configuration
@@ -75,6 +76,9 @@ type Config struct {
 	// KnowledgeAPI 知识 API 行为控制
 	// KnowledgeAPI configures knowledge endpoints behaviour
 	KnowledgeAPI *KnowledgeAPIOptions
+
+	// SummaryManager 会话摘要管理器
+	SummaryManager *session.SummaryManager
 }
 
 // VectorDBConfig 向量数据库配置
@@ -219,6 +223,10 @@ func NewServer(config *Config) (*Server, error) {
 		config.Logger = slog.Default()
 	}
 
+	if config.SummaryManager == nil {
+		config.SummaryManager = session.NewSummaryManager(session.WithSummaryLogger(config.Logger))
+	}
+
 	if config.RequestTimeout == 0 {
 		config.RequestTimeout = 30 * time.Second
 	}
@@ -254,6 +262,7 @@ func NewServer(config *Config) (*Server, error) {
 		sessionStorage: config.SessionStorage,
 		agentRegistry:  NewAgentRegistry(),
 		logger:         config.Logger,
+		summaryManager: config.SummaryManager,
 	}
 
 	// 初始化知识库服务（如果配置了）
@@ -350,6 +359,10 @@ func (s *Server) registerRoutes() {
 			sessions.GET("/:id", s.handleGetSession)
 			sessions.PUT("/:id", s.handleUpdateSession)
 			sessions.DELETE("/:id", s.handleDeleteSession)
+			sessions.GET("/:id/summary", s.handleGetSessionSummary)
+			sessions.POST("/:id/summary", s.handlePostSessionSummary)
+			sessions.POST("/:id/reuse", s.handleReuseSession)
+			sessions.GET("/:id/history", s.handleSessionHistory)
 			sessions.GET("", s.handleListSessions)
 		}
 

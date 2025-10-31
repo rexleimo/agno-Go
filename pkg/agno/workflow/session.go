@@ -24,6 +24,26 @@ type HistoryEntry struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+// CancellationRecord captures workflow cancellation details.
+type CancellationRecord struct {
+	RunID      string                 `json:"run_id"`
+	Reason     string                 `json:"reason"`
+	StepID     string                 `json:"step_id,omitempty"`
+	Snapshot   map[string]interface{} `json:"snapshot,omitempty"`
+	OccurredAt time.Time              `json:"occurred_at"`
+}
+
+func cloneMap(src map[string]interface{}) map[string]interface{} {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]interface{}, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
 // WorkflowSession manages multiple workflow runs for a single session
 // WorkflowSession 管理单个会话的多个工作流运行
 type WorkflowSession struct {
@@ -58,6 +78,9 @@ type WorkflowSession struct {
 	// Metadata contains additional session metadata
 	// Metadata 包含额外的会话元数据
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+
+	// Cancellations captures cancellation snapshots for later recovery.
+	Cancellations []*CancellationRecord `json:"cancellations,omitempty"`
 }
 
 // NewWorkflowSession creates a new workflow session
@@ -65,13 +88,14 @@ type WorkflowSession struct {
 func NewWorkflowSession(sessionID, workflowID, userID string) *WorkflowSession {
 	now := time.Now()
 	return &WorkflowSession{
-		SessionID:  sessionID,
-		WorkflowID: workflowID,
-		UserID:     userID,
-		Runs:       make([]*WorkflowRun, 0),
-		CreatedAt:  now,
-		UpdatedAt:  now,
-		Metadata:   make(map[string]interface{}),
+		SessionID:     sessionID,
+		WorkflowID:    workflowID,
+		UserID:        userID,
+		Runs:          make([]*WorkflowRun, 0),
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		Metadata:      make(map[string]interface{}),
+		Cancellations: make([]*CancellationRecord, 0),
 	}
 }
 
@@ -83,6 +107,38 @@ func (s *WorkflowSession) AddRun(run *WorkflowRun) {
 
 	s.Runs = append(s.Runs, run)
 	s.UpdatedAt = time.Now()
+}
+
+// AddCancellation records a cancellation snapshot.
+func (s *WorkflowSession) AddCancellation(record *CancellationRecord) {
+	if record == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Cancellations = append(s.Cancellations, record)
+	s.UpdatedAt = time.Now()
+}
+
+// GetCancellations returns a copy of cancellation records.
+func (s *WorkflowSession) GetCancellations() []*CancellationRecord {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.Cancellations) == 0 {
+		return nil
+	}
+	list := make([]*CancellationRecord, len(s.Cancellations))
+	for i, record := range s.Cancellations {
+		if record == nil {
+			continue
+		}
+		cloned := *record
+		if record.Snapshot != nil {
+			cloned.Snapshot = cloneMap(record.Snapshot)
+		}
+		list[i] = &cloned
+	}
+	return list
 }
 
 // GetRuns returns all runs in the session (thread-safe copy)

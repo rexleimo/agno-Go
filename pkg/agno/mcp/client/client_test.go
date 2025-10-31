@@ -3,8 +3,10 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/rexleimo/agno-go/pkg/agno/mcp/protocol"
 )
@@ -165,6 +167,120 @@ func TestClient_Disconnect(t *testing.T) {
 
 	if client.GetServerInfo() != nil {
 		t.Error("Server info should be nil after disconnect")
+	}
+}
+
+func TestClient_ReconnectOnSendFailure(t *testing.T) {
+	mockTransport := NewMockTransport()
+
+	initResult := protocol.InitializeResult{
+		ProtocolVersion: "1.0",
+		ServerInfo:      protocol.ServerInfo{Name: "test-server", Version: "1.0.0"},
+	}
+	initData, _ := json.Marshal(initResult)
+
+	toolsResult := protocol.ToolsListResult{
+		Tools: []protocol.Tool{{Name: "reconnect_tool", InputSchema: protocol.InputSchema{Type: "object"}}},
+	}
+	toolsData, _ := json.Marshal(toolsResult)
+
+	var sendCount int
+	mockTransport.SetSendFunc(func(ctx context.Context, req *protocol.JSONRPCRequest) (*protocol.JSONRPCResponse, error) {
+		switch req.Method {
+		case protocol.MethodInitialize:
+			return &protocol.JSONRPCResponse{JSONRPC: protocol.JSONRPCVersion, Result: initData, ID: req.ID}, nil
+		case protocol.MethodToolsList:
+			if sendCount == 0 {
+				sendCount++
+				return nil, errors.New("transport failure")
+			}
+			return &protocol.JSONRPCResponse{JSONRPC: protocol.JSONRPCVersion, Result: toolsData, ID: req.ID}, nil
+		default:
+			return &protocol.JSONRPCResponse{JSONRPC: protocol.JSONRPCVersion, Result: json.RawMessage(`{}`), ID: req.ID}, nil
+		}
+	})
+
+	client, err := New(mockTransport, Config{ReconnectAttempts: 2, ReconnectBackoff: time.Millisecond})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+
+	tools, err := client.ListTools(ctx)
+	if err != nil {
+		t.Fatalf("ListTools returned error: %v", err)
+	}
+	if len(tools) != 1 {
+		t.Fatalf("expected 1 tool, got %d", len(tools))
+	}
+
+	if mockTransport.StartCount() < 2 {
+		t.Fatalf("expected transport restart, start count %d", mockTransport.StartCount())
+	}
+}
+
+func TestClient_OnUnauthorizedRefresh(t *testing.T) {
+	mockTransport := NewMockTransport()
+
+	initResult := protocol.InitializeResult{
+		ProtocolVersion: "1.0",
+		ServerInfo:      protocol.ServerInfo{Name: "test-server", Version: "1.0.0"},
+	}
+	initData, _ := json.Marshal(initResult)
+
+	toolsResult := protocol.ToolsListResult{
+		Tools: []protocol.Tool{{Name: "refreshed_tool", InputSchema: protocol.InputSchema{Type: "object"}}},
+	}
+	toolsData, _ := json.Marshal(toolsResult)
+
+	unauthorized := true
+	mockTransport.SetSendFunc(func(ctx context.Context, req *protocol.JSONRPCRequest) (*protocol.JSONRPCResponse, error) {
+		switch req.Method {
+		case protocol.MethodInitialize:
+			return &protocol.JSONRPCResponse{JSONRPC: protocol.JSONRPCVersion, Result: initData, ID: req.ID}, nil
+		case protocol.MethodToolsList:
+			if unauthorized {
+				unauthorized = false
+				resp, _ := protocol.NewErrorResponse(401, "unauthorized", nil, req.ID)
+				return resp, nil
+			}
+			return &protocol.JSONRPCResponse{JSONRPC: protocol.JSONRPCVersion, Result: toolsData, ID: req.ID}, nil
+		default:
+			return &protocol.JSONRPCResponse{JSONRPC: protocol.JSONRPCVersion, Result: json.RawMessage(`{}`), ID: req.ID}, nil
+		}
+	})
+
+	refreshed := false
+	client, err := New(mockTransport, Config{
+		ReconnectAttempts: 2,
+		ReconnectBackoff:  time.Millisecond,
+		OnUnauthorized: func(ctx context.Context) error {
+			refreshed = true
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+
+	tools, err := client.ListTools(ctx)
+	if err != nil {
+		t.Fatalf("ListTools returned error: %v", err)
+	}
+	if !refreshed {
+		t.Fatalf("expected OnUnauthorized to be invoked")
+	}
+	if len(tools) != 1 {
+		t.Fatalf("expected 1 tool, got %d", len(tools))
 	}
 }
 

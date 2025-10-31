@@ -52,6 +52,19 @@ func createMockAgent(id string, responseContent string) *agent.Agent {
 	return ag
 }
 
+func constantModel(id, content string) *MockModel {
+	return &MockModel{
+		BaseModel: models.BaseModel{ID: id, Provider: "mock"},
+		InvokeFunc: func(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
+			return &types.ModelResponse{
+				ID:      "resp-" + id,
+				Content: content,
+				Model:   id,
+			}, nil
+		},
+	}
+}
+
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -246,6 +259,157 @@ func TestTeam_RunConsensus(t *testing.T) {
 
 	if output.Metadata["mode"] != string(ModeConsensus) {
 		t.Errorf("Metadata mode = %v, want consensus", output.Metadata["mode"])
+	}
+}
+
+func TestTeam_ModelInheritance_SharedModel(t *testing.T) {
+	agent1 := createMockAgent("agent1", "agent-one")
+	agent2 := createMockAgent("agent2", "agent-two")
+
+	teamModel := constantModel("claude-3.5", "team-shared-output")
+
+	team, err := New(Config{
+		Name:        "inherit-team",
+		Agents:      []*agent.Agent{agent1, agent2},
+		Mode:        ModeSequential,
+		SharedModel: teamModel,
+	})
+	if err != nil {
+		t.Fatalf("failed to create team: %v", err)
+	}
+
+	output, err := team.Run(context.Background(), "Plan a response")
+	if err != nil {
+		t.Fatalf("team run failed: %v", err)
+	}
+
+	if len(output.AgentOutputs) != 2 {
+		t.Fatalf("expected 2 agent outputs, got %d", len(output.AgentOutputs))
+	}
+	for idx, out := range output.AgentOutputs {
+		if out.Content != "team-shared-output" {
+			t.Fatalf("agent %d expected shared output, got %s", idx, out.Content)
+		}
+	}
+
+	trace, ok := output.Metadata["model_inheritance"].(map[string]map[string]string)
+	if !ok {
+		t.Fatalf("expected inheritance metadata, got %T", output.Metadata["model_inheritance"])
+	}
+	if len(trace) != 2 {
+		t.Fatalf("expected 2 inheritance entries, got %d", len(trace))
+	}
+	for _, entry := range trace {
+		if entry["source"] != "team" {
+			t.Fatalf("expected source team, got %s", entry["source"])
+		}
+		if entry["model_id"] != "claude-3.5" {
+			t.Fatalf("expected model id claude-3.5, got %s", entry["model_id"])
+		}
+	}
+}
+
+func TestTeam_ModelInheritanceOverride(t *testing.T) {
+	agent1 := createMockAgent("agent1", "agent-one")
+	agent2 := createMockAgent("agent2", "agent-two")
+
+	teamModel := constantModel("claude-3.5", "team-output")
+	overrideModel := constantModel("sonnet-override", "override-output")
+
+	team, err := New(Config{
+		Name:        "inherit-override",
+		Agents:      []*agent.Agent{agent1, agent2},
+		Mode:        ModeSequential,
+		SharedModel: teamModel,
+		ModelOverrides: map[string]models.Model{
+			agent1.ID: overrideModel,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create team: %v", err)
+	}
+
+	output, err := team.Run(context.Background(), "Plan a response")
+	if err != nil {
+		t.Fatalf("team run failed: %v", err)
+	}
+
+	if output.AgentOutputs[0].Content != "override-output" {
+		t.Fatalf("agent1 expected override output, got %s", output.AgentOutputs[0].Content)
+	}
+	if output.AgentOutputs[1].Content != "team-output" {
+		t.Fatalf("agent2 expected shared output, got %s", output.AgentOutputs[1].Content)
+	}
+
+	trace, ok := output.Metadata["model_inheritance"].(map[string]map[string]string)
+	if !ok {
+		t.Fatalf("expected inheritance metadata, got %T", output.Metadata["model_inheritance"])
+	}
+
+	entry1 := trace[agent1.ID]
+	if entry1["source"] != "override" {
+		t.Fatalf("agent1 expected override source, got %s", entry1["source"])
+	}
+	if entry1["model_id"] != "sonnet-override" {
+		t.Fatalf("agent1 expected override model id, got %s", entry1["model_id"])
+	}
+
+	entry2 := trace[agent2.ID]
+	if entry2["source"] != "team" {
+		t.Fatalf("agent2 expected team source, got %s", entry2["source"])
+	}
+	if entry2["model_id"] != "claude-3.5" {
+		t.Fatalf("agent2 expected shared model id, got %s", entry2["model_id"])
+	}
+}
+
+func TestTeam_ModelInheritanceOptOut(t *testing.T) {
+	agent1 := createMockAgent("agent1", "agent-one")
+	agent2 := createMockAgent("agent2", "agent-two")
+
+	teamModel := constantModel("claude-3.5", "team-output")
+
+	team, err := New(Config{
+		Name:                  "inherit-optout",
+		Agents:                []*agent.Agent{agent1, agent2},
+		Mode:                  ModeSequential,
+		SharedModel:           teamModel,
+		DisableInheritanceFor: []string{agent2.ID},
+	})
+	if err != nil {
+		t.Fatalf("failed to create team: %v", err)
+	}
+
+	output, err := team.Run(context.Background(), "Plan a response")
+	if err != nil {
+		t.Fatalf("team run failed: %v", err)
+	}
+
+	if output.AgentOutputs[0].Content != "team-output" {
+		t.Fatalf("agent1 expected shared output, got %s", output.AgentOutputs[0].Content)
+	}
+	if output.AgentOutputs[1].Content != "agent-two" {
+		t.Fatalf("agent2 expected original output, got %s", output.AgentOutputs[1].Content)
+	}
+
+	trace, ok := output.Metadata["model_inheritance"].(map[string]map[string]string)
+	if !ok {
+		t.Fatalf("expected inheritance metadata, got %T", output.Metadata["model_inheritance"])
+	}
+	if len(trace) != 1 {
+		t.Fatalf("expected 1 inheritance entry, got %d", len(trace))
+	}
+
+	entry1 := trace[agent1.ID]
+	if entry1["source"] != "team" {
+		t.Fatalf("agent1 expected team source, got %s", entry1["source"])
+	}
+	if entry1["model_id"] != "claude-3.5" {
+		t.Fatalf("agent1 expected shared model id, got %s", entry1["model_id"])
+	}
+
+	if _, exists := trace[agent2.ID]; exists {
+		t.Fatalf("agent2 should be excluded from inheritance trace")
 	}
 }
 

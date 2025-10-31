@@ -12,12 +12,13 @@
 ## Feature Highlights
 
 - **🚀 Extreme performance** – agent instantiation in ~180 ns and (~1.2 KB) memory per agent, 16× faster than the Python version.
-- **🤖 Production ready** – AgentOS REST server (OpenAPI 3.0), session storage, health checks, structured logging, CORS, request timeouts.
-- **🧩 Flexible architecture** – build with Agents, Teams (4 coordination modes), or Workflows (5 primitives) and mix freely.
+- **🤖 Production ready** – AgentOS REST server (OpenAPI 3.0), session storage, health checks, structured logging, CORS, request timeouts, and parity endpoints for summaries, reuse, and history filters.
+- **🪄 Session parity** – shared sessions across agents/teams, async + sync summaries, run metadata with cache hits and cancellation reasons, and `stream_events` flags matching the Python runtime.
+- **🧩 Flexible architecture** – build with Agents, Teams (4 coordination modes), or Workflows (5 primitives) and mix freely; teams inherit/default models and workflows resume from snapshots.
 - **🔌 Multi-provider models** – OpenAI (incl. o-series reasoning), Anthropic Claude, Google Gemini, DeepSeek, GLM, ModelScope, Ollama, Cohere, Groq, Together, OpenRouter, LM Studio, Vercel, Portkey, InternLM, SambaNova.
-- **🔧 Extensible tooling** – calculator, HTTP, file operations, search, plus an SDK for building bespoke toolkits or MCP connectors.
-- **💾 Knowledge & RAG** – ChromaDB integration, batching utilities, and ingestion helpers.
-- **🛡️ Guardrails & hooks** – prompt-injection guard, custom pre/post hooks, graceful degradation.
+- **🔧 Extensible tooling** – calculator, HTTP, file operations, search, Claude Agent Skills, Tavily Reader, PPTX reader, Jira worklogs, Gmail mark-as-read, ElevenLabs speech, plus an SDK for bespoke toolkits or MCP connectors.
+- **💾 Knowledge & RAG** – ChromaDB integration, batching utilities, response caching helpers, and ingestion helpers.
+- **🛡️ Guardrails & hooks** – prompt-injection guard, custom pre/post hooks, media validation, graceful degradation.
 - **📊 Observability** – rich SSE event stream with reasoning snapshots, Logfire / OpenTelemetry sample included.
 
 ---
@@ -77,6 +78,37 @@ curl http://localhost:8080/health
 | Examples | https://rexleimo.github.io/agno-Go/examples/ |
 | Release Notes | https://rexleimo.github.io/agno-Go/release-notes |
 | Internal / WIP Docs | [`docs/`](docs/) |
+
+## Session Runtime & Storage Parity
+
+- **Session reuse & history:** `POST /api/v1/sessions/{id}/reuse` shares conversations between agents, teams, and workflows, while `GET /api/v1/sessions/{id}/history?num_messages=N&stream_events=true` mirrors Python-style pagination and SSE toggles.
+- **Summaries:** `GET`/`POST /api/v1/sessions/{id}/summary` trigger synchronous or async summaries via `session.SummaryManager`, persisting the latest snapshot on completion.
+- **Run metadata:** responses include `runs[*].cache_hit`, `runs[*].status`, timestamps, and cancellation reasons to power audits and resumptions.
+- **Pluggable stores:** choose Postgres, MongoDB, or SQLite adapters with identical JSON contracts; fall back to in-memory storage for tests.
+- **Response caching:** enable the built-in cache to deduplicate identical model calls across runs.
+
+```go
+db, _ := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+store, _ := postgres.NewStorage(db, postgres.WithSchema("agentos"))
+
+summaryModel, _ := openai.New("gpt-4o-mini", openai.Config{APIKey: os.Getenv("OPENAI_API_KEY")})
+summary := session.NewSummaryManager(
+    session.WithSummaryModel(summaryModel),
+    session.WithSummaryTimeout(45*time.Second),
+)
+
+server, _ := agentos.NewServer(&agentos.Config{
+    Address:        ":8080",
+    SessionStorage: store,
+    SummaryManager: summary,
+})
+
+agent, _ := agent.New(agent.Config{
+    Name:        "Cached Assistant",
+    Model:       summaryModel,
+    EnableCache: true,
+})
+```
 
 `docs/README.md` explains the split between the public site (`website/`) and internal design notes (`docs/`).
 

@@ -108,13 +108,7 @@ func ExtractContentMiddleware(config ExtractContentConfig) gin.HandlerFunc {
 			return
 		}
 
-		// 检查 Content-Type
-		// Check Content-Type
 		contentType := c.ContentType()
-		if contentType != "application/json" && contentType != "application/x-www-form-urlencoded" {
-			c.Next()
-			return
-		}
 
 		// 限制请求大小
 		// Limit request size

@@ -1,11 +1,17 @@
 package agentos
 
 import (
+	"context"
+	"errors"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/rexleimo/agno-go/pkg/agno/agent"
 	"github.com/rexleimo/agno-go/pkg/agno/session"
+	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // CreateSessionRequest represents the request to create a new session
@@ -27,17 +33,42 @@ type UpdateSessionRequest struct {
 
 // SessionResponse represents the session API response
 type SessionResponse struct {
-	SessionID  string                 `json:"session_id"`
-	AgentID    string                 `json:"agent_id,omitempty"`
-	UserID     string                 `json:"user_id,omitempty"`
-	TeamID     string                 `json:"team_id,omitempty"`
-	WorkflowID string                 `json:"workflow_id,omitempty"`
-	Name       string                 `json:"name,omitempty"`
-	Metadata   map[string]interface{} `json:"metadata,omitempty"`
-	State      map[string]interface{} `json:"state,omitempty"`
-	RunCount   int                    `json:"run_count"`
-	CreatedAt  int64                  `json:"created_at"`
-	UpdatedAt  int64                  `json:"updated_at"`
+	SessionID  string                  `json:"session_id"`
+	AgentID    string                  `json:"agent_id,omitempty"`
+	UserID     string                  `json:"user_id,omitempty"`
+	TeamID     string                  `json:"team_id,omitempty"`
+	WorkflowID string                  `json:"workflow_id,omitempty"`
+	Name       string                  `json:"name,omitempty"`
+	Metadata   map[string]interface{}  `json:"metadata,omitempty"`
+	State      map[string]interface{}  `json:"state,omitempty"`
+	RunCount   int                     `json:"run_count"`
+	CreatedAt  int64                   `json:"created_at"`
+	UpdatedAt  int64                   `json:"updated_at"`
+	Summary    *session.SessionSummary `json:"summary,omitempty"`
+	Runs       []SessionRunMetadata    `json:"runs,omitempty"`
+}
+
+// SessionRunMetadata captures key details of a run persisted in a session.
+type SessionRunMetadata struct {
+	RunID              string          `json:"run_id"`
+	Status             agent.RunStatus `json:"status"`
+	StartedAt          int64           `json:"started_at,omitempty"`
+	CompletedAt        int64           `json:"completed_at,omitempty"`
+	CancellationReason string          `json:"cancellation_reason,omitempty"`
+	CacheHit           bool            `json:"cache_hit,omitempty"`
+}
+
+// SessionSummaryResult represents the payload returned by summary endpoints.
+type SessionSummaryResult struct {
+	Summary *session.SessionSummary `json:"summary"`
+}
+
+// ReuseSessionRequest allows attaching an existing session to other entities.
+type ReuseSessionRequest struct {
+	AgentID    string `json:"agent_id,omitempty"`
+	TeamID     string `json:"team_id,omitempty"`
+	WorkflowID string `json:"workflow_id,omitempty"`
+	UserID     string `json:"user_id,omitempty"`
 }
 
 // ErrorResponse represents an error response
@@ -270,6 +301,229 @@ func (s *Server) handleListSessions(c *gin.Context) {
 	})
 }
 
+// handleGetSessionSummary returns the stored summary for a session.
+func (s *Server) handleGetSessionSummary(c *gin.Context) {
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error: "session ID is required",
+			Code:  "INVALID_REQUEST",
+		})
+		return
+	}
+
+	sess, err := s.sessionStorage.Get(c.Request.Context(), sessionID)
+	if err == session.ErrSessionNotFound {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Error: "session not found",
+			Code:  "SESSION_NOT_FOUND",
+		})
+		return
+	}
+	if err != nil {
+		s.logger.Error("failed to get session", "error", err, "session_id", sessionID)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "failed to get session",
+			Message: err.Error(),
+			Code:    "STORAGE_ERROR",
+		})
+		return
+	}
+
+	if sess.Summary == nil {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Error: "summary not available",
+			Code:  "SUMMARY_NOT_FOUND",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, SessionSummaryResult{Summary: sess.Summary})
+}
+
+// handlePostSessionSummary triggers summary generation for a session.
+func (s *Server) handlePostSessionSummary(c *gin.Context) {
+	if s.summaryManager == nil {
+		c.JSON(http.StatusNotImplemented, ErrorResponse{
+			Error: "session summary not configured",
+			Code:  "SUMMARY_DISABLED",
+		})
+		return
+	}
+
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error: "session ID is required",
+			Code:  "INVALID_REQUEST",
+		})
+		return
+	}
+
+	async := parseBoolQuery(c, "async")
+
+	sess, err := s.sessionStorage.Get(c.Request.Context(), sessionID)
+	if err == session.ErrSessionNotFound {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Error: "session not found",
+			Code:  "SESSION_NOT_FOUND",
+		})
+		return
+	}
+	if err != nil {
+		s.logger.Error("failed to get session", "error", err, "session_id", sessionID)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "failed to get session",
+			Message: err.Error(),
+			Code:    "STORAGE_ERROR",
+		})
+		return
+	}
+
+	if async {
+		s.scheduleSessionSummary(sessionID)
+		c.JSON(http.StatusAccepted, gin.H{
+			"status":     "scheduled",
+			"session_id": sessionID,
+		})
+		return
+	}
+
+	summary, err := s.generateSessionSummary(c.Request.Context(), sess)
+	if err != nil {
+		s.logger.Error("failed to generate summary", "error", err, "session_id", sessionID)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "failed to generate session summary",
+			Message: err.Error(),
+			Code:    "SUMMARY_ERROR",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, SessionSummaryResult{Summary: summary})
+}
+
+// handleReuseSession attaches an existing session to provided entities.
+func (s *Server) handleReuseSession(c *gin.Context) {
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error: "session ID is required",
+			Code:  "INVALID_REQUEST",
+		})
+		return
+	}
+
+	var req ReuseSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid request",
+			Message: err.Error(),
+			Code:    "INVALID_REQUEST",
+		})
+		return
+	}
+
+	if req.AgentID == "" && req.TeamID == "" && req.WorkflowID == "" && req.UserID == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error: "at least one target identifier is required",
+			Code:  "INVALID_REQUEST",
+		})
+		return
+	}
+
+	sess, err := s.sessionStorage.Get(c.Request.Context(), sessionID)
+	if err == session.ErrSessionNotFound {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Error: "session not found",
+			Code:  "SESSION_NOT_FOUND",
+		})
+		return
+	}
+	if err != nil {
+		s.logger.Error("failed to get session", "error", err, "session_id", sessionID)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "failed to get session",
+			Message: err.Error(),
+			Code:    "STORAGE_ERROR",
+		})
+		return
+	}
+
+	if req.AgentID != "" {
+		sess.AgentID = req.AgentID
+	}
+	if req.TeamID != "" {
+		sess.TeamID = req.TeamID
+	}
+	if req.WorkflowID != "" {
+		sess.WorkflowID = req.WorkflowID
+	}
+	if req.UserID != "" {
+		sess.UserID = req.UserID
+	}
+	sess.UpdatedAt = time.Now().UTC()
+
+	if err := s.sessionStorage.Update(c.Request.Context(), sess); err != nil {
+		s.logger.Error("failed to update session", "error", err, "session_id", sessionID)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "failed to update session",
+			Message: err.Error(),
+			Code:    "STORAGE_ERROR",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, sessionToResponse(sess))
+}
+
+// handleSessionHistory returns recent messages for a session.
+func (s *Server) handleSessionHistory(c *gin.Context) {
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error: "session ID is required",
+			Code:  "INVALID_REQUEST",
+		})
+		return
+	}
+
+	sess, err := s.sessionStorage.Get(c.Request.Context(), sessionID)
+	if err == session.ErrSessionNotFound {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Error: "session not found",
+			Code:  "SESSION_NOT_FOUND",
+		})
+		return
+	}
+	if err != nil {
+		s.logger.Error("failed to get session history", "error", err, "session_id", sessionID)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "failed to get session",
+			Message: err.Error(),
+			Code:    "STORAGE_ERROR",
+		})
+		return
+	}
+
+	messages := cloneMessages(sess)
+	if limit := parseIntQuery(c, "num_messages"); limit > 0 && len(messages) > limit {
+		messages = messages[len(messages)-limit:]
+	}
+
+	response := gin.H{
+		"session_id":    sessionID,
+		"messages":      messages,
+		"stream_events": parseBoolQuery(c, "stream_events"),
+		"runs":          buildSessionRuns(sess.Runs),
+	}
+	if sess.Summary != nil {
+		response["summary"] = sess.Summary
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 // sessionToResponse converts a session to API response format
 func sessionToResponse(sess *session.Session) SessionResponse {
 	return SessionResponse{
@@ -284,5 +538,149 @@ func sessionToResponse(sess *session.Session) SessionResponse {
 		RunCount:   sess.GetRunCount(),
 		CreatedAt:  sess.CreatedAt.Unix(),
 		UpdatedAt:  sess.UpdatedAt.Unix(),
+		Summary:    sess.Summary,
+		Runs:       buildSessionRuns(sess.Runs),
 	}
+}
+
+func buildSessionRuns(runs []*agent.RunOutput) []SessionRunMetadata {
+	if len(runs) == 0 {
+		return nil
+	}
+
+	metadata := make([]SessionRunMetadata, 0, len(runs))
+	for _, run := range runs {
+		if run == nil {
+			continue
+		}
+
+		entry := SessionRunMetadata{
+			RunID:              run.RunID,
+			Status:             run.Status,
+			CancellationReason: run.CancellationReason,
+		}
+		if !run.StartedAt.IsZero() {
+			entry.StartedAt = run.StartedAt.Unix()
+		}
+		if !run.CompletedAt.IsZero() {
+			entry.CompletedAt = run.CompletedAt.Unix()
+		}
+		if run.Metadata != nil {
+			if hit, ok := run.Metadata["cache_hit"].(bool); ok {
+				entry.CacheHit = hit
+			}
+		}
+
+		metadata = append(metadata, entry)
+	}
+
+	return metadata
+}
+
+func (s *Server) generateSessionSummary(ctx context.Context, sess *session.Session) (*session.SessionSummary, error) {
+	if s.summaryManager == nil {
+		return nil, errors.New("summary manager is not configured")
+	}
+
+	summary, err := s.summaryManager.Generate(ctx, sess)
+	if err != nil {
+		return nil, err
+	}
+
+	sess.Summary = summary
+	sess.UpdatedAt = time.Now().UTC()
+
+	if err := s.sessionStorage.Update(ctx, sess); err != nil {
+		return nil, err
+	}
+
+	return summary, nil
+}
+
+func (s *Server) scheduleSessionSummary(sessionID string) {
+	if s.summaryManager == nil {
+		return
+	}
+
+	go func(id string) {
+		ctx, cancel := context.WithTimeout(context.Background(), s.summaryManager.OperationTimeout())
+		defer cancel()
+
+		sess, err := s.sessionStorage.Get(ctx, id)
+		if err != nil {
+			if err != session.ErrSessionNotFound {
+				s.logger.Warn("async summary skipped", "error", err, "session_id", id)
+			}
+			return
+		}
+
+		if _, err := s.generateSessionSummary(ctx, sess); err != nil {
+			s.logger.Warn("async summary generation failed", "error", err, "session_id", id)
+		}
+	}(sessionID)
+}
+
+func cloneMessages(sess *session.Session) []*types.Message {
+	if sess == nil {
+		return nil
+	}
+
+	var messages []*types.Message
+	for _, run := range sess.Runs {
+		if run == nil {
+			continue
+		}
+		if len(run.Messages) == 0 {
+			if run.Content != "" {
+				messages = append(messages, types.NewAssistantMessage(run.Content))
+			}
+			continue
+		}
+		for _, msg := range run.Messages {
+			if msg == nil {
+				continue
+			}
+			messages = append(messages, cloneMessage(msg))
+		}
+	}
+	return messages
+}
+
+func cloneMessage(msg *types.Message) *types.Message {
+	if msg == nil {
+		return nil
+	}
+	clone := *msg
+	if len(msg.ToolCalls) > 0 {
+		clone.ToolCalls = append([]types.ToolCall(nil), msg.ToolCalls...)
+	}
+	if msg.ReasoningContent != nil {
+		rc := *msg.ReasoningContent
+		clone.ReasoningContent = &rc
+	}
+	return &clone
+}
+
+func parseBoolQuery(c *gin.Context, key string) bool {
+	value := c.Query(key)
+	if value == "" {
+		return false
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false
+	}
+	return parsed
+}
+
+func parseIntQuery(c *gin.Context, key string) int {
+	value := c.Query(key)
+	if value == "" {
+		return 0
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	return parsed
 }

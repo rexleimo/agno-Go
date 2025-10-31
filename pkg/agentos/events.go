@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/rexleimo/agno-go/pkg/agno/media"
 )
 
 // EventType 表示事件类型
@@ -78,6 +80,10 @@ type RunStartData struct {
 	// SessionID 会话 ID
 	// SessionID is the session ID
 	SessionID string `json:"session_id,omitempty"`
+
+	// Media 附带的媒体资源
+	// Media contains normalized media attachments
+	Media []media.Attachment `json:"media,omitempty"`
 }
 
 // ToolCallData 工具调用事件数据
@@ -162,6 +168,18 @@ type CompleteData struct {
 	// Usage 用量统计（可选）
 	// Usage provides usage statistics (optional)
 	Usage *UsageMetrics `json:"usage,omitempty"`
+
+	// Status 运行状态
+	Status string `json:"status,omitempty"`
+
+	// CacheHit 缓存命中
+	CacheHit bool `json:"cache_hit,omitempty"`
+
+	// RunID 运行标识
+	RunID string `json:"run_id,omitempty"`
+
+	// CancellationReason 取消原因
+	CancellationReason string `json:"cancellation_reason,omitempty"`
 }
 
 // ReasoningSummary provides a compact reasoning representation

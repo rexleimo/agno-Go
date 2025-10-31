@@ -218,3 +218,37 @@ func (ec *ExecutionContext) AddMessages(msgs []*types.Message) {
 func (ec *ExecutionContext) ClearMessages() {
 	ec.SetSessionState("messages", []*types.Message{})
 }
+
+// ApplySessionState 用快照初始化会话状态。
+func (ec *ExecutionContext) ApplySessionState(snapshot map[string]interface{}) {
+	if len(snapshot) == 0 {
+		return
+	}
+	if ec.SessionState == nil {
+		ec.SessionState = NewSessionState()
+	}
+	for k, v := range snapshot {
+		ec.SessionState.Set(k, v)
+	}
+}
+
+// ExportSessionState 导出当前会话状态快照。
+func (ec *ExecutionContext) ExportSessionState() map[string]interface{} {
+	if ec.SessionState == nil {
+		return map[string]interface{}{}
+	}
+	return ec.SessionState.ToMap()
+}
+
+// MergeMetadata merges metadata into execution context.
+func (ec *ExecutionContext) MergeMetadata(metadata map[string]interface{}) {
+	if len(metadata) == 0 {
+		return
+	}
+	if ec.Metadata == nil {
+		ec.Metadata = make(map[string]interface{}, len(metadata))
+	}
+	for k, v := range metadata {
+		ec.Metadata[k] = v
+	}
+}

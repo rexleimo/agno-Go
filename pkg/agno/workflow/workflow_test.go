@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rexleimo/agno-go/pkg/agno/agent"
+	"github.com/rexleimo/agno-go/pkg/agno/media"
 	"github.com/rexleimo/agno-go/pkg/agno/models"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
@@ -50,6 +51,30 @@ func createMockAgent(id string, responseContent string) *agent.Agent {
 	})
 
 	return ag
+}
+
+type stubNode struct {
+	id       string
+	nodeType NodeType
+	execute  func(context.Context, *ExecutionContext) (*ExecutionContext, error)
+}
+
+func (n *stubNode) Execute(ctx context.Context, execCtx *ExecutionContext) (*ExecutionContext, error) {
+	if n.execute != nil {
+		return n.execute(ctx, execCtx)
+	}
+	return execCtx, nil
+}
+
+func (n *stubNode) GetID() string {
+	return n.id
+}
+
+func (n *stubNode) GetType() NodeType {
+	if n.nodeType != "" {
+		return n.nodeType
+	}
+	return NodeTypeStep
 }
 
 func TestNew(t *testing.T) {
@@ -390,6 +415,191 @@ func TestExecutionContext(t *testing.T) {
 	_, exists = ctx.Get("nonexistent")
 	if exists {
 		t.Error("Get() returned true for non-existent key")
+	}
+}
+
+func TestWorkflow_RunWithSessionStateInjection(t *testing.T) {
+	store := NewMemoryStorage(10)
+
+	inspectNode := &stubNode{
+		id: "inspect",
+		execute: func(_ context.Context, execCtx *ExecutionContext) (*ExecutionContext, error) {
+			val, ok := execCtx.GetSessionState("progress")
+			if !ok || val.(int) != 42 {
+				t.Fatalf("expected session state progress=42, got %v (ok=%v)", val, ok)
+			}
+			execCtx.Output = "done"
+			return execCtx, nil
+		},
+	}
+
+	wf, err := New(Config{
+		Name:          "inject",
+		Steps:         []Node{inspectNode},
+		EnableHistory: true,
+		HistoryStore:  store,
+	})
+	if err != nil {
+		t.Fatalf("failed to create workflow: %v", err)
+	}
+
+	execCtx, err := wf.Run(context.Background(), "ignored", "sess-inject",
+		WithSessionState(map[string]interface{}{"progress": 42}),
+		WithUserID("user-1"),
+	)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if execCtx.Output != "done" {
+		t.Fatalf("expected output 'done', got %s", execCtx.Output)
+	}
+}
+
+func TestWorkflow_RunResumeFromStep(t *testing.T) {
+	var executed []string
+
+	nodeA := &stubNode{
+		id: "step-a",
+		execute: func(_ context.Context, execCtx *ExecutionContext) (*ExecutionContext, error) {
+			executed = append(executed, "a")
+			execCtx.Output = "a"
+			return execCtx, nil
+		},
+	}
+
+	nodeB := &stubNode{
+		id: "step-b",
+		execute: func(_ context.Context, execCtx *ExecutionContext) (*ExecutionContext, error) {
+			executed = append(executed, "b")
+			execCtx.Output = "b"
+			return execCtx, nil
+		},
+	}
+
+	nodeC := &stubNode{
+		id: "step-c",
+		execute: func(_ context.Context, execCtx *ExecutionContext) (*ExecutionContext, error) {
+			executed = append(executed, "c")
+			execCtx.Output = "c"
+			return execCtx, nil
+		},
+	}
+
+	wf, err := New(Config{
+		Name:  "resume",
+		Steps: []Node{nodeA, nodeB, nodeC},
+	})
+	if err != nil {
+		t.Fatalf("failed to create workflow: %v", err)
+	}
+
+	execCtx, err := wf.Run(context.Background(), "start", "sess-resume", WithResumeFrom("step-b"))
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if execCtx.Output != "c" {
+		t.Fatalf("expected output 'c', got %s", execCtx.Output)
+	}
+	if len(executed) != 2 || executed[0] != "b" || executed[1] != "c" {
+		t.Fatalf("expected execution order [b c], got %v", executed)
+	}
+}
+
+func TestWorkflow_CancellationPersistence(t *testing.T) {
+	store := NewMemoryStorage(10)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cancelNode := &stubNode{
+		id: "cancel-step",
+		execute: func(_ context.Context, execCtx *ExecutionContext) (*ExecutionContext, error) {
+			cancel()
+			return execCtx, nil
+		},
+	}
+
+	finalNode := &stubNode{
+		id: "final-step",
+		execute: func(_ context.Context, execCtx *ExecutionContext) (*ExecutionContext, error) {
+			execCtx.Output = "finished"
+			return execCtx, nil
+		},
+	}
+
+	wf, err := New(Config{
+		Name:          "cancel",
+		Steps:         []Node{cancelNode, finalNode},
+		EnableHistory: true,
+		HistoryStore:  store,
+	})
+	if err != nil {
+		t.Fatalf("failed to create workflow: %v", err)
+	}
+
+	sessionID := "sess-cancel"
+	_, err = wf.Run(ctx, "start", sessionID)
+	if err == nil {
+		t.Fatalf("expected cancellation error")
+	}
+
+	session, err := store.GetSession(context.Background(), sessionID)
+	if err != nil {
+		t.Fatalf("GetSession error: %v", err)
+	}
+
+	if len(session.Cancellations) != 1 {
+		t.Fatalf("expected 1 cancellation record, got %d", len(session.Cancellations))
+	}
+
+	record := session.Cancellations[0]
+	if record.StepID != "cancel-step" {
+		t.Fatalf("expected step_id cancel-step, got %s", record.StepID)
+	}
+	if record.Reason != context.Canceled.Error() {
+		t.Fatalf("expected reason context canceled, got %s", record.Reason)
+	}
+	if record.RunID == "" {
+		t.Fatalf("expected run_id recorded")
+	}
+
+	runs := session.GetRuns()
+	if len(runs) == 0 || runs[len(runs)-1].Status != RunStatusCancelled {
+		t.Fatalf("expected last run cancelled, got %+v", runs)
+	}
+	if runs[len(runs)-1].CancellationReason == "" {
+		t.Fatalf("expected cancellation reason recorded on run")
+	}
+}
+
+func TestWorkflow_RunWithMediaPayloadOnly(t *testing.T) {
+	node := &stubNode{
+		id: "media-step",
+		execute: func(_ context.Context, execCtx *ExecutionContext) (*ExecutionContext, error) {
+			execCtx.Output = "ok"
+			if _, ok := execCtx.GetSessionState("media_payload"); !ok {
+				t.Fatalf("expected media payload in session state")
+			}
+			return execCtx, nil
+		},
+	}
+
+	wf, err := New(Config{
+		Name:  "media",
+		Steps: []Node{node},
+	})
+	if err != nil {
+		t.Fatalf("failed to create workflow: %v", err)
+	}
+
+	execCtx, err := wf.Run(context.Background(), "", "sess-media", WithMediaPayload([]media.Attachment{
+		{Type: "image", URL: "https://example.com/image.png"},
+	}))
+	if err != nil {
+		t.Fatalf("Run() with media payload failed: %v", err)
+	}
+	if execCtx.Output != "ok" {
+		t.Fatalf("expected output ok, got %s", execCtx.Output)
 	}
 }
 

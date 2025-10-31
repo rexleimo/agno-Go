@@ -19,6 +19,8 @@ type MockTransport struct {
 	startError    error
 	sendError     error
 	notifications []*protocol.JSONRPCNotification
+	sendFunc      func(context.Context, *protocol.JSONRPCRequest) (*protocol.JSONRPCResponse, error)
+	startCount    int
 }
 
 // NewMockTransport creates a new mock transport for testing
@@ -36,6 +38,7 @@ func (m *MockTransport) Start(ctx context.Context) error {
 	}
 	m.mu.Lock()
 	m.running = true
+	m.startCount++
 	m.mu.Unlock()
 	return nil
 }
@@ -50,6 +53,14 @@ func (m *MockTransport) Stop() error {
 func (m *MockTransport) Send(ctx context.Context, req *protocol.JSONRPCRequest) (*protocol.JSONRPCResponse, error) {
 	if m.sendError != nil {
 		return nil, m.sendError
+	}
+
+	m.mu.RLock()
+	sendHook := m.sendFunc
+	m.mu.RUnlock()
+
+	if sendHook != nil {
+		return sendHook(ctx, req)
 	}
 
 	m.mu.RLock()
@@ -89,4 +100,18 @@ func (m *MockTransport) SetResponse(id int64, resp *protocol.JSONRPCResponse) {
 	m.mu.Lock()
 	m.responses[id] = resp
 	m.mu.Unlock()
+}
+
+// SetSendFunc sets a custom function to handle Send calls.
+func (m *MockTransport) SetSendFunc(fn func(context.Context, *protocol.JSONRPCRequest) (*protocol.JSONRPCResponse, error)) {
+	m.mu.Lock()
+	m.sendFunc = fn
+	m.mu.Unlock()
+}
+
+// StartCount returns how many times Start was called.
+func (m *MockTransport) StartCount() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.startCount
 }

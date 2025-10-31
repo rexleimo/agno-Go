@@ -9,6 +9,7 @@ import (
 
 	"github.com/rexleimo/agno-go/pkg/agno/agent"
 	"github.com/rexleimo/agno-go/pkg/agno/hooks"
+	"github.com/rexleimo/agno-go/pkg/agno/models"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
@@ -25,6 +26,13 @@ type Team struct {
 	logger      *slog.Logger
 	mu          sync.RWMutex
 	taskResults map[string]*TaskResult
+
+	sharedModel      models.Model
+	inheritModel     bool
+	modelOverrides   map[string]models.Model
+	skipInheritance  map[string]struct{}
+	inheritanceMu    sync.Mutex
+	inheritanceTrace map[string]inheritanceRecord
 
 	// Storage control flags
 	// 注意: 这些标志由各个 Agent 在其 Run() 方法中处理
@@ -57,6 +65,18 @@ type Config struct {
 	PreHooks  []hooks.Hook // Hooks to execute before processing input
 	PostHooks []hooks.Hook // Hooks to execute after generating output
 	Logger    *slog.Logger
+
+	// SharedModel 指定团队默认模型，未显式覆盖的成员将继承该模型。
+	SharedModel models.Model
+
+	// InheritModel 控制是否启用模型继承；nil 表示使用默认行为（当 SharedModel 存在时启用）。
+	InheritModel *bool
+
+	// ModelOverrides 为特定成员指定模型覆盖，优先级高于 SharedModel。
+	ModelOverrides map[string]models.Model
+
+	// DisableInheritanceFor 指定不参与模型继承的成员 ID。
+	DisableInheritanceFor []string
 
 	// Storage control flags (nil means use default: true)
 	// 注意: Team 通过调用 Agent.Run() 工作，各个 Agent 已经实现了存储控制
@@ -111,6 +131,33 @@ func New(config Config) (*Team, error) {
 		return *ptr
 	}
 
+	inheritModel := false
+	if config.SharedModel != nil {
+		inheritModel = true
+	}
+	if config.InheritModel != nil {
+		inheritModel = *config.InheritModel && config.SharedModel != nil
+	}
+
+	var modelOverrides map[string]models.Model
+	if len(config.ModelOverrides) > 0 {
+		modelOverrides = make(map[string]models.Model, len(config.ModelOverrides))
+		for id, mdl := range config.ModelOverrides {
+			if mdl == nil {
+				continue
+			}
+			modelOverrides[id] = mdl
+		}
+	}
+
+	skipInheritance := make(map[string]struct{}, len(config.DisableInheritanceFor))
+	for _, id := range config.DisableInheritanceFor {
+		if id == "" {
+			continue
+		}
+		skipInheritance[id] = struct{}{}
+	}
+
 	return &Team{
 		ID:                   config.ID,
 		Name:                 config.Name,
@@ -124,6 +171,11 @@ func New(config Config) (*Team, error) {
 		taskResults:          make(map[string]*TaskResult),
 		storeToolMessages:    boolOrDefault(config.StoreToolMessages, true),
 		storeHistoryMessages: boolOrDefault(config.StoreHistoryMessages, true),
+		sharedModel:          config.SharedModel,
+		inheritModel:         inheritModel,
+		modelOverrides:       modelOverrides,
+		skipInheritance:      skipInheritance,
+		inheritanceTrace:     make(map[string]inheritanceRecord),
 	}, nil
 }
 
@@ -145,6 +197,8 @@ func (t *Team) Run(ctx context.Context, input string) (*RunOutput, error) {
 	if input == "" {
 		return nil, types.NewInvalidInputError("input cannot be empty", nil)
 	}
+
+	t.resetInheritance()
 
 	t.logger.Info("team run started",
 		"team_id", t.ID,
@@ -214,7 +268,7 @@ func (t *Team) runSequential(ctx context.Context, input string) (*RunOutput, err
 	for i, ag := range t.Agents {
 		t.logger.Info("running agent", "agent_id", ag.ID, "sequence", i+1)
 
-		result, err := ag.Run(ctx, currentInput)
+		result, err := t.invokeAgent(ctx, ag, currentInput)
 		if err != nil {
 			return nil, types.NewError(types.ErrCodeUnknown, fmt.Sprintf("agent %s failed", ag.ID), err)
 		}
@@ -234,13 +288,16 @@ func (t *Team) runSequential(ctx context.Context, input string) (*RunOutput, err
 		finalContent = agentOutputs[len(agentOutputs)-1].Content
 	}
 
+	metadata := map[string]interface{}{
+		"mode":        string(ModeSequential),
+		"agent_count": len(t.Agents),
+	}
+	t.appendInheritanceMetadata(metadata)
+
 	return &RunOutput{
 		Content:      finalContent,
 		AgentOutputs: agentOutputs,
-		Metadata: map[string]interface{}{
-			"mode":        string(ModeSequential),
-			"agent_count": len(t.Agents),
-		},
+		Metadata:     metadata,
 	}, nil
 }
 
@@ -257,7 +314,7 @@ func (t *Team) runParallel(ctx context.Context, input string) (*RunOutput, error
 
 			t.logger.Info("running agent in parallel", "agent_id", a.ID)
 
-			result, err := a.Run(ctx, input)
+			result, err := t.invokeAgent(ctx, a, input)
 			if err != nil {
 				errors <- types.NewError(types.ErrCodeUnknown, fmt.Sprintf("agent %s failed", a.ID), err)
 				return
@@ -294,13 +351,16 @@ func (t *Team) runParallel(ctx context.Context, input string) (*RunOutput, error
 		combinedContent += fmt.Sprintf("[%s]: %s", output.AgentID, output.Content)
 	}
 
+	metadata := map[string]interface{}{
+		"mode":        string(ModeParallel),
+		"agent_count": len(t.Agents),
+	}
+	t.appendInheritanceMetadata(metadata)
+
 	return &RunOutput{
 		Content:      combinedContent,
 		AgentOutputs: agentOutputs,
-		Metadata: map[string]interface{}{
-			"mode":        string(ModeParallel),
-			"agent_count": len(t.Agents),
-		},
+		Metadata:     metadata,
 	}, nil
 }
 
@@ -315,7 +375,7 @@ Task: %s
 Respond with a JSON array of subtasks, one for each team member.
 Example: ["subtask1", "subtask2", "subtask3"]`, input)
 
-	planResult, err := t.Leader.Run(ctx, planPrompt)
+	planResult, err := t.invokeAgent(ctx, t.Leader, planPrompt)
 	if err != nil {
 		return nil, types.NewError(types.ErrCodeUnknown, "leader planning failed", err)
 	}
@@ -334,7 +394,7 @@ Example: ["subtask1", "subtask2", "subtask3"]`, input)
 
 			t.logger.Info("follower executing", "agent_id", a.ID)
 
-			result, err := a.Run(ctx, input) // Use original input for now
+			result, err := t.invokeAgent(ctx, a, input) // Use original input for now
 			if err != nil {
 				errors <- types.NewError(types.ErrCodeUnknown, fmt.Sprintf("agent %s failed", a.ID), err)
 				return
@@ -372,7 +432,7 @@ Team Outputs:%s
 
 Provide a comprehensive final answer.`, input, combinedResults)
 
-	finalResult, err := t.Leader.Run(ctx, synthesisPrompt)
+	finalResult, err := t.invokeAgent(ctx, t.Leader, synthesisPrompt)
 	if err != nil {
 		return nil, types.NewError(types.ErrCodeUnknown, "leader synthesis failed", err)
 	}
@@ -387,14 +447,17 @@ Provide a comprehensive final answer.`, input, combinedResults)
 		Content: finalResult.Content,
 	})
 
+	metadata := map[string]interface{}{
+		"mode":        string(ModeLeaderFollower),
+		"leader_id":   t.Leader.ID,
+		"agent_count": len(t.Agents),
+	}
+	t.appendInheritanceMetadata(metadata)
+
 	return &RunOutput{
 		Content:      finalResult.Content,
 		AgentOutputs: allOutputs,
-		Metadata: map[string]interface{}{
-			"mode":        string(ModeLeaderFollower),
-			"leader_id":   t.Leader.ID,
-			"agent_count": len(t.Agents),
-		},
+		Metadata:     metadata,
 	}, nil
 }
 
@@ -426,7 +489,7 @@ Consider the previous outputs and provide your refined answer. If you agree with
 			go func(a *agent.Agent) {
 				defer wg.Done()
 
-				result, err := a.Run(ctx, roundPrompt)
+				result, err := t.invokeAgent(ctx, a, roundPrompt)
 				if err != nil {
 					errors <- err
 					return
@@ -470,14 +533,17 @@ Consider the previous outputs and provide your refined answer. If you agree with
 		finalContent = allOutputs[len(allOutputs)-1].Content
 	}
 
+	metadata := map[string]interface{}{
+		"mode":        string(ModeConsensus),
+		"rounds":      t.MaxRounds,
+		"agent_count": len(t.Agents),
+	}
+	t.appendInheritanceMetadata(metadata)
+
 	return &RunOutput{
 		Content:      finalContent,
 		AgentOutputs: allOutputs,
-		Metadata: map[string]interface{}{
-			"mode":        string(ModeConsensus),
-			"rounds":      t.MaxRounds,
-			"agent_count": len(t.Agents),
-		},
+		Metadata:     metadata,
 	}, nil
 }
 
@@ -510,4 +576,116 @@ func (t *Team) GetAgents() []*agent.Agent {
 	agents := make([]*agent.Agent, len(t.Agents))
 	copy(agents, t.Agents)
 	return agents
+}
+
+type inheritanceRecord struct {
+	ModelID string
+	Source  string
+}
+
+type modelScope struct {
+	restore func()
+	record  *inheritanceRecord
+}
+
+func (t *Team) invokeAgent(ctx context.Context, ag *agent.Agent, input string) (*agent.RunOutput, error) {
+	scope := t.prepareAgentModel(ag)
+	output, err := ag.Run(ctx, input)
+	if scope.restore != nil {
+		scope.restore()
+	}
+	if scope.record != nil {
+		t.recordInheritance(ag.ID, scope.record)
+	}
+	return output, err
+}
+
+func (t *Team) prepareAgentModel(ag *agent.Agent) modelScope {
+	scope := modelScope{
+		restore: func() {},
+	}
+	if ag == nil {
+		return scope
+	}
+
+	original := ag.Model
+	scope.restore = func() {
+		ag.Model = original
+	}
+
+	if override, ok := t.modelOverrides[ag.ID]; ok && override != nil {
+		ag.Model = override
+		scope.record = &inheritanceRecord{
+			ModelID: override.GetID(),
+			Source:  "override",
+		}
+		return scope
+	}
+
+	if !t.inheritModel || t.sharedModel == nil {
+		return scope
+	}
+
+	if _, skip := t.skipInheritance[ag.ID]; skip {
+		return scope
+	}
+
+	ag.Model = t.sharedModel
+	scope.record = &inheritanceRecord{
+		ModelID: t.sharedModel.GetID(),
+		Source:  "team",
+	}
+	return scope
+}
+
+func (t *Team) recordInheritance(agentID string, record *inheritanceRecord) {
+	if agentID == "" || record == nil {
+		return
+	}
+	t.inheritanceMu.Lock()
+	defer t.inheritanceMu.Unlock()
+
+	if t.inheritanceTrace == nil {
+		t.inheritanceTrace = make(map[string]inheritanceRecord)
+	}
+	t.inheritanceTrace[agentID] = *record
+}
+
+func (t *Team) snapshotInheritance() map[string]map[string]string {
+	t.inheritanceMu.Lock()
+	defer t.inheritanceMu.Unlock()
+
+	if len(t.inheritanceTrace) == 0 {
+		return nil
+	}
+
+	result := make(map[string]map[string]string, len(t.inheritanceTrace))
+	for agentID, record := range t.inheritanceTrace {
+		result[agentID] = map[string]string{
+			"model_id": record.ModelID,
+			"source":   record.Source,
+		}
+	}
+	return result
+}
+
+func (t *Team) appendInheritanceMetadata(metadata map[string]interface{}) {
+	if metadata == nil {
+		return
+	}
+	if trace := t.snapshotInheritance(); len(trace) > 0 {
+		metadata["model_inheritance"] = trace
+	}
+}
+
+func (t *Team) resetInheritance() {
+	t.inheritanceMu.Lock()
+	defer t.inheritanceMu.Unlock()
+	if t.inheritanceTrace == nil {
+		t.inheritanceTrace = make(map[string]inheritanceRecord)
+		return
+	}
+	for k := range t.inheritanceTrace {
+		delete(t.inheritanceTrace, k)
+	}
 }

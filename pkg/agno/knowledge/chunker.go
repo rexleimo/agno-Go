@@ -70,30 +70,37 @@ func (c *CharacterChunker) Chunk(doc Document) ([]Chunk, error) {
 			}
 		}
 
-		chunk := Chunk{
-			ID:      fmt.Sprintf("%s_chunk_%d", doc.ID, index),
-			Content: strings.TrimSpace(text[start:end]),
-			Index:   index,
-			Metadata: map[string]interface{}{
-				"document_id": doc.ID,
-				"source":      doc.Source,
-				"chunk_index": index,
-				"start_char":  start,
-				"end_char":    end,
-			},
-		}
+		content := strings.TrimSpace(text[start:end])
+		if content != "" {
+			chunk := Chunk{
+				ID:      fmt.Sprintf("%s_chunk_%d", doc.ID, index),
+				Content: content,
+				Index:   index,
+				Metadata: map[string]interface{}{
+					"document_id": doc.ID,
+					"source":      doc.Source,
+					"chunk_index": index,
+					"start_char":  start,
+					"end_char":    end,
+				},
+			}
 
-		// Copy document metadata
-		if doc.Metadata != nil {
-			for k, v := range doc.Metadata {
-				if _, exists := chunk.Metadata[k]; !exists {
-					chunk.Metadata[k] = v
+			// Copy document metadata
+			if doc.Metadata != nil {
+				for k, v := range doc.Metadata {
+					if _, exists := chunk.Metadata[k]; !exists {
+						chunk.Metadata[k] = v
+					}
 				}
 			}
+
+			chunks = append(chunks, chunk)
+			index++
 		}
 
-		chunks = append(chunks, chunk)
-		index++
+		if end == len(text) {
+			break
+		}
 
 		// Move start position with overlap
 		start = end - c.ChunkOverlap

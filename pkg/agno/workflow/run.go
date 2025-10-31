@@ -78,6 +78,18 @@ type WorkflowRun struct {
 	// Metadata contains additional metadata for this run
 	// Metadata 包含此次运行的额外元数据
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+
+	// CancellationReason provides context when run is cancelled.
+	CancellationReason string `json:"cancellation_reason,omitempty"`
+
+	// CancellationSnapshot stores the last known snapshot before cancellation.
+	CancellationSnapshot map[string]interface{} `json:"cancellation_snapshot,omitempty"`
+
+	// LastStepID indicates the last step identifier processed before cancellation/failure.
+	LastStepID string `json:"last_step_id,omitempty"`
+
+	// ResumedFrom records the step the run resumed from, if applicable.
+	ResumedFrom string `json:"resumed_from,omitempty"`
 }
 
 // NewWorkflowRun creates a new workflow run with the given parameters
@@ -123,6 +135,16 @@ func (r *WorkflowRun) MarkFailed(err error) {
 func (r *WorkflowRun) MarkCancelled() {
 	r.Status = RunStatusCancelled
 	r.CompletedAt = time.Now()
+}
+
+// ApplyCancellation enriches cancellation metadata.
+func (r *WorkflowRun) ApplyCancellation(reason, stepID string, snapshot map[string]interface{}) {
+	r.MarkCancelled()
+	r.CancellationReason = reason
+	r.LastStepID = stepID
+	if len(snapshot) > 0 {
+		r.CancellationSnapshot = snapshot
+	}
 }
 
 // AddMessage adds a message to the run's conversation history

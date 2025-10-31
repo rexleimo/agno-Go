@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/rexleimo/agno-go/pkg/agno/cache"
 	"github.com/rexleimo/agno-go/pkg/agno/memory"
 	"github.com/rexleimo/agno-go/pkg/agno/models"
 	"github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
@@ -128,6 +130,14 @@ func TestAgent_Run_SimpleResponse(t *testing.T) {
 	if len(output.Messages) < 2 {
 		t.Errorf("Run() should have at least 2 messages (user + assistant)")
 	}
+
+	if output.Status != RunStatusCompleted {
+		t.Fatalf("expected run to be completed, got %s", output.Status)
+	}
+
+	if output.RunID == "" {
+		t.Fatalf("expected run id to be set")
+	}
 }
 
 func TestAgent_Run_EmptyInput(t *testing.T) {
@@ -205,10 +215,115 @@ func TestAgent_Run_WithToolCalls(t *testing.T) {
 		t.Errorf("Run() content = %v, want %v", output.Content, "The result is 8")
 	}
 
+	if output.Status != RunStatusCompleted {
+		t.Fatalf("expected run status completed, got %s", output.Status)
+	}
+
 	// Check metadata
 	loops, ok := output.Metadata["loops"].(int)
 	if !ok || loops != 2 {
 		t.Errorf("Run() loops = %v, want 2", loops)
+	}
+}
+
+func TestAgent_Run_UsesCache(t *testing.T) {
+	provider, err := cache.NewMemoryProvider(8, time.Minute)
+	if err != nil {
+		t.Fatalf("NewMemoryProvider error = %v", err)
+	}
+
+	callCount := 0
+	mockModel := &MockModel{
+		BaseModel: models.BaseModel{ID: "test", Provider: "mock"},
+		InvokeFunc: func(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
+			callCount++
+			return &types.ModelResponse{
+				ID:      "cached-response",
+				Content: "Cached result",
+				Model:   "test",
+			}, nil
+		},
+	}
+
+	agent, err := New(Config{
+		Name:          "CacheAgent",
+		Model:         mockModel,
+		EnableCache:   true,
+		CacheProvider: provider,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create agent: %v", err)
+	}
+
+	first, err := agent.Run(context.Background(), "Hello")
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected 1 provider call, got %d", callCount)
+	}
+	if hit, _ := first.Metadata["cache_hit"].(bool); hit {
+		t.Fatalf("first run should not be cache hit")
+	}
+
+	agent.ClearMemory()
+	second, err := agent.Run(context.Background(), "Hello")
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected cached run without provider call, got %d", callCount)
+	}
+	if hit, _ := second.Metadata["cache_hit"].(bool); !hit {
+		t.Fatalf("expected cache hit on second run")
+	}
+
+	if second.Content != "Cached result" {
+		t.Fatalf("unexpected content: %v", second.Content)
+	}
+
+	if second.Status != RunStatusCompleted {
+		t.Fatalf("expected cached run to be completed")
+	}
+}
+
+func TestAgent_Run_ContextCancelled(t *testing.T) {
+	mockModel := &MockModel{
+		BaseModel: models.BaseModel{ID: "test", Provider: "mock"},
+		InvokeFunc: func(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	agent, err := New(Config{
+		Name:  "CancelAgent",
+		Model: mockModel,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create agent: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	output, runErr := agent.Run(ctx, "Hello")
+	if runErr == nil {
+		t.Fatalf("expected cancellation error")
+	}
+
+	agnoErr, ok := runErr.(*types.AgnoError)
+	if !ok || agnoErr.Code != types.ErrCodeCancelled {
+		t.Fatalf("expected cancellation error code, got %#v", runErr)
+	}
+
+	if output == nil {
+		t.Fatalf("expected run output even on cancellation")
+	}
+	if output.Status != RunStatusCancelled {
+		t.Fatalf("expected cancelled status, got %s", output.Status)
+	}
+	if output.CancellationReason == "" {
+		t.Fatalf("expected cancellation reason to be populated")
 	}
 }
 

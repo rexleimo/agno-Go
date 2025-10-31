@@ -3,6 +3,7 @@ package reasoning
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/rexleimo/agno-go/pkg/agno/models"
@@ -59,7 +60,8 @@ func NewRegistry() *Registry {
 func (r *Registry) RegisterDetector(detector ReasoningDetector) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.detectors[detector.Provider()] = detector
+	key := normalizeProvider(detector.Provider())
+	r.detectors[key] = detector
 }
 
 // RegisterExtractor 注册一个提取器
@@ -67,7 +69,8 @@ func (r *Registry) RegisterDetector(detector ReasoningDetector) {
 func (r *Registry) RegisterExtractor(extractor ReasoningExtractor) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.extractors[extractor.Provider()] = extractor
+	key := normalizeProvider(extractor.Provider())
+	r.extractors[key] = extractor
 }
 
 // GetDetector 获取指定提供商的检测器
@@ -75,7 +78,8 @@ func (r *Registry) RegisterExtractor(extractor ReasoningExtractor) {
 func (r *Registry) GetDetector(provider string) (ReasoningDetector, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	detector, ok := r.detectors[provider]
+	key := normalizeProvider(provider)
+	detector, ok := r.detectors[key]
 	return detector, ok
 }
 
@@ -84,7 +88,8 @@ func (r *Registry) GetDetector(provider string) (ReasoningDetector, bool) {
 func (r *Registry) GetExtractor(provider string) (ReasoningExtractor, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	extractor, ok := r.extractors[provider]
+	key := normalizeProvider(provider)
+	extractor, ok := r.extractors[key]
 	return extractor, ok
 }
 
@@ -95,6 +100,9 @@ var DefaultRegistry = NewRegistry()
 // IsReasoningModel 检查模型是否支持推理(使用默认注册中心)
 // Checks if a model supports reasoning (using default registry)
 func IsReasoningModel(model models.Model) bool {
+	if model == nil {
+		return false
+	}
 	detector, ok := DefaultRegistry.GetDetector(model.GetProvider())
 	if !ok {
 		return false
@@ -105,11 +113,26 @@ func IsReasoningModel(model models.Model) bool {
 // ExtractReasoning 从响应中提取推理内容(使用默认注册中心)
 // Extracts reasoning content from response (using default registry)
 func ExtractReasoning(ctx context.Context, model models.Model, response *types.ModelResponse) (*types.ReasoningContent, error) {
+	if model == nil {
+		return nil, nil
+	}
 	extractor, ok := DefaultRegistry.GetExtractor(model.GetProvider())
 	if !ok {
 		return nil, nil // 不支持的提供商,返回 nil
 	}
 	return extractor.Extract(ctx, response)
+}
+
+func normalizeProvider(provider string) string {
+	p := strings.TrimSpace(strings.ToLower(provider))
+	switch p {
+	case "vertex-ai", "google-vertexai", "google_vertexai", "google-vertex-ai":
+		return "vertexai"
+	case "claude":
+		return "anthropic"
+	default:
+		return p
+	}
 }
 
 // WrapReasoningContent 将推理内容包装成 <thinking> 格式

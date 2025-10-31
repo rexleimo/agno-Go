@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
@@ -108,18 +109,18 @@ func New(config Config) (*Workflow, error) {
 	}, nil
 }
 
-// Run executes the workflow
-// Run 执行工作流
-// sessionID 参数可选,为空则自动生成
-func (w *Workflow) Run(ctx context.Context, input string, sessionID string) (*ExecutionContext, error) {
-	// 验证输入
-	// Validate input
-	if input == "" {
+// Run executes the workflow.
+// sessionID 参数可选,为空则自动生成。
+func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts ...RunOption) (*ExecutionContext, error) {
+	options := evaluateOptions(opts)
+	if options.mediaError != nil {
+		return nil, types.NewInvalidInputError("invalid media payload", options.mediaError)
+	}
+
+	if input == "" && len(options.mediaPayload) == 0 {
 		return nil, types.NewInvalidInputError("input cannot be empty", nil)
 	}
 
-	// 生成 session ID（如果未提供）
-	// Generate session ID if not provided
 	if sessionID == "" {
 		sessionID = generateSessionID()
 	}
@@ -127,24 +128,23 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string) (*Ex
 	w.logger.Info("workflow started",
 		"workflow_id", w.ID,
 		"session_id", sessionID,
-		"steps", len(w.Steps))
+		"steps", len(w.Steps),
+		"resume_from", options.resumeFromStep)
 
-	// 创建执行上下文
-	// Create execution context
-	execCtx := NewExecutionContextWithSession(input, sessionID, "")
+	execCtx := NewExecutionContextWithSession(input, sessionID, options.userID)
+	execCtx.ApplySessionState(options.sessionState)
+	execCtx.MergeMetadata(options.metadata)
 
-	// 加载历史（如果启用）
-	// Load history (if enabled)
+	if len(options.mediaPayload) > 0 {
+		execCtx.SetSessionState("media_payload", options.mediaPayload)
+	}
+
 	if w.enableHistory && w.historyStore != nil {
 		if err := w.loadHistory(ctx, execCtx); err != nil {
 			w.logger.Error("failed to load history", "error", err)
-			// 不阻止执行，仅记录错误
-			// Don't block execution, just log error
 		}
 	}
 
-	// 传递历史配置到执行上下文
-	// Pass history configuration to execution context
 	if w.enableHistory {
 		execCtx.SetSessionState("workflow_history_config", &WorkflowHistoryConfig{
 			AddHistoryToSteps: w.addHistoryToSteps,
@@ -152,54 +152,95 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string) (*Ex
 		})
 	}
 
-	// 创建 WorkflowRun 记录
-	// Create WorkflowRun record
 	var workflowRun *WorkflowRun
 	if w.enableHistory {
 		runID := generateRunID()
 		workflowRun = NewWorkflowRun(runID, sessionID, w.ID, input)
 		workflowRun.MarkStarted()
+		if options.resumeFromStep != "" {
+			workflowRun.ResumedFrom = options.resumeFromStep
+		}
+		if len(options.mediaPayload) > 0 {
+			workflowRun.Metadata["media"] = options.mediaPayload
+		}
 	}
 
-	// 执行步骤
-	// Execute steps
-	for i, step := range w.Steps {
+	startIdx := 0
+	if options.resumeFromStep != "" {
+		found := false
+		for i, step := range w.Steps {
+			if step.GetID() == options.resumeFromStep {
+				startIdx = i
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, types.NewInvalidInputError("resume step not found", fmt.Errorf("step %s not in workflow", options.resumeFromStep))
+		}
+	}
+
+	var lastStepID string
+
+	for idx := startIdx; idx < len(w.Steps); idx++ {
+		step := w.Steps[idx]
+
 		select {
 		case <-ctx.Done():
 			if workflowRun != nil {
-				workflowRun.MarkCancelled()
-				w.saveRun(ctx, sessionID, workflowRun)
+				reason := ctx.Err()
+				snapshot := execCtx.ExportSessionState()
+				workflowRun.ApplyCancellation(reason.Error(), lastStepID, snapshot)
+				// Create a new context with timeout for persistence operations
+				// as the original context is cancelled
+				persistCtx, persistCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				w.saveRun(persistCtx, sessionID, workflowRun)
+				w.saveCancellation(persistCtx, sessionID, &CancellationRecord{
+					RunID:      workflowRun.RunID,
+					Reason:     reason.Error(),
+					StepID:     lastStepID,
+					Snapshot:   snapshot,
+					OccurredAt: time.Now(),
+				})
+				persistCancel()
 			}
 			return nil, ctx.Err()
 		default:
 		}
 
+		sequence := idx - startIdx + 1
+		currentStepID := step.GetID()
+		lastStepID = currentStepID
+		if workflowRun != nil {
+			workflowRun.LastStepID = currentStepID
+		}
+
 		w.logger.Info("executing step",
-			"step_id", step.GetID(),
+			"step_id", currentStepID,
 			"step_type", step.GetType(),
-			"sequence", i+1)
+			"sequence", sequence)
 
 		result, err := step.Execute(ctx, execCtx)
 		if err != nil {
 			w.logger.Error("step execution failed",
-				"step_id", step.GetID(),
+				"step_id", currentStepID,
 				"error", err)
 
 			if workflowRun != nil {
+				workflowRun.LastStepID = currentStepID
 				workflowRun.MarkFailed(err)
 				w.saveRun(ctx, sessionID, workflowRun)
 			}
 
-			return nil, types.NewError(types.ErrCodeUnknown, fmt.Sprintf("step %s failed", step.GetID()), err)
+			return nil, types.NewError(types.ErrCodeUnknown, fmt.Sprintf("step %s failed", currentStepID), err)
 		}
 
 		execCtx = result
 	}
 
-	// 保存历史（如果启用）
-	// Save history (if enabled)
 	if workflowRun != nil {
 		workflowRun.MarkCompleted(execCtx.Output)
+		workflowRun.LastStepID = lastStepID
 		workflowRun.Messages = extractMessages(execCtx)
 		w.saveRun(ctx, sessionID, workflowRun)
 	}
@@ -307,6 +348,28 @@ func (w *Workflow) saveRun(ctx context.Context, sessionID string, run *WorkflowR
 		"run_id", run.RunID,
 		"status", run.Status)
 
+	return nil
+}
+
+func (w *Workflow) saveCancellation(ctx context.Context, sessionID string, record *CancellationRecord) error {
+	if w.historyStore == nil || record == nil {
+		return nil
+	}
+
+	session, err := w.historyStore.GetSession(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to get session for cancellation: %w", err)
+	}
+
+	session.AddCancellation(record)
+	if err := w.historyStore.UpdateSession(ctx, session); err != nil {
+		return fmt.Errorf("failed to update session cancellation: %w", err)
+	}
+
+	w.logger.Debug("saved cancellation",
+		"session_id", sessionID,
+		"run_id", record.RunID,
+		"step_id", record.StepID)
 	return nil
 }
 

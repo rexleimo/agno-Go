@@ -23,6 +23,10 @@ func NewMemoryStorage() *MemoryStorage {
 
 // Create creates a new session
 func (m *MemoryStorage) Create(ctx context.Context, session *Session) error {
+	if err := ensureContext(ctx); err != nil {
+		return err
+	}
+
 	if session.SessionID == "" {
 		return ErrInvalidSessionID
 	}
@@ -52,6 +56,10 @@ func (m *MemoryStorage) Create(ctx context.Context, session *Session) error {
 
 // Get retrieves a session by ID
 func (m *MemoryStorage) Get(ctx context.Context, sessionID string) (*Session, error) {
+	if err := ensureContext(ctx); err != nil {
+		return nil, err
+	}
+
 	if sessionID == "" {
 		return nil, ErrInvalidSessionID
 	}
@@ -70,6 +78,10 @@ func (m *MemoryStorage) Get(ctx context.Context, sessionID string) (*Session, er
 
 // Update updates an existing session
 func (m *MemoryStorage) Update(ctx context.Context, session *Session) error {
+	if err := ensureContext(ctx); err != nil {
+		return err
+	}
+
 	if session.SessionID == "" {
 		return ErrInvalidSessionID
 	}
@@ -97,6 +109,10 @@ func (m *MemoryStorage) update(session *Session) error {
 
 // Delete deletes a session by ID
 func (m *MemoryStorage) Delete(ctx context.Context, sessionID string) error {
+	if err := ensureContext(ctx); err != nil {
+		return err
+	}
+
 	if sessionID == "" {
 		return ErrInvalidSessionID
 	}
@@ -114,6 +130,10 @@ func (m *MemoryStorage) Delete(ctx context.Context, sessionID string) error {
 
 // List lists all sessions (with optional filters)
 func (m *MemoryStorage) List(ctx context.Context, filters map[string]interface{}) ([]*Session, error) {
+	if err := ensureContext(ctx); err != nil {
+		return nil, err
+	}
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -130,6 +150,10 @@ func (m *MemoryStorage) List(ctx context.Context, filters map[string]interface{}
 
 // ListByAgent lists all sessions for a specific agent
 func (m *MemoryStorage) ListByAgent(ctx context.Context, agentID string) ([]*Session, error) {
+	if err := ensureContext(ctx); err != nil {
+		return nil, err
+	}
+
 	return m.List(ctx, map[string]interface{}{
 		"agent_id": agentID,
 	})
@@ -137,6 +161,10 @@ func (m *MemoryStorage) ListByAgent(ctx context.Context, agentID string) ([]*Ses
 
 // ListByUser lists all sessions for a specific user
 func (m *MemoryStorage) ListByUser(ctx context.Context, userID string) ([]*Session, error) {
+	if err := ensureContext(ctx); err != nil {
+		return nil, err
+	}
+
 	return m.List(ctx, map[string]interface{}{
 		"user_id": userID,
 	})

@@ -3,8 +3,10 @@ package client
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/rexleimo/agno-go/pkg/agno/mcp/protocol"
 )
@@ -45,6 +47,15 @@ type Config struct {
 	// Capabilities are the capabilities supported by this client
 	// Capabilities 是此客户端支持的功能
 	Capabilities map[string]interface{}
+
+	// ReconnectAttempts controls automatic reconnect attempts when transport fails (default: 3)
+	ReconnectAttempts int
+
+	// ReconnectBackoff controls initial backoff duration between reconnect attempts (default: 500ms, exponential)
+	ReconnectBackoff time.Duration
+
+	// OnUnauthorized is invoked when server returns an unauthorized error (e.g., to refresh tokens).
+	OnUnauthorized func(ctx context.Context) error
 }
 
 // New creates a new MCP client with the given transport and configuration.
@@ -69,6 +80,13 @@ func New(transport Transport, config Config) (*Client, error) {
 		config.ProtocolVersion = "1.0"
 	}
 
+	if config.ReconnectAttempts < 0 {
+		config.ReconnectAttempts = 0
+	}
+	if config.ReconnectBackoff <= 0 {
+		config.ReconnectBackoff = 500 * time.Millisecond
+	}
+
 	return &Client{
 		transport: transport,
 		config:    config,
@@ -84,8 +102,15 @@ func (c *Client) Connect(ctx context.Context) error {
 		return fmt.Errorf("failed to start transport: %w", err)
 	}
 
-	// Send initialize request
-	// 发送初始化请求
+	if err := c.initialize(ctx); err != nil {
+		_ = c.transport.Stop()
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) initialize(ctx context.Context) error {
 	initParams := protocol.InitializeParams{
 		ProtocolVersion: c.config.ProtocolVersion,
 		ClientInfo: protocol.ClientInfo{
@@ -95,10 +120,25 @@ func (c *Client) Connect(ctx context.Context) error {
 		Capabilities: c.config.Capabilities,
 	}
 
-	var initResult protocol.InitializeResult
-	if err := c.call(ctx, protocol.MethodInitialize, initParams, &initResult); err != nil {
-		c.transport.Stop()
+	reqID := c.requestID.Add(1)
+	req, err := protocol.NewRequest(protocol.MethodInitialize, initParams, reqID)
+	if err != nil {
+		return fmt.Errorf("failed to create initialize request: %w", err)
+	}
+
+	resp, err := c.transport.Send(ctx, req)
+	if err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	if resp.Error != nil {
+		return fmt.Errorf("failed to initialize: server error [%d] %s", resp.Error.Code, resp.Error.Message)
+	}
+
+	var initResult protocol.InitializeResult
+	if resp.Result != nil {
+		if err := parseResult(resp.Result, &initResult); err != nil {
+			return fmt.Errorf("failed to parse initialize result: %w", err)
+		}
 	}
 
 	c.initMu.Lock()
@@ -107,8 +147,6 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.initialized = true
 	c.initMu.Unlock()
 
-	// Send initialized notification
-	// 发送初始化完成通知
 	notif, err := protocol.NewNotification("initialized", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create initialized notification: %w", err)
@@ -118,6 +156,36 @@ func (c *Client) Connect(ctx context.Context) error {
 		return fmt.Errorf("failed to send initialized notification: %w", err)
 	}
 
+	return nil
+}
+
+func (c *Client) reconnect(ctx context.Context, attempt int) error {
+	c.initMu.Lock()
+	c.initialized = false
+	c.serverInfo = nil
+	c.capabilities = nil
+	c.initMu.Unlock()
+
+	_ = c.transport.Stop()
+
+	backoff := c.config.ReconnectBackoff
+	delay := backoff * time.Duration(1<<attempt)
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+	}
+
+	if err := c.transport.Start(ctx); err != nil {
+		return fmt.Errorf("failed to restart transport: %w", err)
+	}
+
+	if err := c.initialize(ctx); err != nil {
+		return fmt.Errorf("failed to reinitialize: %w", err)
+	}
 	return nil
 }
 
@@ -274,37 +342,70 @@ func (c *Client) GetPrompt(ctx context.Context, name string, arguments map[strin
 // call is a helper method to make JSON-RPC calls
 // call 是一个辅助方法，用于进行 JSON-RPC 调用
 func (c *Client) call(ctx context.Context, method string, params interface{}, result interface{}) error {
-	// Generate unique request ID
-	// 生成唯一的请求 ID
 	id := c.requestID.Add(1)
+	maxAttempts := c.config.ReconnectAttempts + 1
+	unauthorizedRetried := false
 
-	// Create request
-	// 创建请求
-	req, err := protocol.NewRequest(method, params, id)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Send request and wait for response
-	// 发送请求并等待响应
-	resp, err := c.transport.Send(ctx, req)
-	if err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
-	}
-
-	// Check for error response
-	// 检查错误响应
-	if resp.Error != nil {
-		return fmt.Errorf("server error [%d]: %s", resp.Error.Code, resp.Error.Message)
-	}
-
-	// Unmarshal result if provided
-	// 如果提供了结果，则解析
-	if result != nil && resp.Result != nil {
-		if err := parseResult(resp.Result, result); err != nil {
-			return fmt.Errorf("failed to parse result: %w", err)
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		req, err := protocol.NewRequest(method, params, id)
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
 		}
+
+		resp, err := c.transport.Send(ctx, req)
+		if err != nil {
+			if attempt < c.config.ReconnectAttempts {
+				if recErr := c.reconnect(ctx, attempt); recErr == nil {
+					continue
+				} else {
+					return fmt.Errorf("failed to reconnect transport: %w", recErr)
+				}
+			}
+			return fmt.Errorf("failed to send request: %w", err)
+		}
+
+		if resp.Error != nil {
+			if !unauthorizedRetried && c.handleUnauthorized(ctx, resp.Error, attempt) {
+				unauthorizedRetried = true
+				continue
+			}
+			return fmt.Errorf("server error [%d]: %s", resp.Error.Code, resp.Error.Message)
+		}
+
+		if result != nil && resp.Result != nil {
+			if err := parseResult(resp.Result, result); err != nil {
+				return fmt.Errorf("failed to parse result: %w", err)
+			}
+		}
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("request failed after %d attempts", maxAttempts)
+}
+
+func (c *Client) handleUnauthorized(ctx context.Context, rpcErr *protocol.JSONRPCError, attempt int) bool {
+	if !isUnauthorized(rpcErr) || c.config.OnUnauthorized == nil {
+		return false
+	}
+
+	if err := c.config.OnUnauthorized(ctx); err != nil {
+		return false
+	}
+
+	if err := c.reconnect(ctx, attempt); err != nil {
+		return false
+	}
+
+	return true
+}
+
+func isUnauthorized(err *protocol.JSONRPCError) bool {
+	if err == nil {
+		return false
+	}
+	if err.Code == 401 {
+		return true
+	}
+	message := strings.ToLower(err.Message)
+	return strings.Contains(message, "unauthorized") || strings.Contains(message, "401")
 }

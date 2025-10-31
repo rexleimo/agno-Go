@@ -17,6 +17,7 @@ const (
 	ErrCodePromptInjection   ErrorCode = "PROMPT_INJECTION"
 	ErrCodePIIDetected       ErrorCode = "PII_DETECTED"
 	ErrCodeContentModeration ErrorCode = "CONTENT_MODERATION"
+	ErrCodeCancelled         ErrorCode = "RUN_CANCELLED"
 	ErrCodeUnknown           ErrorCode = "UNKNOWN"
 )
 
@@ -102,4 +103,9 @@ func NewPIIDetectedError(message string, cause error) *AgnoError {
 // NewContentModerationError creates a content moderation error
 func NewContentModerationError(message string, cause error) *AgnoError {
 	return NewError(ErrCodeContentModeration, message, cause)
+}
+
+// NewCancellationError creates a cancellation error when a run is cancelled.
+func NewCancellationError(message string, cause error) *AgnoError {
+	return NewError(ErrCodeCancelled, message, cause)
 }

@@ -2,17 +2,36 @@ package agent
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/rexleimo/agno-go/pkg/agno/cache"
 	"github.com/rexleimo/agno-go/pkg/agno/hooks"
 	"github.com/rexleimo/agno-go/pkg/agno/memory"
 	"github.com/rexleimo/agno-go/pkg/agno/models"
 	"github.com/rexleimo/agno-go/pkg/agno/reasoning"
 	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
+)
+
+const defaultCacheTTL = 5 * time.Minute
+
+// RunStatus represents the lifecycle status of a run.
+type RunStatus string
+
+const (
+	RunStatusRunning   RunStatus = "running"
+	RunStatusCompleted RunStatus = "completed"
+	RunStatusCancelled RunStatus = "cancelled"
+	RunStatusError     RunStatus = "error"
 )
 
 // Agent represents an AI agent
@@ -28,6 +47,9 @@ type Agent struct {
 	PreHooks     []hooks.Hook // Hooks executed before processing input
 	PostHooks    []hooks.Hook // Hooks executed after generating output
 	logger       *slog.Logger
+	cache        cache.Provider
+	cacheTTL     time.Duration
+	cacheEnabled bool
 
 	// Storage control / 存储控制
 	storeToolMessages    bool // Whether to store tool messages in RunOutput / 是否在 RunOutput 中存储工具消息
@@ -41,17 +63,20 @@ type Agent struct {
 
 // Config contains agent configuration
 type Config struct {
-	ID           string
-	Name         string
-	Model        models.Model
-	Toolkits     []toolkit.Toolkit
-	Memory       memory.Memory
-	Instructions string
-	MaxLoops     int
-	UserID       string       // User ID for multi-tenant scenarios / 多租户场景的用户ID
-	PreHooks     []hooks.Hook // Hooks to execute before processing input
-	PostHooks    []hooks.Hook // Hooks to execute after generating output
-	Logger       *slog.Logger
+	ID            string
+	Name          string
+	Model         models.Model
+	Toolkits      []toolkit.Toolkit
+	Memory        memory.Memory
+	Instructions  string
+	MaxLoops      int
+	UserID        string       // User ID for multi-tenant scenarios / 多租户场景的用户ID
+	PreHooks      []hooks.Hook // Hooks to execute before processing input
+	PostHooks     []hooks.Hook // Hooks to execute after generating output
+	Logger        *slog.Logger
+	EnableCache   bool
+	CacheProvider cache.Provider
+	CacheTTL      time.Duration
 
 	// Storage control flags (nil means use default: true) / 存储控制标志 (nil 表示使用默认值: true)
 	// StoreToolMessages controls whether tool-related messages are included in RunOutput.
@@ -93,6 +118,23 @@ func New(config Config) (*Agent, error) {
 		config.Logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	}
 
+	var cacheProvider cache.Provider
+	if config.EnableCache {
+		cacheProvider = config.CacheProvider
+		if cacheProvider == nil {
+			provider, err := cache.NewMemoryProvider(0, config.CacheTTL)
+			if err != nil {
+				return nil, err
+			}
+			cacheProvider = provider
+		}
+	}
+
+	cacheTTL := config.CacheTTL
+	if cacheTTL <= 0 {
+		cacheTTL = defaultCacheTTL
+	}
+
 	// Helper function to get bool value or default / 辅助函数获取布尔值或默认值
 	boolOrDefault := func(ptr *bool, defaultVal bool) bool {
 		if ptr == nil {
@@ -113,6 +155,9 @@ func New(config Config) (*Agent, error) {
 		PreHooks:     config.PreHooks,
 		PostHooks:    config.PostHooks,
 		logger:       config.Logger,
+		cache:        cacheProvider,
+		cacheTTL:     cacheTTL,
+		cacheEnabled: config.EnableCache && cacheProvider != nil,
 
 		// Storage control (default to true for backward compatibility) / 存储控制 (默认为 true 以保持向后兼容)
 		storeToolMessages:    boolOrDefault(config.StoreToolMessages, true),
@@ -130,31 +175,29 @@ func New(config Config) (*Agent, error) {
 
 // RunOutput contains the result of agent execution
 type RunOutput struct {
-	Content  string                 `json:"content"`
-	Messages []*types.Message       `json:"messages"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	RunID              string                 `json:"run_id,omitempty"`
+	Status             RunStatus              `json:"status"`
+	StartedAt          time.Time              `json:"started_at"`
+	CompletedAt        time.Time              `json:"completed_at"`
+	CancellationReason string                 `json:"cancellation_reason,omitempty"`
+	Content            string                 `json:"content"`
+	Messages           []*types.Message       `json:"messages"`
+	Metadata           map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // Run executes the agent with the given input
 func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
-	// Ensure temporary instructions are cleared after execution (even on early return)
-	// 确保执行完成后清除临时指令（即使提前返回）
 	defer a.ClearTempInstructions()
 
 	if input == "" {
 		return nil, types.NewInvalidInputError("input cannot be empty", nil)
 	}
 
-	// Get current instructions at execution start (temporary or permanent)
-	// 在执行开始时获取当前指令（临时或永久）
 	currentInstructions := a.GetInstructions()
-
 	a.logger.Info("agent run started", "agent_id", a.ID, "input", input)
 
-	// Record initial message count for history filtering / 记录初始消息数量用于历史过滤
 	initialMessageCount := len(a.Memory.GetMessages(a.UserID))
 
-	// Execute pre-hooks
 	if len(a.PreHooks) > 0 {
 		a.logger.Debug("executing pre-hooks", "count", len(a.PreHooks))
 		hookInput := hooks.NewHookInput(input).
@@ -167,51 +210,75 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 		}
 	}
 
-	// Add user message
-	// 添加用户消息
 	userMsg := types.NewUserMessage(input)
 	a.Memory.Add(userMsg, a.UserID)
 
+	output := &RunOutput{
+		RunID:     "run-" + uuid.NewString(),
+		Status:    RunStatusRunning,
+		StartedAt: time.Now().UTC(),
+		Metadata:  map[string]interface{}{},
+	}
+
 	var finalResponse *types.ModelResponse
 	loopCount := 0
+	cacheHit := false
 
-	// Tool calling loop
 	for loopCount < a.MaxLoops {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			cancelled := a.markRunCancelled(output, loopCount, cacheHit, ctxErr, initialMessageCount)
+			return cancelled, types.NewCancellationError("agent run cancelled", ctxErr)
+		}
+
 		loopCount++
 
-		// Prepare request with current instructions
-		// 使用当前指令准备请求
 		messages := a.Memory.GetMessages(a.UserID)
-
-		// If using temporary instructions, update system message
-		// 如果使用临时指令，更新系统消息
 		if currentInstructions != a.Instructions && currentInstructions != "" {
-			// Replace or prepend system message with current instructions
-			// 用当前指令替换或添加系统消息
 			messages = a.updateSystemMessage(messages, currentInstructions)
 		}
 
-		req := &models.InvokeRequest{
-			Messages: messages,
-		}
-
-		// Add tools if available
+		req := &models.InvokeRequest{Messages: messages}
 		if len(a.Toolkits) > 0 {
 			req.Tools = toolkit.ToModelToolDefinitions(a.Toolkits)
 		}
 
-		// Call model
-		resp, err := a.Model.Invoke(ctx, req)
-		if err != nil {
-			a.logger.Error("model invocation failed", "error", err)
-			return nil, types.NewAPIError("model invocation failed", err)
+		var (
+			resp      *types.ModelResponse
+			invokeErr error
+			fromCache bool
+			cacheKey  string
+		)
+
+		if a.cacheEnabled {
+			cachedResp, key, ok, cacheErr := a.tryCacheGet(ctx, req)
+			cacheKey = key
+			if cacheErr != nil {
+				a.logger.Warn("cache lookup failed", "error", cacheErr)
+			} else if ok {
+				resp = cachedResp
+				fromCache = true
+				cacheHit = true
+			}
 		}
 
-		// 提取推理内容(如果模型支持) / Extract reasoning content (if model supports)
-		reasoningContent := a.extractReasoning(ctx, resp)
+		if !fromCache {
+			resp, invokeErr = a.Model.Invoke(ctx, req)
+			if invokeErr != nil {
+				if errors.Is(invokeErr, context.Canceled) || errors.Is(invokeErr, context.DeadlineExceeded) || ctx.Err() != nil {
+					cancelled := a.markRunCancelled(output, loopCount, cacheHit, invokeErr, initialMessageCount)
+					return cancelled, types.NewCancellationError("agent run cancelled", invokeErr)
+				}
+				a.logger.Error("model invocation failed", "error", invokeErr)
+				return nil, types.NewAPIError("model invocation failed", invokeErr)
+			}
+			if a.cacheEnabled {
+				if cacheKey == "" {
+					cacheKey = a.buildCacheKey(req)
+				}
+			}
+		}
 
-		// Store assistant response
-		// 存储助手响应
+		reasoningContent := a.extractReasoning(ctx, resp)
 		assistantMsg := &types.Message{
 			Role:             types.RoleAssistant,
 			Content:          resp.Content,
@@ -220,32 +287,33 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 		}
 		a.Memory.Add(assistantMsg, a.UserID)
 
-		// Check if there are tool calls
 		if !resp.HasToolCalls() {
+			if a.cacheEnabled && !fromCache {
+				a.tryCacheSet(ctx, cacheKey, resp)
+			}
 			finalResponse = resp
 			break
 		}
 
-		// Execute tool calls
 		a.logger.Info("executing tool calls", "count", len(resp.ToolCalls))
 		if err := a.executeToolCalls(ctx, resp.ToolCalls); err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+				cancelled := a.markRunCancelled(output, loopCount, cacheHit, err, initialMessageCount)
+				return cancelled, types.NewCancellationError("agent run cancelled", err)
+			}
 			a.logger.Error("tool execution failed", "error", err)
 			return nil, types.NewToolExecutionError("tool execution failed", err)
 		}
-
-		// Continue loop to process tool results
-	}
-
-	if loopCount >= a.MaxLoops {
-		a.logger.Warn("max loops reached", "max_loops", a.MaxLoops)
-		return nil, types.NewError(types.ErrCodeUnknown, "max tool calling loops reached", nil)
 	}
 
 	if finalResponse == nil {
+		if loopCount >= a.MaxLoops {
+			a.logger.Warn("max loops reached", "max_loops", a.MaxLoops)
+			return nil, types.NewError(types.ErrCodeUnknown, "max tool calling loops reached", nil)
+		}
 		return nil, types.NewError(types.ErrCodeUnknown, "no response from model", nil)
 	}
 
-	// Execute post-hooks
 	if len(a.PostHooks) > 0 {
 		a.logger.Debug("executing post-hooks", "count", len(a.PostHooks))
 		hookInput := hooks.NewHookInput(input).
@@ -261,20 +329,75 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 
 	a.logger.Info("agent run completed", "agent_id", a.ID)
 
-	// Build output / 构建输出
-	output := &RunOutput{
-		Content:  finalResponse.Content,
-		Messages: a.Memory.GetMessages(a.UserID),
-		Metadata: map[string]interface{}{
-			"loops": loopCount,
-			"usage": finalResponse.Usage,
-		},
-	}
+	output.Status = RunStatusCompleted
+	output.CompletedAt = time.Now().UTC()
+	output.Content = finalResponse.Content
+	output.Messages = a.Memory.GetMessages(a.UserID)
+	output.Metadata["loops"] = loopCount
+	output.Metadata["usage"] = finalResponse.Usage
+	output.Metadata["cache_hit"] = cacheHit
 
-	// Apply storage filters / 应用存储过滤器
 	a.scrubRunOutputWithContext(output, initialMessageCount)
 
 	return output, nil
+}
+
+func (a *Agent) tryCacheGet(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, string, bool, error) {
+	if !a.cacheEnabled || a.cache == nil {
+		return nil, "", false, nil
+	}
+
+	key := a.buildCacheKey(req)
+	resp, ok, err := a.cache.Get(ctx, key)
+	return resp, key, ok, err
+}
+
+func (a *Agent) tryCacheSet(ctx context.Context, key string, resp *types.ModelResponse) {
+	if !a.cacheEnabled || a.cache == nil || key == "" || resp == nil {
+		return
+	}
+
+	if resp.HasToolCalls() {
+		return
+	}
+
+	if err := a.cache.Set(ctx, key, resp, a.cacheTTL); err != nil && a.logger != nil {
+		a.logger.Warn("failed to cache response", "error", err)
+	}
+}
+
+func (a *Agent) buildCacheKey(req *models.InvokeRequest) string {
+	if req == nil {
+		return ""
+	}
+
+	var builder strings.Builder
+	builder.Grow(256)
+
+	builder.WriteString(a.Model.GetProvider())
+	builder.WriteString(":")
+	builder.WriteString(a.Model.GetID())
+
+	for _, msg := range req.Messages {
+		builder.WriteString("|")
+		builder.WriteString(string(msg.Role))
+		builder.WriteString(":")
+		builder.WriteString(msg.Content)
+		if len(msg.ToolCalls) > 0 {
+			builder.WriteString("#toolcalls")
+		}
+	}
+
+	if len(req.Tools) > 0 {
+		builder.WriteString("|tools:")
+		for _, tool := range req.Tools {
+			builder.WriteString(tool.Function.Name)
+			builder.WriteString(",")
+		}
+	}
+
+	sum := sha256.Sum256([]byte(builder.String()))
+	return hex.EncodeToString(sum[:])
 }
 
 // executeToolCalls executes all tool calls and adds results to memory
@@ -572,4 +695,27 @@ func (a *Agent) scrubRunOutputWithContext(output *RunOutput, initialMessageCount
 			"store_history_messages", a.storeHistoryMessages,
 		)
 	}
+}
+
+func (a *Agent) markRunCancelled(output *RunOutput, loopCount int, cacheHit bool, reason error, initialMessageCount int) *RunOutput {
+	if output == nil {
+		return nil
+	}
+
+	if output.Metadata == nil {
+		output.Metadata = map[string]interface{}{}
+	}
+
+	output.Status = RunStatusCancelled
+	output.CompletedAt = time.Now().UTC()
+	output.Metadata["loops"] = loopCount
+	output.Metadata["cache_hit"] = cacheHit
+	if reason != nil {
+		output.CancellationReason = reason.Error()
+		output.Metadata["error"] = reason.Error()
+	}
+
+	output.Messages = a.Memory.GetMessages(a.UserID)
+	a.scrubRunOutputWithContext(output, initialMessageCount)
+	return output
 }

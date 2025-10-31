@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/rexleimo/agno-go/pkg/agno/media"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
@@ -243,9 +244,13 @@ func TestEventDataStructures(t *testing.T) {
 		data := RunStartData{
 			Input:     "test input",
 			SessionID: "session123",
+			Media: []media.Attachment{
+				{Type: "image", URL: "https://example.com/image.png"},
+			},
 		}
 		assert.Equal(t, "test input", data.Input)
 		assert.Equal(t, "session123", data.SessionID)
+		assert.Len(t, data.Media, 1)
 	})
 
 	t.Run("ToolCallData", func(t *testing.T) {

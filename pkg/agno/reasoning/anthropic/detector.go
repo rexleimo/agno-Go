@@ -26,6 +26,12 @@ func (d *Detector) IsReasoningModel(model models.Model) bool {
 		return false
 	}
 
+	modelID := strings.ToLower(model.GetID())
+	if strings.Contains(modelID, "@") {
+		// IDs with version suffix (@YYYYMMDD) belong to Vertex AI mirror models
+		return false
+	}
+
 	if capable, ok := model.(reasoningCapable); ok {
 		return capable.SupportsReasoning()
 	}
