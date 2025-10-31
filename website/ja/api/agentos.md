@@ -10,6 +10,7 @@ func NewServer(config *Config) (*Server, error)
 
 type Config struct {
     Address        string           // サーバーアドレス (デフォルト: :8080)
+    Prefix         string           // API プレフィックス (デフォルト: /api/v1)
     SessionStorage session.Storage  // セッションストレージ (デフォルト: memory)
     Logger         *slog.Logger     // ロガー (デフォルト: slog.Default())
     Debug          bool             // デバッグモード (デフォルト: false)
@@ -22,6 +23,10 @@ type Config struct {
     // ナレッジ API (オプション) / Knowledge API (optional)
     VectorDBConfig  *VectorDBConfig  // ベクトルDB構成（例: chromadb）
     EmbeddingConfig *EmbeddingConfig // 埋め込みモデル構成（例: OpenAI）
+    KnowledgeAPI    *KnowledgeAPIOptions // ナレッジエンドポイントの有効/無効
+
+    // セッションサマリー (オプション) / Session summaries (optional)
+    SummaryManager *session.SummaryManager // 同期/非同期サマリーを構成
 }
 
 type VectorDBConfig struct {
@@ -102,8 +107,47 @@ server.Shutdown(ctx)
 - `PUT /api/v1/sessions/{id}` - セッション更新
 - `DELETE /api/v1/sessions/{id}` - セッション削除
 - `GET /api/v1/sessions` - セッション一覧
+- `POST /api/v1/sessions/{id}/reuse` - セッションを共有
+- `GET /api/v1/sessions/{id}/summary` - サマリー取得（準備中は 404）
+- `POST /api/v1/sessions/{id}/summary?async=true|false` - 同期/非同期サマリー生成
+- `GET /api/v1/sessions/{id}/history` - 履歴取得（`num_messages`、`stream_events` フィルター）
 - `GET /api/v1/agents` - エージェント一覧
 - `POST /api/v1/agents/{id}/run` - エージェント実行
+
+### セッションサマリーと再利用 (v1.2.6)
+
+`session.SummaryManager` を設定すると同期/非同期サマリーを有効化できます:
+
+```go
+// import (
+//     "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+//     "github.com/rexleimo/agno-go/pkg/agno/session"
+// )
+summaryModel, _ := openai.New("gpt-4o-mini", openai.Config{
+    APIKey: os.Getenv("OPENAI_API_KEY"),
+})
+
+summary := session.NewSummaryManager(
+    session.WithSummaryModel(summaryModel),
+    session.WithSummaryTimeout(45*time.Second),
+)
+
+server, err := agentos.NewServer(&agentos.Config{
+    Address:        ":8080",
+    SummaryManager: summary,
+})
+```
+
+- `POST /api/v1/sessions/{id}/summary`
+  - `async=true` バックグラウンドジョブをスケジュールし `202 Accepted` を返す
+  - `async=false` 同期実行しサマリーを返す
+- `GET /api/v1/sessions/{id}/summary` は最新スナップショットを返す（準備完了前は 404）
+- `POST /api/v1/sessions/{id}/reuse` はエージェント、チーム、ワークフロー、ユーザー間でセッションを共有
+
+### 履歴フィルターと実行メタデータ
+
+- `GET /api/v1/sessions/{id}/history?num_messages=20&stream_events=true` で最新 N 件にトリミングし、Python ランタイムの SSE トグルと同等に動作します。
+- セッションレスポンスには実行メタデータ（`runs[*].status`、タイムスタンプ、キャンセル理由、`cache_hit`）が含まれ、監査やキャッシュ可観測性を強化します。
 
 **知識エンドポイント（オプション） / Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — ナレッジベースでベクトル類似検索 / Vector similarity search

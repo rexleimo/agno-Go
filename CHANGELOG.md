@@ -5,6 +5,28 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6] - 2025-10-31
+
+### ✨ Added
+- Session runtime parity: session reuse endpoint, history pagination filters (`num_messages`, `stream_events`), and summary manager supporting sync/async generation.
+- Response caching for agents and teams via in-memory LRU store, exposing cache-hit metadata in session runs.
+- Media attachments across agents, teams, and workflows, including validation helpers and `WithMediaPayload` run option.
+- Pluggable session storage drivers: MongoDB and SQLite implementations alongside Postgres with shared JSON contracts.
+- Tooling expansions: Tavily Reader/Search, Claude Agent Skills, Gmail mark-as-read, Jira worklogs, ElevenLabs speech synthesis, and enhanced file toolkit.
+
+### 🛠️ Changed
+- AgentOS session handlers now expose summary endpoints, reuse semantics, run metadata (status timestamps, cancellation reasons, cache hits), and history filters.
+- Workflow engine supports resumable checkpoints, cancellation persistence, and media-only payload execution paths.
+- MCP client caches capability manifests and forwards media attachments in tool calls.
+
+### 🧪 Tests
+- Added dedicated coverage for cache layer, summary manager, storage drivers, workflow media flows, and new toolkits.
+
+### ✅ Compatibility
+- Additive release; existing APIs remain backward compatible with new features opt-in.
+
+---
+
 ## [1.2.5] - 2025-10-20
 
 ### ✨ Added

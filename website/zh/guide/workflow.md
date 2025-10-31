@@ -413,6 +413,60 @@ loop, _ := workflow.NewLoop(workflow.LoopConfig{
 })
 ```
 
+
+## 高级 Workflow 功能
+
+### 从检查点恢复
+
+在上次成功步骤处恢复被中断的工作流:
+
+```go
+execCtx, err := wf.Run(ctx, input, "session-id",
+    workflow.WithResumeFrom("validate-output"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+当配置项 `EnableHistory` 启用时, 每次运行都会持久化步骤输出与取消记录。传入 `WithResumeFrom(stepID)` 会跳过已完成的步骤, 从目标检查点继续执行。
+
+### 取消持久化
+
+启用历史记录以捕获取消原因、运行 ID 与时间戳:
+
+```go
+store := workflow.NewMemoryStorage(100)
+wf, _ := workflow.New(workflow.Config{
+    Name:          "retriable-pipeline",
+    Steps:         []workflow.Node{firstStep, finalStep},
+    EnableHistory: true,
+    HistoryStore:  store,
+})
+```
+
+若某个步骤取消了上下文, 最新的历史记录会保存 `RunStatusCancelled` 状态以及 `CancellationReason`。可通过 `store.GetSession(ctx, sessionID)` 检查细节。
+
+### 媒体负载
+
+在不影响提示的情况下附加图片、音频或文件:
+
+```go
+// import "github.com/rexleimo/agno-go/pkg/agno/media"
+attachments := []media.Attachment{
+    {Type: "image", URL: "https://example.com/diagram.png"},
+    {Type: "file",  ID:  "spec-v1", Name: "spec.pdf"},
+}
+
+execCtx, _ := wf.Run(ctx, "review this", "sess-media",
+    workflow.WithMediaPayload(attachments),
+)
+
+payload, _ := execCtx.GetSessionState("media_payload")
+```
+
+工作流会将校验后的附件存入会话状态 (`media_payload`), 供后续步骤与 AgentOS 集成访问。
+
 ---
 
 ## Workflow vs Team

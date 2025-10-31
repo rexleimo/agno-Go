@@ -19,39 +19,39 @@ hero:
 features:
   - icon: 🚀
     title: Extreme Performance
-    details: Agent instantiation in ~180ns, 16x faster than Python version. Memory footprint of just 1.2KB per agent with native Go concurrency support.
+    details: Agent instantiation in ~180ns with ~1.2KB per agent, delivering a 16× speedup over the Python runtime.
 
   - icon: 🤖
-    title: Production-Ready
-    details: AgentOS HTTP server with RESTful API, session management, agent registry, health monitoring, and comprehensive error handling out of the box.
+    title: Production Ready AgentOS
+    details: REST server with OpenAPI 3.0, session storage, health checks, structured logging, CORS, request timeouts, and parity endpoints for summaries, reuse, and history filters.
+
+  - icon: 🪄
+    title: Session Parity
+    details: Share sessions across agents and teams, trigger sync/async summaries, capture cache hits and cancellation reasons, and mirror Python's `stream_events` switches.
 
   - icon: 🧩
     title: Flexible Architecture
-    details: Choose from Agent (autonomous), Team (4 coordination modes), or Workflow (5 control primitives) to build your multi-agent system.
+    details: Compose Agents, Teams (4 coordination modes), and Workflows (5 primitives) with inherited defaults, resumable checkpoints, and deterministic orchestration.
 
   - icon: 🔌
-    title: Multi-Model Support
-    details: Built-in support for OpenAI (GPT-4), Anthropic Claude, Ollama (local models), DeepSeek, Google Gemini, and ModelScope.
+    title: Multi-Provider Models
+    details: Ready for OpenAI o-series, Anthropic Claude, Google Gemini, DeepSeek, GLM, ModelScope, Ollama, Cohere, Groq, Together, OpenRouter, LM Studio, Vercel, Portkey, InternLM, and SambaNova.
 
   - icon: 🔧
-    title: Extensible Tools
-    details: Easy-to-extend toolkit system with built-in Calculator, HTTP Client, File Operations, and DuckDuckGo Search. MCP integration for connecting to any MCP-compatible server.
+    title: Extensible Tooling
+    details: Calculator, HTTP, file ops, search, Claude Agent Skills, Tavily Reader/Search, Gmail mark-as-read, Jira worklogs, ElevenLabs voice, PPTX reader, plus MCP connectors.
 
   - icon: 💾
-    title: RAG & Knowledge
-    details: ChromaDB vector database integration with OpenAI embeddings. Build intelligent agents with semantic search and knowledge bases.
+    title: Knowledge & Caching
+    details: ChromaDB integration, batching utilities, ingestion helpers, and response caching to deduplicate identical model calls.
 
-  - icon: ✅
-    title: Well-Tested
-    details: 80.8% test coverage with 85+ test cases and 100% pass rate. Production-quality code you can trust.
+  - icon: 🛡️
+    title: Guardrails & Observability
+    details: Prompt-injection guard, custom pre/post hooks, media validation, SSE reasoning stream, and Logfire/OpenTelemetry tracing samples.
 
   - icon: 📦
     title: Easy Deployment
-    details: Docker, Docker Compose, and Kubernetes manifests included. Deploy to any cloud platform in minutes with complete deployment guides.
-
-  - icon: 📚
-    title: Complete Documentation
-    details: OpenAPI 3.0 specification, deployment guides, architecture docs, performance benchmarks, and working examples for every feature.
+    details: Ship single binaries or use Docker, Compose, and Kubernetes manifests with ready-to-run deployment guides.
 ---
 
 ## Quick Example

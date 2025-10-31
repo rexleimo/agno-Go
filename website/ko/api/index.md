@@ -188,6 +188,18 @@ POST /api/v1/sessions
 
 # 세션 조회
 GET /api/v1/sessions/{session_id}
+
+# 세션 공유 (에이전트/팀 간)
+POST /api/v1/sessions/{session_id}/reuse
+
+# 세션 요약 생성 (동기/비동기)
+POST /api/v1/sessions/{session_id}/summary?async=true|false
+
+# 세션 요약 스냅샷 조회
+GET /api/v1/sessions/{session_id}/summary
+
+# 히스토리 조회 (num_messages, stream_events 필터)
+GET /api/v1/sessions/{session_id}/history
 ```
 
 [전체 AgentOS API →](/api/agentos)

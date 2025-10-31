@@ -10,6 +10,7 @@ func NewServer(config *Config) (*Server, error)
 
 type Config struct {
     Address        string           // Server address (default: :8080)
+    Prefix         string           // API prefix (default: /api/v1)
     SessionStorage session.Storage  // Session storage (default: memory)
     Logger         *slog.Logger     // Logger (default: slog.Default())
     Debug          bool             // Debug mode (default: false)
@@ -22,6 +23,10 @@ type Config struct {
     // Knowledge API (optional)
     VectorDBConfig *VectorDBConfig  // Vector database configuration (e.g., chromadb)
     EmbeddingConfig *EmbeddingConfig // Embedding model configuration (e.g., OpenAI)
+    KnowledgeAPI   *KnowledgeAPIOptions // Toggle knowledge endpoints
+
+    // Session summaries (optional)
+    SummaryManager *session.SummaryManager // Configure sync/async summaries
 }
 
 type VectorDBConfig struct {
@@ -102,8 +107,47 @@ See [OpenAPI Specification](../../pkg/agentos/openapi.yaml) for complete API doc
 - `PUT /api/v1/sessions/{id}` - Update session
 - `DELETE /api/v1/sessions/{id}` - Delete session
 - `GET /api/v1/sessions` - List sessions
+- `POST /api/v1/sessions/{id}/reuse` - Attach session to another agent/team/workflow
+- `GET /api/v1/sessions/{id}/summary` - Retrieve stored summary (404 if not ready)
+- `POST /api/v1/sessions/{id}/summary?async=true|false` - Generate session summary (sync or async)
+- `GET /api/v1/sessions/{id}/history` - Fetch conversation history (`num_messages`, `stream_events`)
 - `GET /api/v1/agents` - List agents
 - `POST /api/v1/agents/{id}/run` - Run agent
+
+### Session Summaries & Reuse (v1.2.6)
+
+Configure summaries by supplying a `session.SummaryManager`:
+
+```go
+// import (
+//     "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+//     "github.com/rexleimo/agno-go/pkg/agno/session"
+// )
+summaryModel, _ := openai.New("gpt-4o-mini", openai.Config{
+    APIKey: os.Getenv("OPENAI_API_KEY"),
+})
+
+summary := session.NewSummaryManager(
+    session.WithSummaryModel(summaryModel),
+    session.WithSummaryTimeout(45*time.Second),
+)
+
+server, err := agentos.NewServer(&agentos.Config{
+    Address:        ":8080",
+    SummaryManager: summary,
+})
+```
+
+- `POST /api/v1/sessions/{id}/summary`
+  - `async=true` schedules background jobs; the endpoint returns `202 Accepted`
+  - `async=false` runs synchronously and returns the generated summary
+- `GET /api/v1/sessions/{id}/summary` returns the latest snapshot (404 until ready)
+- `POST /api/v1/sessions/{id}/reuse` shares a session across agents, teams, workflows, or user IDs
+
+### History Filters & Run Metadata
+
+- `GET /api/v1/sessions/{id}/history?num_messages=20&stream_events=true` trims history to the latest N interactions and mirrors Python SSE options.
+- Session responses now include run metadata (`runs[*].status`, timestamps, cancellation reasons, `cache_hit`) enabling audit trails and cache observability.
 
 **Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — Vector similarity search in knowledge base

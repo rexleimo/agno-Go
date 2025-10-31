@@ -13,7 +13,12 @@
 - **Calculator**: 基本的な数学演算
 - **HTTP**: Webリクエストを実行
 - **File**: 安全制御付きのファイル読み書き
-- **Google Sheets** ⭐ 新機能: Google Sheetsデータの読み書き (v1.2.1)
+- **Google Sheets** ⭐ 新機能 (v1.2.1): Google Sheets データの読み書き
+- **Claude Agent Skills** ⭐ 新機能 (v1.2.6): `invoke_claude_skill` で Anthropic Agent Skills を呼び出し
+- **Tavily** ⭐ 新機能 (v1.2.6): クイックアンサーとリーダーモード抽出
+- **Gmail** ⭐ 新機能 (v1.2.6): Gmail API で既読処理やアーカイブを実行
+- **Jira Worklog** ⭐ 新機能 (v1.2.6): Jira Cloud の作業ログを要約・エクスポート
+- **ElevenLabs Voice** ⭐ 新機能 (v1.2.6): 音声クリップをオンデマンドで生成
 
 ---
 

@@ -30,8 +30,15 @@ type Config struct {
     Memory       memory.Memory     // Conversation memory
     Instructions string            // System instructions
     MaxLoops     int               // Max tool call loops (default: 10)
+    UserID       string            // Optional tenant identifier
     PreHooks     []hooks.Hook      // Pre-execution hooks
     PostHooks    []hooks.Hook      // Post-execution hooks
+    Logger       *slog.Logger      // Custom logger (optional)
+    EnableCache  bool              // Enable response caching
+    CacheProvider cache.Provider   // Custom cache provider (optional)
+    CacheTTL     time.Duration     // Cache TTL (default: 5m)
+    StoreToolMessages   *bool      // Include tool messages in RunOutput (default: true)
+    StoreHistoryMessages *bool     // Include memory messages in RunOutput (default: true)
 }
 ```
 
@@ -43,8 +50,15 @@ type Config struct {
 - **Memory** (optional): Defaults to in-memory storage with 100 message limit
 - **Instructions** (optional): System prompt/persona
 - **MaxLoops** (optional): Prevent infinite tool call loops (default: 10)
+- **UserID** (optional): Associate runs with a tenant or end-user
 - **PreHooks** (optional): Validation hooks before execution
 - **PostHooks** (optional): Validation hooks after execution
+- **Logger** (optional): Custom logger for structured output
+- **EnableCache** (optional): Deduplicate identical model calls
+- **CacheProvider** (optional): Supply custom cache backend (defaults to in-memory LRU)
+- **CacheTTL** (optional): Override cache expiration (default 5 minutes)
+- **StoreToolMessages** (optional): Filter tool call transcripts from output
+- **StoreHistoryMessages** (optional): Filter historical memory messages from output
 
 ## Basic Usage
 
@@ -153,6 +167,27 @@ if err != nil {
     }
 }
 ```
+
+### Response Caching (v1.2.6)
+
+Enable deterministic responses to reuse cached model outputs:
+
+```go
+ag, _ := agent.New(agent.Config{
+    Model:       model,
+    EnableCache: true,
+    CacheTTL:    2 * time.Minute,
+})
+
+first, _ := ag.Run(ctx, "Summarise REST vs gRPC")
+second, _ := ag.Run(ctx, "Summarise REST vs gRPC")
+
+if cached, _ := second.Metadata["cache_hit"].(bool); cached {
+    // Handle cached response
+}
+```
+
+Provide a custom `cache.Provider` when you want Redis or shared storage; otherwise an in-memory LRU is used.
 
 ## Run Output
 

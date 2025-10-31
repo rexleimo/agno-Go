@@ -19,39 +19,39 @@ hero:
 features:
   - icon: 🚀
     title: 极致性能
-    details: 智能体实例化仅需 ~180ns,比 Python 版本快 16 倍。每个智能体内存占用仅 1.2KB,原生支持 Go 并发。
+    details: 智能体实例化仅需 ~180ns, 每个智能体约 1.2KB 内存, 相比 Python 运行时快 16 倍。
 
   - icon: 🤖
-    title: 生产就绪
-    details: AgentOS HTTP 服务器提供 RESTful API、会话管理、智能体注册表、健康监控和开箱即用的全面错误处理。
+    title: 生产级 AgentOS
+    details: 内置 OpenAPI 3.0、会话存储、健康检查、结构化日志、CORS、请求超时, 并补齐摘要、复用与历史筛选等对等端点。
+
+  - icon: 🪄
+    title: 会话对齐
+    details: 会话可在 Agent / Team 间共享, 支持同步/异步摘要, 记录缓存命中与取消原因, 并复用 Python 上的 `stream_events` 开关。
 
   - icon: 🧩
     title: 灵活架构
-    details: 从 Agent(自主式)、Team(4 种协作模式)或 Workflow(5 种控制原语)中选择,构建您的多智能体系统。
+    details: 自由组合 Agent、Team（4 种协作模式）与 Workflow（5 种控制原语）, 继承默认配置并支持检点恢复与确定性编排。
 
   - icon: 🔌
-    title: 多模型支持
-    details: 内置支持 OpenAI(GPT-4)、Anthropic Claude、Ollama(本地模型)、DeepSeek、Google Gemini 和 ModelScope。
+    title: 多模型供应商
+    details: 开箱支持 OpenAI o-series、Anthropic Claude、Google Gemini、DeepSeek、GLM、ModelScope、Ollama、Cohere、Groq、Together、OpenRouter、LM Studio、Vercel、Portkey、InternLM、SambaNova。
 
   - icon: 🔧
     title: 可扩展工具
-    details: 易于扩展的工具包系统,内置计算器、HTTP 客户端、文件操作和 DuckDuckGo 搜索。几分钟内创建自定义工具。
+    details: 内置计算器、HTTP、文件、搜索, 并新增 Claude Agent Skills、Tavily Reader/Search、Gmail 标记已读、Jira 工时、ElevenLabs 语音、PPTX 阅读器及 MCP 连接器。
 
   - icon: 💾
-    title: RAG 与知识库
-    details: ChromaDB 向量数据库集成,支持 OpenAI 嵌入。构建具有语义搜索和知识库的智能代理。
+    title: 知识与缓存
+    details: 集成 ChromaDB、批量导入工具与摄取助手, 提供响应缓存以去重相同的模型调用。
 
-  - icon: ✅
-    title: 完善测试
-    details: 80.8% 测试覆盖率,85+ 个测试用例,100% 通过率。值得信赖的生产级代码。
+  - icon: 🛡️
+    title: 防护与可观测性
+    details: 提供提示注入防护、自定义前后置钩子、媒体校验、SSE 推理流以及 Logfire / OpenTelemetry 链路追踪示例。
 
   - icon: 📦
     title: 易于部署
-    details: 包含 Docker、Docker Compose 和 Kubernetes 清单。几分钟内部署到任何云平台,提供完整部署指南。
-
-  - icon: 📚
-    title: 完整文档
-    details: OpenAPI 3.0 规范、部署指南、架构文档、性能基准测试,以及每个功能的实际示例。
+    details: 提供单一二进制、Docker、Compose 与 Kubernetes 清单, 配套上线指南可快速落地。
 ---
 
 ## 快速示例

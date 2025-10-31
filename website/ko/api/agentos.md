@@ -10,6 +10,7 @@ func NewServer(config *Config) (*Server, error)
 
 type Config struct {
     Address        string           // 서버 주소 (기본값: :8080)
+    Prefix         string           // API 프리픽스 (기본값: /api/v1)
     SessionStorage session.Storage  // 세션 저장소 (기본값: memory)
     Logger         *slog.Logger     // 로거 (기본값: slog.Default())
     Debug          bool             // 디버그 모드 (기본값: false)
@@ -22,6 +23,10 @@ type Config struct {
     // 지식 API (선택) / Knowledge API (optional)
     VectorDBConfig  *VectorDBConfig  // 벡터 DB 구성 (예: chromadb)
     EmbeddingConfig *EmbeddingConfig // 임베딩 모델 구성 (예: OpenAI)
+    KnowledgeAPI    *KnowledgeAPIOptions // 지식 엔드포인트 온/오프
+
+    // 세션 요약 (선택) / Session summaries (optional)
+    SummaryManager *session.SummaryManager // 동기/비동기 요약을 구성
 }
 
 type VectorDBConfig struct {
@@ -102,8 +107,47 @@ server.Shutdown(ctx)
 - `PUT /api/v1/sessions/{id}` - 세션 업데이트
 - `DELETE /api/v1/sessions/{id}` - 세션 삭제
 - `GET /api/v1/sessions` - 세션 목록
+- `POST /api/v1/sessions/{id}/reuse` - 세션 공유
+- `GET /api/v1/sessions/{id}/summary` - 세션 요약 조회 (준비 중이면 404)
+- `POST /api/v1/sessions/{id}/summary?async=true|false` - 동기/비동기 요약 생성
+- `GET /api/v1/sessions/{id}/history` - 히스토리 조회 (`num_messages`, `stream_events` 지원)
 - `GET /api/v1/agents` - 에이전트 목록
 - `POST /api/v1/agents/{id}/run` - 에이전트 실행
+
+### 세션 요약과 재사용 (v1.2.6)
+
+`session.SummaryManager` 를 설정하면 동기/비동기 요약을 사용할 수 있습니다:
+
+```go
+// import (
+//     "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+//     "github.com/rexleimo/agno-go/pkg/agno/session"
+// )
+summaryModel, _ := openai.New("gpt-4o-mini", openai.Config{
+    APIKey: os.Getenv("OPENAI_API_KEY"),
+})
+
+summary := session.NewSummaryManager(
+    session.WithSummaryModel(summaryModel),
+    session.WithSummaryTimeout(45*time.Second),
+)
+
+server, err := agentos.NewServer(&agentos.Config{
+    Address:        ":8080",
+    SummaryManager: summary,
+})
+```
+
+- `POST /api/v1/sessions/{id}/summary`
+  - `async=true` 백그라운드 작업을 예약하고 `202 Accepted` 를 반환합니다.
+  - `async=false` 즉시 실행하여 생성된 요약을 반환합니다.
+- `GET /api/v1/sessions/{id}/summary` 는 최신 스냅샷을 반환하며, 준비 전에는 404 를 반환합니다.
+- `POST /api/v1/sessions/{id}/reuse` 는 에이전트, 팀, 워크플로, 사용자 간에 세션을 공유합니다.
+
+### 히스토리 필터와 실행 메타데이터
+
+- `GET /api/v1/sessions/{id}/history?num_messages=20&stream_events=true` 는 최근 N 개만 반환하며 Python 런타임의 SSE 토글과 동일하게 작동합니다.
+- 세션 응답에는 실행 메타데이터(`runs[*].status`, 타임스탬프, 취소 사유, `cache_hit`)가 포함되어 감사와 캐시 모니터링을 지원합니다.
 
 **지식 엔드포인트 (선택) / Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — 지식 베이스에서 벡터 유사도 검색 / Vector similarity search

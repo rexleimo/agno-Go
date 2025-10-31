@@ -6,6 +6,27 @@ outline: deep
 
 # 版本发布说明
 
+## Version 1.2.6 (2025-10-31)
+
+### ✨ 新增亮点
+- 会话对齐：新增会话复用接口、同步/异步摘要（`GET/POST /sessions/{id}/summary`）、历史分页参数（`num_messages`、`stream_events`）、运行元数据（缓存命中、取消原因、时间戳）。
+- 响应缓存：为 Agent/Team 提供内存 LRU 缓存与可配置的摘要管理器默认值。
+- 媒体附件流水线：Agent/Team/Workflow 全面支持媒体附件，提供校验工具与 `WithMediaPayload` 运行选项。
+- 存储适配器：新增 MongoDB 与 SQLite 会话存储，实现与 Postgres 一致的 JSON 协议。
+- 工具包扩展：Tavily Reader/Search、Claude Agent Skills、Gmail 标记已读、Jira 工时、ElevenLabs 语音、强化文件工具。
+- 文化知识管理器：异步维护组织知识，支持标签筛选。
+
+### 🔧 改进
+- 工作流引擎持久化取消原因、支持 resume-from 检查点，并能处理仅媒体负载。
+- AgentOS 会话 API 开放摘要端点、复用语义与带 SSE 开关的历史分页。
+- MCP 客户端缓存能力清单并转发媒体附件，降低调用延迟。
+
+### 🧪 测试
+- 新增缓存层、摘要管理器、存储驱动、工作流恢复路径与新工具包的覆盖。
+
+### ✅ 兼容性
+- 增量变更，保持向后兼容。
+
 ## Version 1.2.5 (2025-10-20)
 
 ### ✨ 新增

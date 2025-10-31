@@ -415,6 +415,61 @@ loop, _ := workflow.NewLoop(workflow.LoopConfig{
 
 ---
 
+## Advanced Workflow Features
+
+### Resume From Checkpoints
+
+Restart an interrupted workflow from the last successful step:
+
+```go
+execCtx, err := wf.Run(ctx, input, "session-id",
+    workflow.WithResumeFrom("validate-output"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+When `EnableHistory` is set on the workflow config, every run persists step outputs and cancellation records. Passing `WithResumeFrom(stepID)` skips previously completed steps and continues from the target checkpoint.
+
+### Cancellation Persistence
+
+Enable history to capture cancellation reasons, run IDs, and timestamps:
+
+```go
+store := workflow.NewMemoryStorage(100)
+wf, _ := workflow.New(workflow.Config{
+    Name:          "retriable-pipeline",
+    Steps:         []workflow.Node{firstStep, finalStep},
+    EnableHistory: true,
+    HistoryStore:  store,
+})
+```
+
+If a step cancels the context, the latest history entry records the `RunStatusCancelled` status plus `CancellationReason`. You can inspect it via `store.GetSession(ctx, sessionID)`.
+
+### Media Payloads
+
+Attach images, audio, or files to a run without embedding them in the prompt:
+
+```go
+// import "github.com/rexleimo/agno-go/pkg/agno/media"
+attachments := []media.Attachment{
+    {Type: "image", URL: "https://example.com/diagram.png"},
+    {Type: "file",  ID:  "spec-v1", Name: "spec.pdf"},
+}
+
+execCtx, _ := wf.Run(ctx, "review this", "sess-media",
+    workflow.WithMediaPayload(attachments),
+)
+
+payload, _ := execCtx.GetSessionState("media_payload")
+```
+
+The workflow stores the validated attachments in session state (`media_payload`), making them accessible to every step and downstream AgentOS integrations.
+
+---
+
 ## Workflow vs Team
 
 When to use each:

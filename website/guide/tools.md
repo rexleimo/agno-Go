@@ -13,7 +13,12 @@ Tools are functions that agents can call to interact with external systems, perf
 - **Calculator**: Basic math operations
 - **HTTP**: Make web requests
 - **File**: Read/write files with safety controls
-- **Google Sheets** ⭐ NEW: Read/write Google Sheets data (v1.2.1)
+- **Google Sheets** ⭐: Read/write Google Sheets data
+- **Claude Agent Skills** ⭐ NEW (v1.2.6): Call Anthropic Agent Skills via `invoke_claude_skill`
+- **Tavily** ⭐ NEW (v1.2.6): Perform quick answers and reader-mode extractions
+- **Gmail** ⭐ NEW (v1.2.6): Mark messages as read or archive via Gmail API
+- **Jira Worklog** ⭐ NEW (v1.2.6): Summarise and export Jira Cloud worklogs
+- **ElevenLabs Voice** ⭐ NEW (v1.2.6): Generate speech audio clips on demand
 
 ---
 

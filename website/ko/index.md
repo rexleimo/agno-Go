@@ -19,39 +19,39 @@ hero:
 features:
   - icon: 🚀
     title: 극한의 성능
-    details: 에이전트 인스턴스화 약 180ns, Python 버전보다 16배 빠름. 에이전트당 메모리 사용량은 단 1.2KB이며 네이티브 Go 동시성을 지원합니다.
+    details: 에이전트 초기화는 약 180ns, 에이전트당 메모리는 약 1.2KB로 Python 런타임보다 16배 빠릅니다.
 
   - icon: 🤖
-    title: 프로덕션 준비 완료
-    details: AgentOS HTTP 서버는 RESTful API, 세션 관리, 에이전트 레지스트리, 상태 모니터링, 포괄적인 오류 처리를 기본 제공합니다.
+    title: 프로덕션 준비 AgentOS
+    details: OpenAPI 3.0, 세션 스토리지, 헬스 체크, 구조화 로그, CORS, 요청 타임아웃과 함께 요약/재사용/히스토리 필터의 패리티 엔드포인트를 제공합니다.
+
+  - icon: 🪄
+    title: 세션 패리티
+    details: 에이전트·팀 간에 세션을 공유하고 동기/비동기 요약을 실행하며 캐시 적중과 취소 사유를 기록, Python의 `stream_events` 스위치와 동일하게 동작합니다.
 
   - icon: 🧩
     title: 유연한 아키텍처
-    details: Agent(자율형), Team(4가지 협력 모드), Workflow(5가지 제어 프리미티브) 중 선택하여 멀티 에이전트 시스템을 구축하세요.
+    details: 에이전트, 팀(4가지 협업 모드), 워크플로(5가지 제어 프리미티브)를 조합하여 기본값 상속과 체크포인트 재시작으로 결정론적으로 오케스트레이션합니다.
 
   - icon: 🔌
-    title: 다중 모델 지원
-    details: OpenAI(GPT-4), Anthropic Claude, Ollama(로컬 모델), DeepSeek, Google Gemini, ModelScope를 기본 지원합니다.
+    title: 다중 모델 프로바이더
+    details: OpenAI o-series, Anthropic Claude, Google Gemini, DeepSeek, GLM, ModelScope, Ollama, Cohere, Groq, Together, OpenRouter, LM Studio, Vercel, Portkey, InternLM, SambaNova를 지원합니다.
 
   - icon: 🔧
     title: 확장 가능한 도구
-    details: 확장이 쉬운 툴킷 시스템으로 계산기, HTTP 클라이언트, 파일 작업, DuckDuckGo 검색을 기본 제공. 몇 분 만에 커스텀 도구를 만들 수 있습니다.
+    details: 계산기, HTTP, 파일, 검색에 더해 Claude Agent Skills, Tavily Reader/Search, Gmail 읽음 처리, Jira 워크로그, ElevenLabs 음성, PPTX 리더, MCP 커넥터를 제공합니다.
 
   - icon: 💾
-    title: RAG & 지식 베이스
-    details: OpenAI 임베딩을 사용한 ChromaDB 벡터 데이터베이스 통합. 시맨틱 검색과 지식 베이스를 갖춘 지능형 에이전트를 구축하세요.
+    title: 지식과 캐시
+    details: ChromaDB 통합, 배치 유틸리티, 인제스트 도우미와 함께 동일 모델 호출을 중복 제거하는 응답 캐시를 제공합니다.
 
-  - icon: ✅
-    title: 충분한 테스트
-    details: 80.8% 테스트 커버리지, 85개 이상의 테스트 케이스, 100% 통과율. 신뢰할 수 있는 프로덕션 품질의 코드입니다.
+  - icon: 🛡️
+    title: 가드레일과 관측성
+    details: 프롬프트 인젝션 방어, 커스텀 프리/포스트 훅, 미디어 검증, SSE 추론 스트림, Logfire / OpenTelemetry 추적 샘플을 제공합니다.
 
   - icon: 📦
     title: 손쉬운 배포
-    details: Docker, Docker Compose, Kubernetes 매니페스트 포함. 완전한 배포 가이드와 함께 몇 분 안에 모든 클라우드 플랫폼에 배포 가능합니다.
-
-  - icon: 📚
-    title: 완전한 문서
-    details: OpenAPI 3.0 사양, 배포 가이드, 아키텍처 문서, 성능 벤치마크, 모든 기능에 대한 실제 예제를 제공합니다.
+    details: 단일 바이너리 또는 Docker / Compose / Kubernetes 매니페스트와 실전 배포 가이드로 즉시 배포할 수 있습니다.
 ---
 
 ## 빠른 예제

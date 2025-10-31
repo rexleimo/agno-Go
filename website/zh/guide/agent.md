@@ -154,6 +154,27 @@ if err != nil {
 }
 ```
 
+### 响应缓存 (v1.2.6)
+
+启用缓存以复用模型输出、获得可重复的响应:
+
+```go
+ag, _ := agent.New(agent.Config{
+    Model:       model,
+    EnableCache: true,
+    CacheTTL:    2 * time.Minute,
+})
+
+first, _ := ag.Run(ctx, "Summarise REST vs gRPC")
+second, _ := ag.Run(ctx, "Summarise REST vs gRPC")
+
+if cached, _ := second.Metadata["cache_hit"].(bool); cached {
+    // Handle cached response
+}
+```
+
+如需使用 Redis 或共享存储, 可以自定义 `cache.Provider`; 默认情况下使用内存 LRU。
+
 ## Run 输出
 
 `Run` 方法返回 `*RunOutput`:

@@ -13,7 +13,12 @@ Tools 是 Agent 可以调用的函数,用于与外部系统交互、执行计算
 - **Calculator**: 基础数学运算
 - **HTTP**: 发起网络请求
 - **File**: 带安全控制的读写文件
-- **Google Sheets** ⭐ 新增: 读写 Google Sheets 数据 (v1.2.1)
+- **Google Sheets** ⭐ 新增 (v1.2.1): 读写 Google Sheets 数据
+- **Claude Agent Skills** ⭐ 新增 (v1.2.6): 通过 `invoke_claude_skill` 调用 Anthropic Agent Skills
+- **Tavily** ⭐ 新增 (v1.2.6): 快速获取答案与 Reader 模式提取
+- **Gmail** ⭐ 新增 (v1.2.6): 通过 Gmail API 标记邮件已读或归档
+- **Jira Worklog** ⭐ 新增 (v1.2.6): 汇总并导出 Jira Cloud 工时
+- **ElevenLabs Voice** ⭐ 新增 (v1.2.6): 按需生成语音音频片段
 
 ---
 

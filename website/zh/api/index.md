@@ -188,6 +188,18 @@ POST /api/v1/sessions
 
 # 获取会话 / Get session
 GET /api/v1/sessions/{session_id}
+
+# 共享会话（跨智能体/团队）/ Reuse session across agents/teams
+POST /api/v1/sessions/{session_id}/reuse
+
+# 生成同步/异步摘要 / Generate session summary (sync or async)
+POST /api/v1/sessions/{session_id}/summary?async=true|false
+
+# 获取摘要快照 / Fetch session summary snapshot
+GET /api/v1/sessions/{session_id}/summary
+
+# 带筛选的历史查询 (`num_messages`, `stream_events`) / Fetch history with filters
+GET /api/v1/sessions/{session_id}/history
 ```
 
 [完整 AgentOS API →](/api/agentos)

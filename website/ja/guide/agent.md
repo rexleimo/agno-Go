@@ -154,6 +154,27 @@ if err != nil {
 }
 ```
 
+### レスポンスキャッシュ (v1.2.6)
+
+キャッシュを有効化するとモデル出力を再利用でき、決定的なレスポンスを得られます:
+
+```go
+ag, _ := agent.New(agent.Config{
+    Model:       model,
+    EnableCache: true,
+    CacheTTL:    2 * time.Minute,
+})
+
+first, _ := ag.Run(ctx, "Summarise REST vs gRPC")
+second, _ := ag.Run(ctx, "Summarise REST vs gRPC")
+
+if cached, _ := second.Metadata["cache_hit"].(bool); cached {
+    // Handle cached response
+}
+```
+
+共有ストレージや Redis を使う場合は `cache.Provider` を差し替えてください。デフォルトではインメモリ LRU が利用されます。
+
 ## 実行出力
 
 `Run`メソッドは`*RunOutput`を返します:

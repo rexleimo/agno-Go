@@ -154,6 +154,27 @@ if err != nil {
 }
 ```
 
+### 응답 캐시 (v1.2.6)
+
+캐시를 활성화하면 모델 출력을 재사용하여 결정적인 응답을 받을 수 있습니다:
+
+```go
+ag, _ := agent.New(agent.Config{
+    Model:       model,
+    EnableCache: true,
+    CacheTTL:    2 * time.Minute,
+})
+
+first, _ := ag.Run(ctx, "Summarise REST vs gRPC")
+second, _ := ag.Run(ctx, "Summarise REST vs gRPC")
+
+if cached, _ := second.Metadata["cache_hit"].(bool); cached {
+    // Handle cached response
+}
+```
+
+Redis나 공유 저장소를 사용하려면 `cache.Provider` 를 교체하세요. 기본값은 인메모리 LRU입니다.
+
 ## Run 출력
 
 `Run` 메서드는 `*RunOutput`을 반환합니다:

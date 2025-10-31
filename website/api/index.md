@@ -188,6 +188,18 @@ POST /api/v1/sessions
 
 # Get session
 GET /api/v1/sessions/{session_id}
+
+# Reuse session across agents/teams
+POST /api/v1/sessions/{session_id}/reuse
+
+# Generate session summary (sync or async)
+POST /api/v1/sessions/{session_id}/summary?async=true|false
+
+# Fetch session summary snapshot
+GET /api/v1/sessions/{session_id}/summary
+
+# Fetch history with filters (num_messages, stream_events)
+GET /api/v1/sessions/{session_id}/history
 ```
 
 [Full AgentOS API →](/api/agentos)

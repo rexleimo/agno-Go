@@ -6,6 +6,28 @@ outline: deep
 
 # Release Notes
 
+## Version 1.2.6 (2025-10-31)
+
+### ✨ Highlights
+- Session parity: session reuse endpoint, `GET/POST /sessions/{id}/summary` with sync/async modes, history filters (`num_messages`, `stream_events`), and run metadata for cache hits and cancellation reasons.
+- Response caching for agents and teams with in-memory LRU store plus configurable summary manager defaults.
+- Media attachments pipeline for agents, teams, and workflows (`WithMediaPayload`) with validation helpers.
+- Storage adapters for MongoDB and SQLite alongside Postgres, sharing the same JSON contracts.
+- Toolkit expansions: Tavily Reader/Search, Claude Agent Skills, Gmail mark-as-read, Jira worklogs, ElevenLabs speech synthesis, and enhanced file tooling.
+- Culture knowledge manager for curating organisational knowledge asynchronously.
+
+### 🔧 Improvements
+- Workflow engine persists cancellation reasons, supports resume-from checkpoints, and handles media-only payloads.
+- AgentOS session APIs expose summary endpoints, reuse semantics, and history pagination with SSE toggles.
+- MCP client forwards media attachments and caches capability manifests for faster tool execution.
+
+### 🧪 Tests
+- Added coverage for cache layer, summary manager, storage drivers, workflow resumptions, and new toolkits.
+
+### ✅ Compatibility
+- Additive changes; existing APIs remain backward compatible.
+
+
 ## Version 1.2.5 (2025-10-20)
 
 ### ✨ Highlights

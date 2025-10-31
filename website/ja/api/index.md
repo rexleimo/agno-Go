@@ -188,6 +188,18 @@ POST /api/v1/sessions
 
 # セッション取得
 GET /api/v1/sessions/{session_id}
+
+# セッションを共有 (エージェント/チーム間)
+POST /api/v1/sessions/{session_id}/reuse
+
+# サマリー生成 (同期/非同期)
+POST /api/v1/sessions/{session_id}/summary?async=true|false
+
+# サマリースナップショット取得
+GET /api/v1/sessions/{session_id}/summary
+
+# 履歴取得 (num_messages, stream_events フィルター)
+GET /api/v1/sessions/{session_id}/history
 ```
 
 [完全なAgentOS APIドキュメント →](/api/agentos)

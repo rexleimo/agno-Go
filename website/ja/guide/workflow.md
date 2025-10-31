@@ -413,6 +413,60 @@ loop, _ := workflow.NewLoop(workflow.LoopConfig{
 })
 ```
 
+
+## 高度な Workflow 機能
+
+### チェックポイントから再開
+
+中断されたワークフローを最後に成功したステップから再開します:
+
+```go
+execCtx, err := wf.Run(ctx, input, "session-id",
+    workflow.WithResumeFrom("validate-output"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+`EnableHistory` を有効にすると各実行のステップ出力とキャンセル記録が永続化されます。`WithResumeFrom(stepID)` を渡すと、完了済みステップをスキップして指定したチェックポイントから続行します。
+
+### キャンセルの永続化
+
+キャンセル理由や Run ID、タイムスタンプを記録するには履歴を有効化します:
+
+```go
+store := workflow.NewMemoryStorage(100)
+wf, _ := workflow.New(workflow.Config{
+    Name:          "retriable-pipeline",
+    Steps:         []workflow.Node{firstStep, finalStep},
+    EnableHistory: true,
+    HistoryStore:  store,
+})
+```
+
+ステップがコンテキストをキャンセルした場合、最新の履歴エントリには `RunStatusCancelled` と `CancellationReason` が保存されます。`store.GetSession(ctx, sessionID)` で内容を確認できます。
+
+### メディアペイロード
+
+プロンプトへ埋め込まずに画像・音声・ファイルを添付できます:
+
+```go
+// import "github.com/rexleimo/agno-go/pkg/agno/media"
+attachments := []media.Attachment{
+    {Type: "image", URL: "https://example.com/diagram.png"},
+    {Type: "file",  ID:  "spec-v1", Name: "spec.pdf"},
+}
+
+execCtx, _ := wf.Run(ctx, "review this", "sess-media",
+    workflow.WithMediaPayload(attachments),
+)
+
+payload, _ := execCtx.GetSessionState("media_payload")
+```
+
+ワークフローは検証済みの添付ファイルをセッション状態 (`media_payload`) に保存し、後続ステップや AgentOS 連携からアクセスできるようにします。
+
 ---
 
 ## Workflow vs Team

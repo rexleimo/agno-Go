@@ -10,6 +10,7 @@ func NewServer(config *Config) (*Server, error)
 
 type Config struct {
     Address        string           // 服务器地址 (默认: :8080) / Server address (default: :8080)
+    Prefix         string           // API 前缀 (默认: /api/v1) / API prefix (default: /api/v1)
     SessionStorage session.Storage  // 会话存储 (默认: memory) / Session storage (default: memory)
     Logger         *slog.Logger     // 日志记录器 (默认: slog.Default()) / Logger (default: slog.Default())
     Debug          bool             // 调试模式 (默认: false) / Debug mode (default: false)
@@ -22,6 +23,10 @@ type Config struct {
     // 知识库 API（可选）/ Knowledge API (optional)
     VectorDBConfig  *VectorDBConfig  // 向量数据库配置（如 chromadb）/ Vector DB configuration
     EmbeddingConfig *EmbeddingConfig // 嵌入模型配置（如 OpenAI）/ Embedding model configuration
+    KnowledgeAPI    *KnowledgeAPIOptions // 知识端点开关 / Toggle knowledge endpoints
+
+    // 会话摘要（可选）/ Session summaries (optional)
+    SummaryManager *session.SummaryManager // 配置同步/异步摘要 / Configure sync/async summaries
 }
  
 type VectorDBConfig struct {
@@ -102,8 +107,47 @@ server.Shutdown(ctx)
 - `PUT /api/v1/sessions/{id}` - 更新会话 / Update session
 - `DELETE /api/v1/sessions/{id}` - 删除会话 / Delete session
 - `GET /api/v1/sessions` - 列出会话 / List sessions
+- `POST /api/v1/sessions/{id}/reuse` - 共享会话 / Reuse session across agents
+- `GET /api/v1/sessions/{id}/summary` - 获取会话摘要（未准备好返回 404）/ Retrieve session summary (404 until ready)
+- `POST /api/v1/sessions/{id}/summary?async=true|false` - 生成同步/异步摘要 / Generate sync or async summary
+- `GET /api/v1/sessions/{id}/history` - 获取历史记录（`num_messages`、`stream_events`）/ Fetch history with filters
 - `GET /api/v1/agents` - 列出智能体 / List agents
 - `POST /api/v1/agents/{id}/run` - 运行智能体 / Run agent
+
+### 会话摘要与复用 (v1.2.6) / Session Summaries & Reuse (v1.2.6)
+
+配置 `session.SummaryManager` 以启用同步/异步摘要：/ Configure `session.SummaryManager` to enable sync/async summaries:
+
+```go
+// import (
+//     "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+//     "github.com/rexleimo/agno-go/pkg/agno/session"
+// )
+summaryModel, _ := openai.New("gpt-4o-mini", openai.Config{
+    APIKey: os.Getenv("OPENAI_API_KEY"),
+})
+
+summary := session.NewSummaryManager(
+    session.WithSummaryModel(summaryModel),
+    session.WithSummaryTimeout(45*time.Second),
+)
+
+server, err := agentos.NewServer(&agentos.Config{
+    Address:        ":8080",
+    SummaryManager: summary,
+})
+```
+
+- `POST /api/v1/sessions/{id}/summary`
+  - `async=true` 安排后台任务, 返回 `202 Accepted` / schedules a background job and returns `202 Accepted`
+  - `async=false` 同步执行并返回摘要 / runs synchronously and returns the summary
+- `GET /api/v1/sessions/{id}/summary` 返回最新快照（未完成时 404）/ returns the latest snapshot (404 until ready)
+- `POST /api/v1/sessions/{id}/reuse` 在 Agent、Team、Workflow 或不同用户之间共享会话 / shares a session across agents, teams, workflows, or user IDs
+
+### 历史筛选与运行元数据 / History Filters & Run Metadata
+
+- `GET /api/v1/sessions/{id}/history?num_messages=20&stream_events=true` 限定最近 N 条记录并与 Python 的 SSE 开关对齐 / trims the history to the last N entries and mirrors Python SSE toggles.
+- 会话响应包含运行元数据（`runs[*].status`、时间戳、取消原因、`cache_hit`）以便审计与缓存观测 / session responses now include run metadata (`runs[*].status`, timestamps, cancellation reasons, `cache_hit`) for audit trails and cache observability.
 
 **知识库端点（可选） / Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — 在知识库中进行向量相似搜索 / Vector similarity search in knowledge base

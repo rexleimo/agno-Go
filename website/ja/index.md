@@ -19,39 +19,39 @@ hero:
 features:
   - icon: 🚀
     title: 極限のパフォーマンス
-    details: エージェントのインスタンス化は約 180ns、Python 版より 16 倍高速。エージェントあたりのメモリフットプリントはわずか 1.2KB で、Go のネイティブ並行性をサポート。
+    details: エージェント初期化は約 180ns、エージェントあたり約 1.2KB のメモリで、Python ランタイムより 16 倍高速です。
 
   - icon: 🤖
-    title: 本番環境対応
-    details: AgentOS HTTP サーバーは、RESTful API、セッション管理、エージェントレジストリ、ヘルスモニタリング、包括的なエラー処理を標準装備。
+    title: 本番対応 AgentOS
+    details: OpenAPI 3.0、セッションストレージ、ヘルスチェック、構造化ログ、CORS、タイムアウトに加え、要約・再利用・履歴フィルターのパリティエンドポイントを備えています。
+
+  - icon: 🪄
+    title: セッションパリティ
+    details: エージェントやチーム間でセッションを共有し、同期 / 非同期サマリー、キャッシュヒットやキャンセル理由を記録しつつ、Python の `stream_events` スイッチとも互換です。
 
   - icon: 🧩
     title: 柔軟なアーキテクチャ
-    details: Agent(自律型)、Team(4 つの協調モード)、Workflow(5 つの制御プリミティブ)から選択して、マルチエージェントシステムを構築。
+    details: エージェント、チーム（4 つの協調モード）、ワークフロー（5 つの制御プリミティブ）を組み合わせ、継承デフォルトやチェックポイント復帰で決定論的にオーケストレーションします。
 
   - icon: 🔌
-    title: マルチモデル対応
-    details: OpenAI(GPT-4)、Anthropic Claude、Ollama(ローカルモデル)、DeepSeek、Google Gemini、ModelScope を標準サポート。
+    title: マルチプロバイダーモデル
+    details: OpenAI o-series、Anthropic Claude、Google Gemini、DeepSeek、GLM、ModelScope、Ollama、Cohere、Groq、Together、OpenRouter、LM Studio、Vercel、Portkey、InternLM、SambaNova をサポート。
 
   - icon: 🔧
     title: 拡張可能なツール
-    details: 拡張が簡単なツールキットシステムで、計算機、HTTP クライアント、ファイル操作、DuckDuckGo 検索を標準装備。数分でカスタムツールを作成可能。
+    details: 計算機、HTTP、ファイル、検索に加え、Claude Agent Skills、Tavily Reader/Search、Gmail 既読化、Jira Worklog、ElevenLabs 音声、PPTX リーダー、MCP コネクタを搭載。
 
   - icon: 💾
-    title: RAG とナレッジベース
-    details: OpenAI 埋め込みによる ChromaDB ベクトルデータベース統合。セマンティック検索とナレッジベースを備えたインテリジェントエージェントを構築。
+    title: ナレッジとキャッシュ
+    details: ChromaDB 連携、バッチ投入ユーティリティ、インジェスト支援に加え、同一モデル呼び出しを重複排除するレスポンスキャッシュを提供します。
 
-  - icon: ✅
-    title: 十分なテスト
-    details: 80.8% のテストカバレッジ、85 以上のテストケース、100% の合格率。信頼できる本番品質のコード。
+  - icon: 🛡️
+    title: ガードレールと可観測性
+    details: プロンプトインジェクション防御、カスタム前後処理フック、メディア検証、SSE 推論ストリーム、Logfire / OpenTelemetry 連携サンプルを提供します。
 
   - icon: 📦
-    title: 簡単なデプロイ
-    details: Docker、Docker Compose、Kubernetes マニフェストを同梱。完全なデプロイガイド付きで、数分で任意のクラウドプラットフォームにデプロイ可能。
-
-  - icon: 📚
-    title: 完全なドキュメント
-    details: OpenAPI 3.0 仕様、デプロイガイド、アーキテクチャドキュメント、パフォーマンスベンチマーク、すべての機能の実用例。
+    title: シンプルなデプロイ
+    details: 単一バイナリ、Docker / Compose / Kubernetes マニフェスト、実践的なデプロイガイドですぐに導入できます。
 ---
 
 ## クイック例

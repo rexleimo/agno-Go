@@ -13,7 +13,12 @@
 - **Calculator**: 기본 수학 연산
 - **HTTP**: 웹 요청 만들기
 - **File**: 안전 제어를 갖춘 파일 읽기/쓰기
-- **Google Sheets** ⭐ 새로운 기능: Google Sheets 데이터 읽기/쓰기 (v1.2.1)
+- **Google Sheets** ⭐ 신규 (v1.2.1): Google Sheets 데이터 읽기/쓰기
+- **Claude Agent Skills** ⭐ 신규 (v1.2.6): `invoke_claude_skill` 로 Anthropic Agent Skills 호출
+- **Tavily** ⭐ 신규 (v1.2.6): 빠른 Q&A와 리더 모드 추출 제공
+- **Gmail** ⭐ 신규 (v1.2.6): Gmail API로 읽음 처리 및 아카이브
+- **Jira Worklog** ⭐ 신규 (v1.2.6): Jira Cloud 근무 기록 요약 및 내보내기
+- **ElevenLabs Voice** ⭐ 신규 (v1.2.6): 요청 시 음성 오디오 클립 생성
 
 ---
 

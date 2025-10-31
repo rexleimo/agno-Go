@@ -26,6 +26,7 @@ Please avoid duplicating the same content across both locations. Use the tables 
 
 | File | Description |
 | --- | --- |
+| `release/v1.2.6-announcement.md` | Launch article and social copy for the v1.2.6 release. |
 | `release/logfire_observability.md` | How to wire Agno-Go telemetry into Logfire using OpenTelemetry. |
 | `_archive/migration_plan.md` | High-level v2.1.5 migration tracker. |
 
