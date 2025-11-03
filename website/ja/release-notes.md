@@ -6,6 +6,23 @@ outline: deep
 
 # リリースノート
 
+## Version 1.2.7 (2025-11-03)
+
+### ✨ ハイライト
+- Go ネイティブのセッションサービスが Python AgentOS の `/sessions` API を完全に再現し、Postgres ベースの CRUD、Chi ルーター、ヘルスチェックを提供（[ガイド](/ja/guide/session-service)）。
+- あらゆる環境向けのデプロイ資産: 専用 Dockerfile、Postgres 同梱の Docker Compose スタック、Kubernetes 用 Helm チャート。
+- ドキュメントと `test-session-api.sh` スクリプトを更新し、ローカルおよび CI でエンドポイント検証を実施可能に。
+
+### 🔧 改善
+- Postgres ストア実装が型付き DTO とトランザクションセーフな処理を備え、既存の AgentOS スキーマと整合しました。
+- DSN 配線、環境変数、ワークフロースクリプトを解説する新しい構成ガイドで Go セッションランタイムの導入を支援。
+
+### 🧪 テスト
+- Go と Python のレスポンスを比較する契約テスト、および Postgres ストア専用テストを追加。
+
+### ✅ 互換性
+- 追加的な更新で、Go セッションランタイムはオプションとして Python サービスと並行稼働可能です。
+
 ## Version 1.2.6 (2025-10-31)
 
 ### ✨ ハイライト

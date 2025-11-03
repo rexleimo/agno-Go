@@ -33,7 +33,7 @@ export default defineConfig({
           { text: 'Advanced', link: '/advanced/' },
           { text: 'Examples', link: '/examples/' },
           {
-            text: 'v1.2.6',
+            text: 'v1.2.7',
             items: [
               { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: 'Release Notes', link: '/release-notes' }
@@ -61,6 +61,7 @@ export default defineConfig({
                 { text: 'Tools', link: '/guide/tools' },
                 { text: 'Memory', link: '/guide/memory' },
                 { text: 'Session State', link: '/guide/session-state' },
+                { text: 'Session Service', link: '/guide/session-service' },
                 { text: 'MCP Integration', link: '/guide/mcp' }
               ]
             }
@@ -134,7 +135,7 @@ export default defineConfig({
           { text: '进阶', link: '/zh/advanced/' },
           { text: '示例', link: '/zh/examples/' },
           {
-            text: 'v1.2.6',
+            text: 'v1.2.7',
             items: [
               { text: '更新日志', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: '发布说明', link: '/zh/release-notes' }
@@ -162,6 +163,7 @@ export default defineConfig({
                 { text: 'Tools 工具', link: '/zh/guide/tools' },
                 { text: 'Memory 记忆', link: '/zh/guide/memory' },
                 { text: '会话状态', link: '/zh/guide/session-state' },
+                { text: 'Go 会话服务', link: '/zh/guide/session-service' },
                 { text: 'MCP 集成', link: '/zh/guide/mcp' }
               ]
             }
@@ -235,7 +237,7 @@ export default defineConfig({
           { text: '高度な内容', link: '/ja/advanced/' },
           { text: 'サンプル', link: '/ja/examples/' },
           {
-            text: 'v1.2.6',
+            text: 'v1.2.7',
             items: [
               { text: '変更履歴', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: 'リリースノート', link: '/ja/release-notes' }
@@ -263,6 +265,7 @@ export default defineConfig({
                 { text: 'Tools ツール', link: '/ja/guide/tools' },
                 { text: 'Memory メモリ', link: '/ja/guide/memory' },
                 { text: 'セッション状態', link: '/ja/guide/session-state' },
+                { text: 'Go セッションサービス', link: '/ja/guide/session-service' },
                 { text: 'MCP 統合', link: '/ja/guide/mcp' }
               ]
             }
@@ -336,7 +339,7 @@ export default defineConfig({
           { text: '고급', link: '/ko/advanced/' },
           { text: '예제', link: '/ko/examples/' },
           {
-            text: 'v1.2.6',
+            text: 'v1.2.7',
             items: [
               { text: '변경 로그', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: '릴리스 노트', link: '/ko/release-notes' }
@@ -364,6 +367,7 @@ export default defineConfig({
                 { text: 'Tools 도구', link: '/ko/guide/tools' },
                 { text: 'Memory 메모리', link: '/ko/guide/memory' },
                 { text: '세션 상태', link: '/ko/guide/session-state' },
+                { text: 'Go 세션 서비스', link: '/ko/guide/session-service' },
                 { text: 'MCP 통합', link: '/ko/guide/mcp' }
               ]
             }

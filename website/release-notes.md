@@ -6,6 +6,23 @@ outline: deep
 
 # Release Notes
 
+## Version 1.2.7 (2025-11-03)
+
+### ✨ Highlights
+- Go-native session service mirroring the Python AgentOS `/sessions` API with Postgres-backed CRUD, Chi routing, and health endpoints ([guide](/guide/session-service)).
+- Deployment assets across environments: dedicated Dockerfile, Docker Compose stack with Postgres, and a Helm chart for Kubernetes rollouts.
+- Documentation updates and `test-session-api.sh` helper script to validate endpoints locally and in CI.
+
+### 🔧 Improvements
+- Postgres store implementation with typed DTOs and transaction-safe operations aligned with existing AgentOS schemas.
+- Configuration guidance covering DSN wiring, environment variables, and workflow scripts for the new session runtime.
+
+### 🧪 Tests
+- Contract suite comparing Go responses to Python fixtures plus dedicated Postgres store tests.
+
+### ✅ Compatibility
+- Additive update; the Go session runtime is optional and coexists with the Python service.
+
 ## Version 1.2.6 (2025-10-31)
 
 ### ✨ Highlights

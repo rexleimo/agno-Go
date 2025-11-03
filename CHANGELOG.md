@@ -5,6 +5,21 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.7] - 2025-11-03
+
+### ✨ Added
+- Go session service matching the Python AgentOS `/sessions` API, including Chi router, Postgres-backed store, and health endpoints.
+- Deployment assets for the session runtime: dedicated Dockerfile, Compose stack, Helm chart, and curl-based verification script.
+- Documentation for quick start and production deployment of the Go session service.
+
+### 🧪 Tests
+- Contract suite and Postgres store coverage ensuring session parity with existing Python fixtures.
+
+### ✅ Compatibility
+- Additive release; existing APIs remain backward compatible with the Go session runtime as an opt-in component.
+
+---
+
 ## [1.2.6] - 2025-10-31
 
 ### ✨ Added

@@ -6,6 +6,23 @@ outline: deep
 
 # 릴리스 노트
 
+## Version 1.2.7 (2025-11-03)
+
+### ✨ 하이라이트
+- Go 네이티브 세션 서비스가 Python AgentOS `/sessions` API를 그대로 재현하고, Postgres 기반 CRUD, Chi 라우팅, 헬스 체크를 제공합니다([가이드](/ko/guide/session-service)).
+- 전용 Dockerfile, Postgres 포함 Docker Compose 스택, Kubernetes용 Helm 차트 등 모든 환경을 위한 배포 자산을 제공합니다.
+- 문서와 `test-session-api.sh` 스크립트를 갱신해 로컬 및 CI 환경에서 엔드포인트 검증을 수행할 수 있습니다.
+
+### 🔧 개선
+- Postgres 스토어 구현이 타입 안전 DTO와 트랜잭션 세이프 처리를 제공해 기존 AgentOS 스키마와 정합을 유지합니다.
+- DSN 연결, 환경 변수, 워크플로 스크립트를 다루는 새 구성 가이드로 Go 세션 런타임 도입을 지원합니다.
+
+### 🧪 테스트
+- Go와 Python 응답을 비교하는 계약 테스트와 Postgres 스토어 전용 테스트를 추가했습니다.
+
+### ✅ 호환성
+- 증분 업데이트이며 Go 세션 런타임은 선택 사항으로 기존 Python 서비스와 병행 운용할 수 있습니다.
+
 ## Version 1.2.6 (2025-10-31)
 
 ### ✨ 하이라이트

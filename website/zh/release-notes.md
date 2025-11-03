@@ -6,6 +6,23 @@ outline: deep
 
 # 版本发布说明
 
+## Version 1.2.7 (2025-11-03)
+
+### ✨ 亮点
+- Go 原生会话服务，完整复刻 Python AgentOS 的 `/sessions` API，提供基于 Postgres 的 CRUD、Chi 路由和健康检查（[指南](/zh/guide/session-service)）。
+- 全环境部署资产：专用 Dockerfile、集成 Postgres 的 Docker Compose 栈，以及面向 Kubernetes 的 Helm Chart。
+- 更新文档与 `test-session-api.sh` 脚本，可在本地或 CI 环境校验端点。
+
+### 🔧 改进
+- Postgres 存储实现采用强类型 DTO 与事务安全操作，与现有 AgentOS 架构保持一致。
+- 新增配置指南，涵盖 DSN 绑定、环境变量与工作流脚本，帮助上线 Go 会话运行时。
+
+### 🧪 测试
+- 合同测试套件对比 Go 与 Python 的响应，并补充专门的 Postgres 存储测试。
+
+### ✅ 兼容性
+- 增量更新；Go 会话运行时为可选组件，可与 Python 服务并行运行。
+
 ## Version 1.2.6 (2025-10-31)
 
 ### ✨ 新增亮点
