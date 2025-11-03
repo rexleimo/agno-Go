@@ -1,4 +1,4 @@
-.PHONY: help test lint build coverage clean fmt vet
+.PHONY: help test lint build coverage clean fmt vet contract-test
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -16,6 +16,9 @@ coverage: test ## Show test coverage
 lint: ## Run linters
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }
 	golangci-lint run ./...
+
+contract-test: ## Run Go/Python contract comparison tests
+	go test ./internal/session/contract -run Test
 
 fmt: ## Format code
 	gofmt -s -w .

@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1.6
+
+FROM golang:1.23 as builder
+WORKDIR /workspace
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /session-service ./cmd/agentos-session
+
+FROM gcr.io/distroless/base-debian12:nonroot
+ENV AGNO_SERVICE_PORT=8080
+EXPOSE 8080
+
+COPY --from=builder /session-service /session-service
+
+ENTRYPOINT ["/session-service"]

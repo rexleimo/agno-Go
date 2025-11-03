@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agentos
+      POSTGRES_USER: agentos
+      POSTGRES_PASSWORD: agentos
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "agentos"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  session:
+    build:
+      context: .
+      dockerfile: Dockerfile.session
+    environment:
+      AGNO_PG_DSN: postgres://agentos:agentos@postgres:5432/agentos?sslmode=disable
+      AGNO_SERVICE_PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
