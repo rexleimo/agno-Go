@@ -13,12 +13,13 @@ import (
 // MCPToolkit integrates an MCP server as a toolkit for agno agents
 // MCPToolkit 将 MCP 服务器集成为 agno agents 的工具包
 type MCPToolkit struct {
-	*toolkit.BaseToolkit
-	client         *client.Client
-	contentHandler *content.Handler
-	tools          []protocol.Tool
-	includeTools   []string // Optional whitelist
-	excludeTools   []string // Optional blacklist
+    *toolkit.BaseToolkit
+    client         *client.Client
+    contentHandler *content.Handler
+    tools          []protocol.Tool
+    includeTools   []string // Optional whitelist
+    excludeTools   []string // Optional blacklist
+    toolNamePrefix string   // Optional name prefix for registered tools
 }
 
 // Config contains configuration for MCPToolkit
@@ -40,7 +41,11 @@ type Config struct {
 
 	// ExcludeTools is a blacklist of tool names to exclude (optional)
 	// ExcludeTools 是要排除的工具名称黑名单（可选）
-	ExcludeTools []string
+    ExcludeTools []string
+
+    // ToolNamePrefix is an optional prefix added to registered tool names
+    // ToolNamePrefix 是可选的注册工具名前缀
+    ToolNamePrefix string
 }
 
 // New creates a new MCP toolkit with the given configuration.
@@ -78,14 +83,15 @@ func New(ctx context.Context, config Config) (*MCPToolkit, error) {
 		}
 	}
 
-	t := &MCPToolkit{
-		BaseToolkit:    toolkit.NewBaseToolkit(name),
-		client:         config.Client,
-		contentHandler: content.New(),
-		tools:          tools,
-		includeTools:   config.IncludeTools,
-		excludeTools:   config.ExcludeTools,
-	}
+    t := &MCPToolkit{
+        BaseToolkit:    toolkit.NewBaseToolkit(name),
+        client:         config.Client,
+        contentHandler: content.New(),
+        tools:          tools,
+        includeTools:   config.IncludeTools,
+        excludeTools:   config.ExcludeTools,
+        toolNamePrefix: config.ToolNamePrefix,
+    }
 
 	// Register tools as functions
 	// 将工具注册为函数
@@ -117,16 +123,20 @@ func (t *MCPToolkit) registerTools() error {
 		// 创建闭包以捕获工具名称
 		toolName := tool.Name
 
-		// Register function
-		// 注册函数
-		t.RegisterFunction(&toolkit.Function{
-			Name:        tool.Name,
-			Description: tool.Description,
-			Parameters:  params,
-			Handler: func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-				return t.callTool(ctx, toolName, args)
-			},
-		})
+        // Register function (apply optional prefix)
+        // 注册函数（应用可选前缀）
+        regName := tool.Name
+        if p := t.toolNamePrefix; p != "" {
+            regName = p + tool.Name
+        }
+        t.RegisterFunction(&toolkit.Function{
+            Name:        regName,
+            Description: tool.Description,
+            Parameters:  params,
+            Handler: func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+                return t.callTool(ctx, toolName, args)
+            },
+        })
 	}
 
 	return nil

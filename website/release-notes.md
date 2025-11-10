@@ -6,6 +6,35 @@ outline: deep
 
 # Release Notes
 
+## Version 1.2.8 (2025-11-10)
+
+### ✨ Highlights
+- Run Context propagation across hooks, tools, and telemetry with `run_context_id` included in streaming events for trace correlation.
+- Session state persists `AGUI` UI substate and returns it via `GET /sessions/{id}`.
+- Vector indexing:
+  - Pluggable VectorDB providers (Chroma default; Redis optional).
+  - VectorDB migration CLI for idempotent setup (`migrate up/down`).
+- Embeddings: VLLM provider (local/remote) via common interface.
+- MCPTools: optional `tool_name_prefix` to prefix registered tools.
+
+### 🔧 Improvements
+- Redis removed as a default dependency for VectorDB; enabling Redis registers provider without affecting defaults.
+- Team model inheritance propagates only the primary model; auxiliary flags remain agent-scoped unless opted-in.
+
+### 🐛 Fixes
+- Correctly bind model responses to active steps; fix unbound/zero-value histories.
+- Team tool determination aligns with OS schema; preserves member tools.
+- Async DB knowledge filters respect composite predicates and timeouts.
+- Toolkit import errors are structured; no panics on missing modules.
+- AgentOS error responses standardized for consistent contract tests.
+
+### 🧪 Tests
+- Added coverage for Run Context, AGUI persistence, team inheritance, MCP prefixing, and VLLM embeddings.
+- Optional Redis tests gated; skipped when dependency absent.
+
+### ✅ Compatibility
+- Additive update; public APIs unchanged. Optional features are off by default.
+
 ## Version 1.2.7 (2025-11-03)
 
 ### ✨ Highlights

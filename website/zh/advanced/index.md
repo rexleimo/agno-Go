@@ -93,6 +93,20 @@ docker run -p 8080:8080 -e OPENAI_API_KEY=$OPENAI_API_KEY agno-go-agentos
 
 [查看部署指南 →](/zh/advanced/deployment)
 
+### 向量索引
+
+```bash
+# 创建或删除向量集合（默认 Chroma）
+go run ./cmd/vectordb_migrate --action up --provider chroma --collection mycol \
+  --chroma-url http://localhost:8000 --distance cosine
+
+# Redis Provider（可选，需 -tags redis）
+go run -tags redis ./cmd/vectordb_migrate --action up --provider redis \
+  --collection mycol --chroma-url localhost:6379
+```
+
+[查看向量索引 →](/zh/advanced/vector-indexing)
+
 ### 测试覆盖率
 
 各包的当前测试覆盖率:

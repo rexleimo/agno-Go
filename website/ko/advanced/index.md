@@ -93,6 +93,20 @@ docker run -p 8080:8080 -e OPENAI_API_KEY=$OPENAI_API_KEY agno-go-agentos
 
 [배포 가이드 보기 →](/ko/advanced/deployment)
 
+### 벡터 인덱싱
+
+```bash
+# 벡터 컬렉션 생성/삭제 (기본 Chroma)
+go run ./cmd/vectordb_migrate --action up --provider chroma --collection mycol \
+  --chroma-url http://localhost:8000 --distance cosine
+
+# Redis Provider (선택, -tags redis 필요)
+go run -tags redis ./cmd/vectordb_migrate --action up --provider redis \
+  --collection mycol --chroma-url localhost:6379
+```
+
+[벡터 인덱싱 보기 →](/ko/advanced/vector-indexing)
+
 ### 테스트 커버리지
 
 패키지별 현재 테스트 커버리지:

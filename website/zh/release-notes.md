@@ -6,6 +6,35 @@ outline: deep
 
 # 版本发布说明
 
+## Version 1.2.8 (2025-11-10)
+
+### ✨ 亮点
+- Run Context 贯穿执行（hooks → tools → telemetry），流式事件包含 `run_context_id` 便于链路关联。
+- 会话状态持久化 `AGUI` 子态，`GET /sessions/{id}` 可返回 UI 状态。
+- 向量检索：
+  - 可插拔 VectorDB 提供方（Chroma 默认；Redis 可选，不做强依赖）。
+  - VectorDB 迁移 CLI（`migrate up/down`）支持幂等创建/回滚。
+- Embeddings：VLLM 提供方（本地/远端）遵循通用接口。
+- MCPTools：新增可选 `tool_name_prefix`，对注册工具名进行前缀化。
+
+### 🔧 改进
+- 移除 Redis 作为默认向量库依赖；启用时按配置注册，未启用对现有用户零影响。
+- 团队模型继承仅下沉主模型；辅助参数需在 Agent 端显式启用。
+
+### 🐛 修复
+- 模型响应正确绑定到运行步骤，修复历史中“未绑定/零值”。
+- 团队工具判定与 OS Schema 对齐，保留成员工具集合。
+- 异步 DB 知识过滤尊重复合谓词与超时上下文，不泄露 goroutine。
+- 工具包导入缺失模块时返回结构化错误而非 panic。
+- AgentOS 错误响应包络标准化，契约测试更稳定。
+
+### 🧪 测试
+- 覆盖 Run Context、AGUI 持久化、团队主模型继承、MCP 前缀、VLLM 嵌入。
+- 可选依赖（Redis）用例按环境开关执行，默认跳过。
+
+### ✅ 兼容性
+- 增量更新；公共 API 保持不变；可选能力默认关闭。
+
 ## Version 1.2.7 (2025-11-03)
 
 ### ✨ 亮点

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/rexleimo/agno-go/pkg/agno/agent"
 	"github.com/rexleimo/agno-go/pkg/agno/media"
 	"github.com/rexleimo/agno-go/pkg/agno/session"
@@ -152,8 +153,12 @@ func (s *Server) handleAgentRun(c *gin.Context) {
 		}
 	}
 
+	// Run the agent (inject a run-context id for correlation)
+	baseCtx := c.Request.Context()
+	runCtxID := "rc-" + uuid.NewString()
+	runCtx := agent.WithRunContext(baseCtx, runCtxID)
 	// Run the agent
-	output, err := ag.Run(c.Request.Context(), req.Input)
+	output, err := ag.Run(runCtx, req.Input)
 
 	if err != nil {
 		s.logger.Error("agent run failed", "error", err, "agent_id", agentID)
@@ -267,6 +272,10 @@ func (s *Server) streamAgentRun(c *gin.Context, agentID string, ag *agent.Agent,
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
 	defer cancel()
 
+	// Generate a stable run context identifier for correlating events in this stream
+	runCtxID := "rc-" + uuid.NewString()
+	ctx = agent.WithRunContext(ctx, runCtxID)
+
 	startEvent := NewEvent(EventRunStart, RunStartData{
 		Input:     req.Input,
 		SessionID: req.SessionID,
@@ -274,6 +283,7 @@ func (s *Server) streamAgentRun(c *gin.Context, agentID string, ag *agent.Agent,
 	})
 	startEvent.AgentID = agentID
 	startEvent.SessionID = req.SessionID
+	startEvent.RunContextID = runCtxID
 	if filter.ShouldSend(startEvent) {
 		s.sendSSE(c.Writer, startEvent)
 		flusher.Flush()
@@ -314,6 +324,9 @@ func (s *Server) streamAgentRun(c *gin.Context, agentID string, ag *agent.Agent,
 				Error: ctx.Err().Error(),
 				Code:  "CONTEXT_CANCELED",
 			})
+			errorEvent.AgentID = agentID
+			errorEvent.SessionID = req.SessionID
+			errorEvent.RunContextID = runCtxID
 			if filter.ShouldSend(errorEvent) {
 				s.sendSSE(c.Writer, errorEvent)
 				flusher.Flush()
@@ -337,6 +350,9 @@ func (s *Server) streamAgentRun(c *gin.Context, agentID string, ag *agent.Agent,
 					Error: err.Error(),
 					Code:  code,
 				})
+				errorEvent.AgentID = agentID
+				errorEvent.SessionID = req.SessionID
+				errorEvent.RunContextID = runCtxID
 				if filter.ShouldSend(errorEvent) {
 					s.sendSSE(c.Writer, errorEvent)
 					flusher.Flush()
@@ -344,7 +360,7 @@ func (s *Server) streamAgentRun(c *gin.Context, agentID string, ag *agent.Agent,
 			}
 
 			if output != nil {
-				s.emitRunEvents(c.Writer, flusher, filter, agentID, req.SessionID, output, ag)
+				s.emitRunEvents(c.Writer, flusher, filter, agentID, req.SessionID, runCtxID, output, ag)
 			}
 			return
 		}

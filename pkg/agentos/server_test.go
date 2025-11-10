@@ -223,6 +223,51 @@ func TestUpdateSession(t *testing.T) {
 	}
 }
 
+func TestUpdateSession_AGUIStatePersists(t *testing.T) {
+	server, _ := NewServer(nil)
+
+	// Create a session first
+	sess := session.NewSession("agui-session", "agent-x")
+	server.sessionStorage.Create(context.Background(), sess)
+
+	// Update with AGUI substate
+	updateReq := UpdateSessionRequest{
+		State: map[string]interface{}{
+			"agui": map[string]interface{}{
+				"pane":    "history",
+				"filters": []interface{}{"runs", "errors"},
+			},
+		},
+	}
+	body, _ := json.Marshal(updateReq)
+	req, _ := http.NewRequest("PUT", "/api/v1/sessions/agui-session", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	server.router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("unexpected status %d: %s", w.Code, w.Body.String())
+	}
+
+	// Read back
+	getReq, _ := http.NewRequest("GET", "/api/v1/sessions/agui-session", nil)
+	getW := httptest.NewRecorder()
+	server.router.ServeHTTP(getW, getReq)
+	if getW.Code != http.StatusOK {
+		t.Fatalf("unexpected get status %d", getW.Code)
+	}
+	var resp SessionResponse
+	if err := json.Unmarshal(getW.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse get response: %v", err)
+	}
+	agui, ok := resp.State["agui"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected agui substate present, got %#v", resp.State)
+	}
+	if agui["pane"].(string) != "history" {
+		t.Fatalf("unexpected pane: %v", agui["pane"])
+	}
+}
+
 func TestSessionSummaryEndpoints(t *testing.T) {
 	server, _ := NewServer(nil)
 

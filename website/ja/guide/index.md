@@ -112,6 +112,11 @@ Agno-Goは以下に最適です：
 2. [インストール](/guide/installation) - 詳細なセットアップ手順
 3. [コアコンセプト](/guide/agent) - Agent、Team、Workflowについて学ぶ
 
+## クイックリンク
+
+- 埋め込み（Embeddings）：[OpenAI / VLLM の使い方](/ja/guide/embeddings)
+- ベクターインデックス：[Chroma + Redis（オプション）+ マイグレーション CLI](/ja/advanced/vector-indexing)
+
 ## コミュニティ
 
 - **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)

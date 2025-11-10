@@ -112,6 +112,11 @@ Ready to get started?
 2. [Installation](/guide/installation) - Detailed setup instructions
 3. [Core Concepts](/guide/agent) - Learn about Agent, Team, Workflow
 
+## Quick Links
+
+- Embeddings: [OpenAI/VLLM usage](/guide/embeddings)
+- Vector Indexing: [Chroma + Redis (optional) + CLI](/advanced/vector-indexing)
+
 ## Community
 
 - **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)

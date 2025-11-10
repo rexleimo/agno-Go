@@ -112,6 +112,11 @@ Agno-Go는 다음에 완벽합니다:
 2. [Installation](/guide/installation) - 자세한 설정 지침
 3. [Core Concepts](/guide/agent) - Agent, Team, Workflow에 대해 배우기
 
+## 빠른 링크
+
+- 임베딩: [OpenAI/VLLM 사용법](/ko/guide/embeddings)
+- 벡터 인덱싱: [Chroma + Redis(선택) + 마이그레이션 CLI](/ko/advanced/vector-indexing)
+
 ## 커뮤니티
 
 - **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)

@@ -65,9 +65,13 @@ type Event struct {
 	// SessionID is the session ID (optional)
 	SessionID string `json:"session_id,omitempty"`
 
-	// AgentID Agent ID（可选）
-	// AgentID is the agent ID (optional)
-	AgentID string `json:"agent_id,omitempty"`
+    // AgentID Agent ID（可选）
+    // AgentID is the agent ID (optional)
+    AgentID string `json:"agent_id,omitempty"`
+
+    // RunContextID 运行上下文 ID（可选，用于事件关联）
+    // RunContextID is the run context identifier for correlating events (optional)
+    RunContextID string `json:"run_context_id,omitempty"`
 }
 
 // RunStartData 运行开始事件数据

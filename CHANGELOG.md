@@ -5,6 +5,35 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.8] - 2025-11-10
+
+### ✨ Added
+- Run Context 贯穿执行：向 hooks、tools、遥测传递上下文，并在流式事件中提供 `run_context_id` 便于关联。
+- 会话状态扩展：持久化 `AGUI` 子态，`GET /sessions/{id}` 返回包含 UI 状态的 `session_state`。
+- 向量索引能力：
+  - 可插拔 VectorDB 提供方（保持 Chroma 为默认示例，Redis 为可选依赖）。
+  - VectorDB 迁移 CLI（`migrate up/down`）支持集合与索引的幂等创建/回滚。
+- Embeddings：新增 VLLM（本地/远端）提供方，遵循通用 `EmbeddingFunction` 接口。
+- MCPTools：支持可选参数 `tool_name_prefix`，为注册工具名加前缀。
+
+### 🛠️ Changed
+- Redis 从向量数据库默认依赖中剥离，未配置时零影响；启用时按配置注册。
+- 团队模型继承仅下沉主模型配置；辅助参数需在 Agent 端显式开启。
+
+### 🐛 Fixed
+- 修复模型响应未正确绑定到步骤导致的“未绑定/零值”问题。
+- 修复团队场景下基于 OS Schema 的工具判定，避免成员工具丢失。
+- 修复异步存储（知识库）复合过滤与超时上下文配合的边界问题（不泄露 goroutine）。
+- 强化工具包导入时的错误信息，缺失模块返回结构化提示而非 panic。
+- AgentOS 错误处理路径更一致，便于契约测试断言。
+
+### 🧪 Tests
+- 新增覆盖：Run Context 传播、AGUI 状态持久化、团队主模型继承、MCP 前缀、VLLM 嵌入。
+- 可选依赖（Redis）用例按环境开关执行，默认跳过。
+
+### ✅ Compatibility
+- 增量更新；默认关闭的可选能力不影响现有用户；外部 API 形态保持不变。
+
 ## [1.2.7] - 2025-11-03
 
 ### ✨ Added

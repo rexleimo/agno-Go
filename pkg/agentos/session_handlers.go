@@ -73,23 +73,25 @@ type ReuseSessionRequest struct {
 
 // ErrorResponse represents an error response
 type ErrorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message,omitempty"`
-	Code    string `json:"code,omitempty"`
+    Status  string `json:"status,omitempty"`  // "error"
+    Error   string `json:"error"`
+    Message string `json:"message,omitempty"`
+    Code    string `json:"code,omitempty"`
 }
 
 // handleCreateSession creates a new session
 // POST /api/v1/sessions
 func (s *Server) handleCreateSession(c *gin.Context) {
 	var req CreateSessionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "invalid request",
-			Message: err.Error(),
-			Code:    "INVALID_REQUEST",
-		})
-		return
-	}
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, ErrorResponse{
+            Status:  "error",
+            Error:   "invalid request",
+            Message: err.Error(),
+            Code:    "INVALID_REQUEST",
+        })
+        return
+    }
 
 	// Generate session ID
 	sessionID := uuid.New().String()
@@ -106,15 +108,16 @@ func (s *Server) handleCreateSession(c *gin.Context) {
 	}
 
 	// Store session
-	if err := s.sessionStorage.Create(c.Request.Context(), sess); err != nil {
-		s.logger.Error("failed to create session", "error", err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "failed to create session",
-			Message: err.Error(),
-			Code:    "STORAGE_ERROR",
-		})
-		return
-	}
+    if err := s.sessionStorage.Create(c.Request.Context(), sess); err != nil {
+        s.logger.Error("failed to create session", "error", err)
+        c.JSON(http.StatusInternalServerError, ErrorResponse{
+            Status:  "error",
+            Error:   "failed to create session",
+            Message: err.Error(),
+            Code:    "STORAGE_ERROR",
+        })
+        return
+    }
 
 	s.logger.Info("session created", "session_id", sessionID, "agent_id", req.AgentID)
 
@@ -125,31 +128,34 @@ func (s *Server) handleCreateSession(c *gin.Context) {
 // GET /api/v1/sessions/:id
 func (s *Server) handleGetSession(c *gin.Context) {
 	sessionID := c.Param("id")
-	if sessionID == "" {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "session ID is required",
-			Code:  "INVALID_REQUEST",
-		})
-		return
-	}
+    if sessionID == "" {
+        c.JSON(http.StatusBadRequest, ErrorResponse{
+            Status: "error",
+            Error:  "session ID is required",
+            Code:   "INVALID_REQUEST",
+        })
+        return
+    }
 
 	sess, err := s.sessionStorage.Get(c.Request.Context(), sessionID)
-	if err == session.ErrSessionNotFound {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error: "session not found",
-			Code:  "SESSION_NOT_FOUND",
-		})
-		return
-	}
-	if err != nil {
-		s.logger.Error("failed to get session", "error", err, "session_id", sessionID)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "failed to get session",
-			Message: err.Error(),
-			Code:    "STORAGE_ERROR",
-		})
-		return
-	}
+    if err == session.ErrSessionNotFound {
+        c.JSON(http.StatusNotFound, ErrorResponse{
+            Status: "error",
+            Error:  "session not found",
+            Code:   "SESSION_NOT_FOUND",
+        })
+        return
+    }
+    if err != nil {
+        s.logger.Error("failed to get session", "error", err, "session_id", sessionID)
+        c.JSON(http.StatusInternalServerError, ErrorResponse{
+            Status:  "error",
+            Error:   "failed to get session",
+            Message: err.Error(),
+            Code:    "STORAGE_ERROR",
+        })
+        return
+    }
 
 	c.JSON(http.StatusOK, sessionToResponse(sess))
 }
@@ -158,42 +164,46 @@ func (s *Server) handleGetSession(c *gin.Context) {
 // PUT /api/v1/sessions/:id
 func (s *Server) handleUpdateSession(c *gin.Context) {
 	sessionID := c.Param("id")
-	if sessionID == "" {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "session ID is required",
-			Code:  "INVALID_REQUEST",
-		})
-		return
-	}
+    if sessionID == "" {
+        c.JSON(http.StatusBadRequest, ErrorResponse{
+            Status: "error",
+            Error:  "session ID is required",
+            Code:   "INVALID_REQUEST",
+        })
+        return
+    }
 
 	var req UpdateSessionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "invalid request",
-			Message: err.Error(),
-			Code:    "INVALID_REQUEST",
-		})
-		return
-	}
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, ErrorResponse{
+            Status:  "error",
+            Error:   "invalid request",
+            Message: err.Error(),
+            Code:    "INVALID_REQUEST",
+        })
+        return
+    }
 
 	// Get existing session
 	sess, err := s.sessionStorage.Get(c.Request.Context(), sessionID)
-	if err == session.ErrSessionNotFound {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error: "session not found",
-			Code:  "SESSION_NOT_FOUND",
-		})
-		return
-	}
-	if err != nil {
-		s.logger.Error("failed to get session", "error", err, "session_id", sessionID)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "failed to get session",
-			Message: err.Error(),
-			Code:    "STORAGE_ERROR",
-		})
-		return
-	}
+    if err == session.ErrSessionNotFound {
+        c.JSON(http.StatusNotFound, ErrorResponse{
+            Status: "error",
+            Error:  "session not found",
+            Code:   "SESSION_NOT_FOUND",
+        })
+        return
+    }
+    if err != nil {
+        s.logger.Error("failed to get session", "error", err, "session_id", sessionID)
+        c.JSON(http.StatusInternalServerError, ErrorResponse{
+            Status:  "error",
+            Error:   "failed to get session",
+            Message: err.Error(),
+            Code:    "STORAGE_ERROR",
+        })
+        return
+    }
 
 	// Update fields
 	if req.Name != "" {
@@ -207,15 +217,16 @@ func (s *Server) handleUpdateSession(c *gin.Context) {
 	}
 
 	// Save updated session
-	if err := s.sessionStorage.Update(c.Request.Context(), sess); err != nil {
-		s.logger.Error("failed to update session", "error", err, "session_id", sessionID)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "failed to update session",
-			Message: err.Error(),
-			Code:    "STORAGE_ERROR",
-		})
-		return
-	}
+    if err := s.sessionStorage.Update(c.Request.Context(), sess); err != nil {
+        s.logger.Error("failed to update session", "error", err, "session_id", sessionID)
+        c.JSON(http.StatusInternalServerError, ErrorResponse{
+            Status:  "error",
+            Error:   "failed to update session",
+            Message: err.Error(),
+            Code:    "STORAGE_ERROR",
+        })
+        return
+    }
 
 	s.logger.Info("session updated", "session_id", sessionID)
 
@@ -226,31 +237,34 @@ func (s *Server) handleUpdateSession(c *gin.Context) {
 // DELETE /api/v1/sessions/:id
 func (s *Server) handleDeleteSession(c *gin.Context) {
 	sessionID := c.Param("id")
-	if sessionID == "" {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "session ID is required",
-			Code:  "INVALID_REQUEST",
-		})
-		return
-	}
+    if sessionID == "" {
+        c.JSON(http.StatusBadRequest, ErrorResponse{
+            Status: "error",
+            Error:  "session ID is required",
+            Code:   "INVALID_REQUEST",
+        })
+        return
+    }
 
 	err := s.sessionStorage.Delete(c.Request.Context(), sessionID)
-	if err == session.ErrSessionNotFound {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error: "session not found",
-			Code:  "SESSION_NOT_FOUND",
-		})
-		return
-	}
-	if err != nil {
-		s.logger.Error("failed to delete session", "error", err, "session_id", sessionID)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "failed to delete session",
-			Message: err.Error(),
-			Code:    "STORAGE_ERROR",
-		})
-		return
-	}
+    if err == session.ErrSessionNotFound {
+        c.JSON(http.StatusNotFound, ErrorResponse{
+            Status: "error",
+            Error:  "session not found",
+            Code:   "SESSION_NOT_FOUND",
+        })
+        return
+    }
+    if err != nil {
+        s.logger.Error("failed to delete session", "error", err, "session_id", sessionID)
+        c.JSON(http.StatusInternalServerError, ErrorResponse{
+            Status:  "error",
+            Error:   "failed to delete session",
+            Message: err.Error(),
+            Code:    "STORAGE_ERROR",
+        })
+        return
+    }
 
 	s.logger.Info("session deleted", "session_id", sessionID)
 
@@ -304,13 +318,14 @@ func (s *Server) handleListSessions(c *gin.Context) {
 // handleGetSessionSummary returns the stored summary for a session.
 func (s *Server) handleGetSessionSummary(c *gin.Context) {
 	sessionID := c.Param("id")
-	if sessionID == "" {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "session ID is required",
-			Code:  "INVALID_REQUEST",
-		})
-		return
-	}
+    if sessionID == "" {
+        c.JSON(http.StatusBadRequest, ErrorResponse{
+            Status: "error",
+            Error:  "session ID is required",
+            Code:   "INVALID_REQUEST",
+        })
+        return
+    }
 
 	sess, err := s.sessionStorage.Get(c.Request.Context(), sessionID)
 	if err == session.ErrSessionNotFound {
@@ -489,22 +504,24 @@ func (s *Server) handleSessionHistory(c *gin.Context) {
 	}
 
 	sess, err := s.sessionStorage.Get(c.Request.Context(), sessionID)
-	if err == session.ErrSessionNotFound {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error: "session not found",
-			Code:  "SESSION_NOT_FOUND",
-		})
-		return
-	}
-	if err != nil {
-		s.logger.Error("failed to get session history", "error", err, "session_id", sessionID)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "failed to get session",
-			Message: err.Error(),
-			Code:    "STORAGE_ERROR",
-		})
-		return
-	}
+    if err == session.ErrSessionNotFound {
+        c.JSON(http.StatusNotFound, ErrorResponse{
+            Status: "error",
+            Error:  "session not found",
+            Code:   "SESSION_NOT_FOUND",
+        })
+        return
+    }
+    if err != nil {
+        s.logger.Error("failed to get session history", "error", err, "session_id", sessionID)
+        c.JSON(http.StatusInternalServerError, ErrorResponse{
+            Status:  "error",
+            Error:   "failed to get session",
+            Message: err.Error(),
+            Code:    "STORAGE_ERROR",
+        })
+        return
+    }
 
 	messages := cloneMessages(sess)
 	if limit := parseIntQuery(c, "num_messages"); limit > 0 && len(messages) > limit {

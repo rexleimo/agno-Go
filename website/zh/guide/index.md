@@ -112,6 +112,11 @@ Agno-Go 非常适合:
 2. [Installation](/guide/installation) - 详细的设置说明
 3. [Core Concepts](/guide/agent) - 了解 Agent、Team、Workflow
 
+## 快速入口
+
+- 嵌入（Embeddings）：[OpenAI/VLLM 使用](/zh/guide/embeddings)
+- 向量索引：[Chroma + Redis（可选）+ 迁移 CLI](/zh/advanced/vector-indexing)
+
 ## 社区
 
 - **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)

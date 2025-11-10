@@ -33,7 +33,7 @@ export default defineConfig({
           { text: 'Advanced', link: '/advanced/' },
           { text: 'Examples', link: '/examples/' },
           {
-            text: 'v1.2.7',
+            text: 'v1.2.8',
             items: [
               { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: 'Release Notes', link: '/release-notes' }
@@ -58,6 +58,7 @@ export default defineConfig({
                 { text: 'Workflow', link: '/guide/workflow' },
                 { text: 'Workflow History', link: '/guide/workflow-history' },
                 { text: 'Models', link: '/guide/models' },
+                { text: 'Embeddings', link: '/guide/embeddings' },
                 { text: 'Tools', link: '/guide/tools' },
                 { text: 'Memory', link: '/guide/memory' },
                 { text: 'Session State', link: '/guide/session-state' },
@@ -92,6 +93,8 @@ export default defineConfig({
                 { text: 'Performance', link: '/advanced/performance' },
                 { text: 'Deployment', link: '/advanced/deployment' },
                 { text: 'Testing', link: '/advanced/testing' },
+                { text: 'Run Context', link: '/advanced/run-context' },
+                { text: 'Vector Indexing', link: '/advanced/vector-indexing' },
                 { text: 'Observability', link: '/advanced/observability' },
                 { text: 'Multi-Tenant', link: '/advanced/multi-tenant' }
               ]
@@ -135,7 +138,7 @@ export default defineConfig({
           { text: '进阶', link: '/zh/advanced/' },
           { text: '示例', link: '/zh/examples/' },
           {
-            text: 'v1.2.7',
+            text: 'v1.2.8',
             items: [
               { text: '更新日志', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: '发布说明', link: '/zh/release-notes' }
@@ -160,6 +163,7 @@ export default defineConfig({
                 { text: 'Workflow 工作流', link: '/zh/guide/workflow' },
                 { text: 'Workflow 历史管理', link: '/zh/guide/workflow-history' },
                 { text: 'Models 模型', link: '/zh/guide/models' },
+                { text: 'Embeddings 嵌入', link: '/zh/guide/embeddings' },
                 { text: 'Tools 工具', link: '/zh/guide/tools' },
                 { text: 'Memory 记忆', link: '/zh/guide/memory' },
                 { text: '会话状态', link: '/zh/guide/session-state' },
@@ -194,6 +198,8 @@ export default defineConfig({
                 { text: '性能', link: '/zh/advanced/performance' },
                 { text: '部署', link: '/zh/advanced/deployment' },
                 { text: '测试', link: '/zh/advanced/testing' },
+                { text: '运行上下文', link: '/zh/advanced/run-context' },
+                { text: '向量索引', link: '/zh/advanced/vector-indexing' },
                 { text: '可观测性', link: '/zh/advanced/observability' },
                 { text: '多租户', link: '/zh/advanced/multi-tenant' }
               ]
@@ -237,7 +243,7 @@ export default defineConfig({
           { text: '高度な内容', link: '/ja/advanced/' },
           { text: 'サンプル', link: '/ja/examples/' },
           {
-            text: 'v1.2.7',
+            text: 'v1.2.8',
             items: [
               { text: '変更履歴', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: 'リリースノート', link: '/ja/release-notes' }
@@ -262,6 +268,7 @@ export default defineConfig({
                 { text: 'Workflow ワークフロー', link: '/ja/guide/workflow' },
                 { text: 'Workflow 履歴管理', link: '/ja/guide/workflow-history' },
                 { text: 'Models モデル', link: '/ja/guide/models' },
+                { text: 'Embeddings 埋め込み', link: '/ja/guide/embeddings' },
                 { text: 'Tools ツール', link: '/ja/guide/tools' },
                 { text: 'Memory メモリ', link: '/ja/guide/memory' },
                 { text: 'セッション状態', link: '/ja/guide/session-state' },
@@ -296,6 +303,8 @@ export default defineConfig({
                 { text: 'パフォーマンス', link: '/ja/advanced/performance' },
                 { text: 'デプロイ', link: '/ja/advanced/deployment' },
                 { text: 'テスト', link: '/ja/advanced/testing' },
+                { text: '実行コンテキスト', link: '/ja/advanced/run-context' },
+                { text: 'ベクターインデックス', link: '/ja/advanced/vector-indexing' },
                 { text: '可観測性', link: '/ja/advanced/observability' },
                 { text: 'マルチテナント', link: '/ja/advanced/multi-tenant' }
               ]
@@ -339,7 +348,7 @@ export default defineConfig({
           { text: '고급', link: '/ko/advanced/' },
           { text: '예제', link: '/ko/examples/' },
           {
-            text: 'v1.2.7',
+            text: 'v1.2.8',
             items: [
               { text: '변경 로그', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
               { text: '릴리스 노트', link: '/ko/release-notes' }
@@ -364,6 +373,7 @@ export default defineConfig({
                 { text: 'Workflow 워크플로우', link: '/ko/guide/workflow' },
                 { text: 'Workflow 히스토리 관리', link: '/ko/guide/workflow-history' },
                 { text: 'Models 모델', link: '/ko/guide/models' },
+                { text: '임베딩', link: '/ko/guide/embeddings' },
                 { text: 'Tools 도구', link: '/ko/guide/tools' },
                 { text: 'Memory 메모리', link: '/ko/guide/memory' },
                 { text: '세션 상태', link: '/ko/guide/session-state' },
@@ -398,6 +408,8 @@ export default defineConfig({
                 { text: '성능', link: '/ko/advanced/performance' },
                 { text: '배포', link: '/ko/advanced/deployment' },
                 { text: '테스트', link: '/ko/advanced/testing' },
+                { text: '실행 컨텍스트', link: '/ko/advanced/run-context' },
+                { text: '벡터 인덱싱', link: '/ko/advanced/vector-indexing' },
                 { text: '관측성', link: '/ko/advanced/observability' },
                 { text: '멀티 테넌트', link: '/ko/advanced/multi-tenant' }
               ]
@@ -440,7 +452,7 @@ export default defineConfig({
       { text: 'Advanced', link: '/advanced/' },
       { text: 'Examples', link: '/examples/' },
       {
-        text: 'v1.2.6',
+        text: 'v1.2.8',
         items: [
           { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
           { text: 'Release Notes', link: '/release-notes' }
@@ -466,6 +478,7 @@ export default defineConfig({
             { text: 'Workflow', link: '/guide/workflow' },
             { text: 'Workflow History', link: '/guide/workflow-history' },
             { text: 'Models', link: '/guide/models' },
+            { text: 'Embeddings', link: '/guide/embeddings' },
             { text: 'Tools', link: '/guide/tools' },
             { text: 'Memory', link: '/guide/memory' },
             { text: 'Session State', link: '/guide/session-state' },
@@ -499,6 +512,8 @@ export default defineConfig({
             { text: 'Performance', link: '/advanced/performance' },
             { text: 'Deployment', link: '/advanced/deployment' },
             { text: 'Testing', link: '/advanced/testing' },
+            { text: 'Run Context', link: '/advanced/run-context' },
+            { text: 'Vector Indexing', link: '/advanced/vector-indexing' },
             { text: 'Multi-Tenant', link: '/advanced/multi-tenant' }
           ]
         }

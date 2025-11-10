@@ -65,6 +65,20 @@ Comprehensive testing approaches for multi-agent systems:
 
 ## Quick Links
 
+### Vector Indexing
+
+```bash
+# Create or drop vector collections (Chroma by default)
+go run ./cmd/vectordb_migrate --action up --provider chroma --collection mycol \
+  --chroma-url http://localhost:8000 --distance cosine
+
+# Redis provider (optional; build with tag)
+go run -tags redis ./cmd/vectordb_migrate --action up --provider redis \
+  --collection mycol --chroma-url localhost:6379
+```
+
+[See release notes →](/release-notes#version-128-2025-11-10)
+
 ### Performance Benchmarks
 
 ```bash
