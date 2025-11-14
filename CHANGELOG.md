@@ -5,6 +5,26 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.9] - 2025-11-14
+
+### ✨ Added
+- EvoLink provider for text, images, and video exposed under `pkg/agno/providers/evolink` and `pkg/agno/models/evolink/*`, enabling agents and workflows to call EvoLink via the standard model interfaces.
+- New EvoLink Media Agents documentation (`website/examples/evolink-media-agents.md`, `website/zh/examples/evolink-media-agents.md`) with end-to-end examples for text → image → video pipelines.
+- Knowledge upload chunking: `POST /api/v1/knowledge/content` now accepts `chunk_size` and `chunk_overlap` for JSON, `text/plain` (query params), and multipart form uploads, propagating these values into stored chunk metadata.
+- AgentOS HTTP tips surfaced in docs, covering custom health endpoints, `/openapi.yaml` and `/docs` routes, and `server.Resync()` usage.
+
+### 🛠️ Changed
+- Knowledge API handlers persist `chunk_size`, `chunk_overlap`, and `chunker_type` for each stored chunk, mirroring the Python AgentOS responses and enabling downstream pipelines to inspect segmentation strategy.
+- AgentOS documentation is now the canonical source for configuring health probes and documentation routes for the Go server, aligning README and VitePress content.
+
+### 🧪 Tests
+- Added focused tests for EvoLink image and video models to validate configuration boundaries and task polling behavior.
+- Extended knowledge API tests to cover chunking parameters, metadata propagation, and compatibility with existing search/config endpoints.
+
+### ✅ Compatibility
+- Additive release; public HTTP and Go APIs remain backward compatible.
+- Knowledge chunking parameters are optional and default to previous behavior when omitted.
+
 ## [1.2.8] - 2025-11-10
 
 ### ✨ Added

@@ -6,6 +6,21 @@ outline: deep
 
 # 版本发布说明
 
+## Version 1.2.9 (2025-11-14)
+
+### ✨ 亮点
+- **EvoLink 媒体 Provider**：在 `pkg/agno/providers/evolink` 与 `pkg/agno/models/evolink/*` 下提供文本、图片、视频模型，支持异步任务轮询与类型安全参数。
+- **EvoLink 媒体智能体示例**：新增 `website/examples/evolink-media-agents.md` 与 `website/zh/examples/evolink-media-agents.md`，演示如何在工作流中串联文本 → 图片 → 视频。
+- **知识上传分块（chunking）**：`POST /api/v1/knowledge/content` 支持 `chunk_size` 与 `chunk_overlap`，可用于 JSON、`text/plain`（query 参数）与 multipart 表单；每个分块会记录 `chunk_size`、`chunk_overlap` 与 `chunker_type` 元数据，对齐 Python AgentOS。
+- **AgentOS HTTP 提示**：文档补充如何自定义健康检查路径、使用 `/openapi.yaml` 与 `/docs`，以及在重挂载路由后调用 `server.Resync()` 的最佳实践。
+
+### 📚 文档
+- 更新 `website/api/agentos.md` 及本地化版本，在 Knowledge 章节中补充分块参数与示例，并在最佳实践中加入 AgentOS HTTP 提示。
+- EvoLink 示例页集中说明所需环境变量、模型表与合规注意事项（HTTPS 回调、审核策略等）。
+
+### ✅ 兼容性
+- 增量版本，无破坏性变更；`chunk_size` / `chunk_overlap` 为可选参数，缺省行为与之前一致。
+
 ## Version 1.2.8 (2025-11-10)
 
 ### ✨ 亮点

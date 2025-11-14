@@ -152,7 +152,19 @@ server, err := agentos.NewServer(&agentos.Config{
 **知识库端点（可选） / Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — 在知识库中进行向量相似搜索 / Vector similarity search in knowledge base
 - `GET  /api/v1/knowledge/config` — 返回可用分块器、向量库与嵌入模型信息 / Available chunkers, VectorDBs, embedding model info
-- `POST /api/v1/knowledge/content` — 最小入库（text/plain 或 application/json）
+- `POST /api/v1/knowledge/content` — 支持可配置分块的最小入库（`chunk_size` 与 `chunk_overlap`，text/plain 或 application/json）/ Minimal ingestion with configurable chunking (`chunk_size`, `chunk_overlap`).
+
+`POST /api/v1/knowledge/content` 现在支持 `chunk_size` 与 `chunk_overlap`，在 JSON 与 multipart 上传中均可使用。对于 `text/plain` 请求，可以使用查询参数传递；在流式文件上传时，可以通过表单字段（如 `chunk_size=2000&chunk_overlap=250`）传递。两个参数会写入 reader 元数据，以便下游管道了解文档是如何被切分的。 / `POST /api/v1/knowledge/content` now accepts `chunk_size` and `chunk_overlap` in both JSON and multipart uploads. Provide them as query parameters for `text/plain` requests or as form fields (`chunk_size=2000&chunk_overlap=250`) when streaming files. Both values propagate into the reader metadata so downstream pipelines can inspect how documents were segmented.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/knowledge/content \
+  -F file=@docs/guide.md \
+  -F chunk_size=1800 \
+  -F chunk_overlap=200 \
+  -F metadata='{"source_url":"https://example.com/guide"}'
+```
+
+每个存储的分块都会记录 `chunk_size`、`chunk_overlap` 与 `chunker_type`，并与 AgentOS Python 响应保持一致。 / Each stored chunk records `chunk_size`, `chunk_overlap`, and the `chunker_type` used—mirroring the AgentOS Python responses.
 
 示例请求 / Example:
 ```bash
@@ -227,4 +239,16 @@ mem := memory.NewInMemory(50)
 server, _ := agentos.NewServer(&agentos.Config{
     RequestTimeout: 60 * time.Second, // 用于复杂智能体 / For complex agents
 })
+```
+
+### 5. AgentOS HTTP 提示 / AgentOS HTTP Tips
+
+- 通过 `Config.HealthPath` 或 `server.GetHealthRouter("/health-check").GET("", customHandler)` 覆盖默认的 `GET /health` 路径, 以匹配生产探针 / Override the default `GET /health` path via `Config.HealthPath` or by attaching your own handlers with `server.GetHealthRouter("/health-check").GET("", customHandler)` so it matches production probes.
+- `/openapi.yaml` 始终提供当前的 OpenAPI 文档, `/docs` 暴露内置的 Swagger UI。热更新路由或挂载自定义处理器后, 需要调用 `server.Resync()` 以重新挂载文档路由。 / `/openapi.yaml` always serves the current OpenAPI document and `/docs` hosts a self-contained Swagger UI bundle. Call `server.Resync()` after hot-swapping routers to remount the documentation routes.
+
+探针示例 / Sample probes:
+
+```bash
+curl http://localhost:8080/health-check
+curl http://localhost:8080/openapi.yaml | head -n 5
 ```

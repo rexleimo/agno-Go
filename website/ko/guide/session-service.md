@@ -77,7 +77,7 @@ docker compose -f docker-compose.session.yml up --build
 ```bash
 helm upgrade --install agno-session ./deploy/helm/agno-session \
   --set image.repository=ghcr.io/<org>/agno-session \
-  --set image.tag=v1.2.7 \
+  --set image.tag=v1.2.9 \
   --set config.dsn="postgres://user:pass@postgres:5432/agentos?sslmode=disable"
 ```
 

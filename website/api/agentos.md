@@ -152,7 +152,24 @@ server, err := agentos.NewServer(&agentos.Config{
 **Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — Vector similarity search in knowledge base
 - `GET  /api/v1/knowledge/config` — Available chunkers, VectorDBs, and embedding model info
-- `POST /api/v1/knowledge/content` — Minimal ingestion (text/plain or application/json)
+- `POST /api/v1/knowledge/content` — Knowledge ingestion with configurable chunking (`chunk_size`, `chunk_overlap`).
+
+`POST /api/v1/knowledge/content` accepts `chunk_size` and `chunk_overlap`
+in both JSON and multipart uploads. Provide them as query parameters for
+`text/plain` requests or as form fields (`chunk_size=2000&chunk_overlap=250`) when
+streaming files. Both values propagate into the reader metadata so downstream
+pipelines can inspect how documents were segmented.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/knowledge/content \
+  -F file=@docs/guide.md \
+  -F chunk_size=1800 \
+  -F chunk_overlap=200 \
+  -F metadata='{"source_url":"https://example.com/guide"}'
+```
+
+Each stored chunk records `chunk_size`, `chunk_overlap`, and the
+`chunker_type` used—mirroring the AgentOS Python responses.
 
 Example request:
 ```bash
@@ -227,4 +244,19 @@ mem := memory.NewInMemory(50)
 server, _ := agentos.NewServer(&agentos.Config{
     RequestTimeout: 60 * time.Second, // For complex agents
 })
+```
+
+### 5. AgentOS HTTP Tips
+
+- Override the default `GET /health` path via `Config.HealthPath` or attach your
+  own handlers with `server.GetHealthRouter("/health-check").GET("", customHandler)`.
+- `/openapi.yaml` always serves the current OpenAPI document and `/docs` hosts a
+  self-contained Swagger UI bundle. Call `server.Resync()` after hot-swapping
+  routers to remount the documentation routes.
+
+Sample probes:
+
+```bash
+curl http://localhost:8080/health-check
+curl http://localhost:8080/openapi.yaml | head -n 5
 ```

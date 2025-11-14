@@ -152,7 +152,19 @@ server, err := agentos.NewServer(&agentos.Config{
 **知識エンドポイント（オプション） / Knowledge Endpoints (optional):**
 - `POST /api/v1/knowledge/search` — ナレッジベースでベクトル類似検索 / Vector similarity search
 - `GET  /api/v1/knowledge/config` — 利用可能なチャンクャー、VectorDB、埋め込みモデル情報 / Available chunkers, VectorDBs, embedding model
-- `POST /api/v1/knowledge/content` — 最小取り込み（text/plain または application/json）
+- `POST /api/v1/knowledge/content` — チャンクサイズを指定できる最小取り込み（`chunk_size` と `chunk_overlap`、text/plain または application/json）/ Minimal ingestion with configurable chunking (`chunk_size`, `chunk_overlap`).
+
+`POST /api/v1/knowledge/content` は JSON と multipart アップロードの両方で `chunk_size` と `chunk_overlap` を受け付けます。`text/plain` リクエストではクエリパラメータで指定し、ファイルをストリーミングする場合はフォームフィールド（例: `chunk_size=2000&chunk_overlap=250`）として渡します。これらの値は reader メタデータに保存され、下流のパイプラインが文書の分割方法を確認できます。 / `POST /api/v1/knowledge/content` accepts `chunk_size` and `chunk_overlap` in both JSON and multipart uploads. Provide them as query parameters for `text/plain` requests or as form fields (`chunk_size=2000&chunk_overlap=250`) when streaming files. Both values propagate into the reader metadata so downstream pipelines can inspect how documents were segmented.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/knowledge/content \
+  -F file=@docs/guide.md \
+  -F chunk_size=1800 \
+  -F chunk_overlap=200 \
+  -F metadata='{"source_url":"https://example.com/guide"}'
+```
+
+各チャンクには `chunk_size`、`chunk_overlap`、使用された `chunker_type` が記録され、Python 版 AgentOS のレスポンスと揃います。 / Each stored chunk records `chunk_size`, `chunk_overlap`, and the `chunker_type` used—mirroring the AgentOS Python responses.
 
 リクエスト例 / Example:
 ```bash
