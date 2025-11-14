@@ -1,6 +1,9 @@
 package workflow
 
-import "github.com/rexleimo/agno-go/pkg/agno/media"
+import (
+	"github.com/rexleimo/agno-go/pkg/agno/media"
+	"github.com/rexleimo/agno-go/pkg/agno/run"
+)
 
 // RunOption configures workflow run behaviour.
 type RunOption func(*runOptions)
@@ -12,6 +15,7 @@ type runOptions struct {
 	mediaPayload   []media.Attachment
 	metadata       map[string]interface{}
 	mediaError     error
+	runContext     *run.RunContext
 }
 
 // WithUserID sets the user ID for the workflow execution context.
@@ -59,6 +63,17 @@ func WithMetadata(metadata map[string]interface{}) RunOption {
 		for k, v := range metadata {
 			o.metadata[k] = v
 		}
+	}
+}
+
+// WithRunContext injects a caller-provided run context, allowing workflows to
+// reuse correlation identifiers from upstream orchestrators.
+func WithRunContext(rc *run.RunContext) RunOption {
+	return func(o *runOptions) {
+		if rc == nil {
+			return
+		}
+		o.runContext = rc.Clone()
 	}
 }
 

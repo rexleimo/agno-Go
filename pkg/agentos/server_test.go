@@ -82,8 +82,73 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
 
-	if response["status"] != "healthy" {
-		t.Errorf("Status = %v, want 'healthy'", response["status"])
+	if response["status"] != "ok" {
+		t.Errorf("Status = %v, want 'ok'", response["status"])
+	}
+	if _, ok := response["instantiated_at"]; !ok {
+		t.Fatal("expected instantiated_at in payload")
+	}
+}
+
+func TestHealthEndpoint_CustomPath(t *testing.T) {
+	server, _ := NewServer(&Config{HealthPath: "/health-check"})
+	req, _ := http.NewRequest("GET", "/health-check", nil)
+	w := httptest.NewRecorder()
+	server.router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected custom health path to return 200, got %d", w.Code)
+	}
+}
+
+func TestCustomHealthRouter(t *testing.T) {
+	server, _ := NewServer(nil)
+	group := server.GetHealthRouter("/health-check")
+	if group == nil {
+		t.Fatal("expected health router group")
+	}
+	group.GET("", server.handleHealth)
+
+	req, _ := http.NewRequest("GET", "/health-check", nil)
+	w := httptest.NewRecorder()
+	server.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestDocsEndpoints(t *testing.T) {
+	server, _ := NewServer(nil)
+
+	reqSpec, _ := http.NewRequest("GET", "/openapi.yaml", nil)
+	wSpec := httptest.NewRecorder()
+	server.router.ServeHTTP(wSpec, reqSpec)
+	if wSpec.Code != http.StatusOK {
+		t.Fatalf("expected openapi 200, got %d", wSpec.Code)
+	}
+	if !strings.Contains(wSpec.Body.String(), "openapi") {
+		t.Fatal("openapi spec missing content")
+	}
+
+	reqDocs, _ := http.NewRequest("GET", "/docs", nil)
+	wDocs := httptest.NewRecorder()
+	server.router.ServeHTTP(wDocs, reqDocs)
+	if wDocs.Code != http.StatusOK {
+		t.Fatalf("expected docs 200, got %d", wDocs.Code)
+	}
+	if !strings.Contains(wDocs.Body.String(), "SwaggerUIBundle") {
+		t.Fatal("docs html not rendered")
+	}
+}
+
+func TestResyncRegistersDocs(t *testing.T) {
+	server, _ := NewServer(nil)
+	server.Resync()
+	req, _ := http.NewRequest("GET", "/docs", nil)
+	w := httptest.NewRecorder()
+	server.router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected docs to remain registered after resync")
 	}
 }
 

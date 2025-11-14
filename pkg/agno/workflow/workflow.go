@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rexleimo/agno-go/pkg/agno/run"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
@@ -125,11 +126,32 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 		sessionID = generateSessionID()
 	}
 
+	runCtx := options.runContext
+	if runCtx == nil {
+		if existing, ok := run.FromContext(ctx); ok && existing != nil {
+			runCtx = existing.Clone()
+		}
+	}
+	if runCtx == nil {
+		runCtx = run.NewContext()
+	}
+	if runCtx.SessionID == "" {
+		runCtx.SessionID = sessionID
+	} else {
+		sessionID = runCtx.SessionID
+	}
+	runCtx.EnsureRunID()
+	ctx = run.WithContext(ctx, runCtx)
+
 	w.logger.Info("workflow started",
 		"workflow_id", w.ID,
 		"session_id", sessionID,
 		"steps", len(w.Steps),
 		"resume_from", options.resumeFromStep)
+
+	metrics := NewWorkflowMetrics()
+	metrics.Start()
+	defer metrics.Stop()
 
 	execCtx := NewExecutionContextWithSession(input, sessionID, options.userID)
 	execCtx.ApplySessionState(options.sessionState)
@@ -194,7 +216,8 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 				// Create a new context with timeout for persistence operations
 				// as the original context is cancelled
 				persistCtx, persistCancel := context.WithTimeout(context.Background(), 5*time.Second)
-				w.saveRun(persistCtx, sessionID, workflowRun)
+				metrics.Stop()
+				w.saveRun(persistCtx, sessionID, workflowRun, metrics)
 				w.saveCancellation(persistCtx, sessionID, &CancellationRecord{
 					RunID:      workflowRun.RunID,
 					Reason:     reason.Error(),
@@ -229,21 +252,31 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 			if workflowRun != nil {
 				workflowRun.LastStepID = currentStepID
 				workflowRun.MarkFailed(err)
-				w.saveRun(ctx, sessionID, workflowRun)
+				metrics.Stop()
+				w.saveRun(ctx, sessionID, workflowRun, metrics)
 			}
 
 			return nil, types.NewError(types.ErrCodeUnknown, fmt.Sprintf("step %s failed", currentStepID), err)
 		}
 
 		execCtx = result
+		if workflowRun != nil {
+			if events := extractStepEvents(execCtx, currentStepID); len(events) > 0 {
+				workflowRun.AddEvents(events)
+			}
+		}
 	}
 
 	if workflowRun != nil {
 		workflowRun.MarkCompleted(execCtx.Output)
 		workflowRun.LastStepID = lastStepID
 		workflowRun.Messages = extractMessages(execCtx)
-		w.saveRun(ctx, sessionID, workflowRun)
+		metrics.Stop()
+		w.saveRun(ctx, sessionID, workflowRun, metrics)
 	}
+
+	metrics.Stop()
+	recordWorkflowMetrics(execCtx, metrics)
 
 	w.logger.Info("workflow completed",
 		"workflow_id", w.ID,
@@ -321,7 +354,7 @@ func (w *Workflow) loadHistory(ctx context.Context, execCtx *ExecutionContext) e
 
 // saveRun 保存运行记录到存储
 // saveRun saves run record to storage
-func (w *Workflow) saveRun(ctx context.Context, sessionID string, run *WorkflowRun) error {
+func (w *Workflow) saveRun(ctx context.Context, sessionID string, run *WorkflowRun, metrics *WorkflowMetrics) error {
 	if w.historyStore == nil {
 		return nil
 	}
@@ -331,6 +364,9 @@ func (w *Workflow) saveRun(ctx context.Context, sessionID string, run *WorkflowR
 	session, err := w.historyStore.GetSession(ctx, sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
+	}
+	if metrics != nil {
+		attachWorkflowMetrics(run, metrics)
 	}
 
 	// 添加运行记录
@@ -349,6 +385,34 @@ func (w *Workflow) saveRun(ctx context.Context, sessionID string, run *WorkflowR
 		"status", run.Status)
 
 	return nil
+}
+
+func attachWorkflowMetrics(run *WorkflowRun, metrics *WorkflowMetrics) {
+	if run == nil || metrics == nil {
+		return
+	}
+	if run.Metadata == nil {
+		run.Metadata = make(map[string]interface{})
+	}
+	snapshot := metrics.Snapshot()
+	if len(snapshot) == 0 {
+		return
+	}
+	run.Metadata["metrics"] = snapshot
+}
+
+func recordWorkflowMetrics(execCtx *ExecutionContext, metrics *WorkflowMetrics) {
+	if execCtx == nil || metrics == nil {
+		return
+	}
+	snapshot := metrics.Snapshot()
+	if len(snapshot) == 0 {
+		return
+	}
+	if execCtx.Metadata == nil {
+		execCtx.Metadata = make(map[string]interface{})
+	}
+	execCtx.Metadata["workflow_metrics"] = snapshot
 }
 
 func (w *Workflow) saveCancellation(ctx context.Context, sessionID string, record *CancellationRecord) error {
@@ -390,6 +454,18 @@ func extractMessages(execCtx *ExecutionContext) []*types.Message {
 		types.NewUserMessage(execCtx.Input),
 		types.NewAssistantMessage(execCtx.Output),
 	}
+}
+
+func extractStepEvents(execCtx *ExecutionContext, stepID string) run.Events {
+	if execCtx == nil || stepID == "" {
+		return nil
+	}
+	if raw, ok := execCtx.Get(stepEventsKey(stepID)); ok {
+		if events, ok := raw.(run.Events); ok {
+			return events
+		}
+	}
+	return nil
 }
 
 // generateSessionID 生成唯一的 session ID

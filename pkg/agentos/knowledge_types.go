@@ -159,6 +159,9 @@ type ChunkerInfo struct {
 	// DefaultOverlap 默认重叠大小
 	// DefaultOverlap is the default overlap size
 	DefaultOverlap int `json:"default_overlap,omitempty"`
+
+	// Metadata describes additional chunker-specific configuration.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // EmbeddingModelInfo 表示嵌入模型信息
@@ -195,6 +198,9 @@ type AddContentRequest struct {
 	// ChunkSize 块大小
 	// ChunkSize is the chunk size
 	ChunkSize int `json:"chunk_size,omitempty"`
+
+	// ChunkOverlap specifies overlap between consecutive chunks
+	ChunkOverlap int `json:"chunk_overlap,omitempty"`
 
 	// CollectionName 集合名称
 	// CollectionName is the collection name

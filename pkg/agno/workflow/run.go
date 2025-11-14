@@ -3,6 +3,7 @@ package workflow
 import (
 	"time"
 
+	"github.com/rexleimo/agno-go/pkg/agno/run"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
@@ -90,6 +91,9 @@ type WorkflowRun struct {
 
 	// ResumedFrom records the step the run resumed from, if applicable.
 	ResumedFrom string `json:"resumed_from,omitempty"`
+
+	// Events captures structured run output events for observability.
+	Events run.Events `json:"events,omitempty"`
 }
 
 // NewWorkflowRun creates a new workflow run with the given parameters
@@ -104,6 +108,7 @@ func NewWorkflowRun(runID, sessionID, workflowID, input string) *WorkflowRun {
 		StartedAt:  time.Now(),
 		Messages:   make([]*types.Message, 0),
 		Metadata:   make(map[string]interface{}),
+		Events:     make(run.Events, 0),
 	}
 }
 
@@ -154,6 +159,14 @@ func (r *WorkflowRun) AddMessage(msg *types.Message) {
 		r.Messages = make([]*types.Message, 0)
 	}
 	r.Messages = append(r.Messages, msg)
+}
+
+// AddEvents appends structured run events to the workflow run metadata.
+func (r *WorkflowRun) AddEvents(events run.Events) {
+	if r == nil || len(events) == 0 {
+		return
+	}
+	r.Events = append(r.Events, events...)
 }
 
 // Duration returns the duration of the run

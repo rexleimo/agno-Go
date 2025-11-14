@@ -26,6 +26,8 @@ type Server struct {
 	httpServer       *http.Server
 	knowledgeService *KnowledgeService // 知识库服务
 	summaryManager   *session.SummaryManager
+	instantiatedAt   time.Time
+	docsMounted      bool
 }
 
 // Config holds server configuration
@@ -79,6 +81,9 @@ type Config struct {
 
 	// SummaryManager 会话摘要管理器
 	SummaryManager *session.SummaryManager
+
+	// HealthPath allows overriding the health check endpoint path.
+	HealthPath string
 }
 
 // VectorDBConfig 向量数据库配置
@@ -239,6 +244,9 @@ func NewServer(config *Config) (*Server, error) {
 		config.KnowledgeAPI = &KnowledgeAPIOptions{}
 	}
 	normalizeKnowledgeOptions(config.KnowledgeAPI)
+	if strings.TrimSpace(config.HealthPath) == "" {
+		config.HealthPath = "/health"
+	}
 
 	// Set Gin mode
 	if config.Debug {
@@ -263,6 +271,7 @@ func NewServer(config *Config) (*Server, error) {
 		agentRegistry:  NewAgentRegistry(),
 		logger:         config.Logger,
 		summaryManager: config.SummaryManager,
+		instantiatedAt: time.Now().UTC(),
 	}
 
 	// 初始化知识库服务（如果配置了）
@@ -343,9 +352,11 @@ func (s *Server) registerRoutes() {
 		baseGroup = &s.router.RouterGroup
 	}
 
-	// Health check (always at root level)
-	// 健康检查 (始终在根级别)
-	s.router.GET("/health", s.handleHealth)
+	// Health check (always at root level, customizable via GetHealthRouter)
+	if group := s.GetHealthRouter(s.config.HealthPath); group != nil {
+		group.GET("", s.handleHealth)
+	}
+	s.RegisterDocs(nil)
 
 	// API v1 under the prefix
 	// 前缀下的 API v1
@@ -384,6 +395,7 @@ func (s *Server) registerRoutes() {
 			}
 			if s.knowledgeService.config.EnableIngestion {
 				knowledge.POST("/content", s.handleAddContent)
+				knowledge.POST("/upload", s.handleAddContent)
 			}
 			if s.knowledgeService.config.EnableHealth {
 				knowledge.GET("/health", s.handleKnowledgeHealth)
@@ -392,13 +404,56 @@ func (s *Server) registerRoutes() {
 	}
 }
 
+// GetHealthRouter returns a router group for the given health path so callers
+// can attach additional handlers (e.g. custom health checks) while the server
+// still maintains its default `/health` endpoint.
+func (s *Server) GetHealthRouter(path string) *gin.RouterGroup {
+	if s.router == nil {
+		return nil
+	}
+	if path == "" {
+		path = "/health"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return s.router.Group(path)
+}
+
+// RegisterDocs mounts the OpenAPI specification and Swagger UI handlers onto
+// the provided router. Passing nil registers the routes on the server's primary
+// router, allowing callers to re-register after custom wiring or resync steps.
+func (s *Server) RegisterDocs(router *gin.Engine) {
+	if router == nil {
+		router = s.router
+		if s.docsMounted {
+			return
+		}
+		s.docsMounted = true
+	}
+	if router == nil {
+		return
+	}
+	router.GET("/openapi.yaml", s.handleOpenAPISpec)
+	router.GET("/docs", s.handleDocs)
+}
+
 // Health check handler
 func (s *Server) handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"status":  "healthy",
-		"service": "agentos",
-		"time":    time.Now().Unix(),
+		"status":          "ok",
+		"service":         "agentos",
+		"instantiated_at": s.instantiatedAt.Format(time.RFC3339),
+		"uptime_seconds":  time.Since(s.instantiatedAt).Seconds(),
 	})
+}
+
+func (s *Server) handleOpenAPISpec(c *gin.Context) {
+	c.Data(http.StatusOK, "application/yaml", openAPISpec)
+}
+
+func (s *Server) handleDocs(c *gin.Context) {
+	c.Data(http.StatusOK, "text/html; charset=utf-8", docsHTML)
 }
 
 // Middleware: Logger
@@ -549,4 +604,10 @@ func initKnowledgeService(config *Config, logger *slog.Logger) (*KnowledgeServic
 	}
 
 	return NewKnowledgeService(vdb, embFunc, svcConfig), nil
+}
+
+// Resync re-registers documentation routes ensuring `/docs` remains mounted
+// after custom wiring or hot reload flows.
+func (s *Server) Resync() {
+	s.RegisterDocs(nil)
 }

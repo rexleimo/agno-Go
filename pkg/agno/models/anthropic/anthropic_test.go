@@ -251,6 +251,66 @@ func TestBuildClaudeRequest(t *testing.T) {
 	}
 }
 
+func TestBuildClaudeRequestBetasAndContext(t *testing.T) {
+	model, _ := New("claude-3-opus-20240229", Config{
+		APIKey: "test-key",
+		Betas:  []string{"beta-a"},
+		ContextManagement: map[string]interface{}{
+			"enabled": true,
+		},
+	})
+	req := &models.InvokeRequest{
+		Extra: map[string]interface{}{
+			"betas": []interface{}{"beta-b"},
+			"context_management": map[string]interface{}{
+				"applied_edits": []string{"edit-1"},
+			},
+		},
+	}
+	claudeReq := model.buildClaudeRequest(req)
+	if len(claudeReq.Betas) != 2 {
+		t.Fatalf("expected 2 betas, got %v", claudeReq.Betas)
+	}
+	if claudeReq.Betas[0] != "beta-a" || claudeReq.Betas[1] != "beta-b" {
+		t.Fatalf("unexpected beta order: %v", claudeReq.Betas)
+	}
+	if claudeReq.ContextManagement == nil {
+		t.Fatal("expected context management to be set")
+	}
+	if _, ok := claudeReq.ContextManagement["applied_edits"]; !ok {
+		t.Fatal("expected applied_edits in context management")
+	}
+}
+
+func TestConvertResponseAddsContextManagement(t *testing.T) {
+	model := &Anthropic{
+		BaseModel: models.BaseModel{ID: "claude-3-sonnet", Provider: "anthropic"},
+	}
+	resp := &ClaudeResponse{
+		ID:    "resp-ctx",
+		Model: "claude-3-sonnet",
+		Content: []ContentBlock{
+			{Type: "text", Text: "done"},
+		},
+		StopReason: "end_turn",
+		Usage:      ClaudeUsage{},
+		ContextManagement: map[string]interface{}{
+			"applied_edits": []string{"trim_history"},
+		},
+	}
+	result := model.convertResponse(resp)
+	if result.Metadata.Extra == nil {
+		t.Fatal("expected metadata extras")
+	}
+	cm, ok := result.Metadata.Extra["context_management"].(map[string]interface{})
+	if !ok || cm == nil {
+		t.Fatal("expected context_management metadata")
+	}
+	if _, ok := cm["applied_edits"]; !ok {
+		t.Fatalf("expected applied_edits in metadata, got %v", cm)
+	}
+}
+
 func TestConvertResponse(t *testing.T) {
 	model, _ := New("claude-3-opus-20240229", Config{APIKey: "test-key"})
 

@@ -13,16 +13,29 @@ import (
 	"github.com/google/uuid"
 	"github.com/rexleimo/agno-go/pkg/agno/agent"
 	"github.com/rexleimo/agno-go/pkg/agno/media"
+	"github.com/rexleimo/agno-go/pkg/agno/run"
 	"github.com/rexleimo/agno-go/pkg/agno/session"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
 // AgentRunRequest represents a request to run an agent
 type AgentRunRequest struct {
-	Input     string      `json:"input"`
-	SessionID string      `json:"session_id,omitempty"`
-	Stream    bool        `json:"stream,omitempty"`
-	Media     interface{} `json:"media,omitempty"`
+	Input      string             `json:"input"`
+	SessionID  string             `json:"session_id,omitempty"`
+	Stream     bool               `json:"stream,omitempty"`
+	Media      interface{}        `json:"media,omitempty"`
+	RunContext *RunContextRequest `json:"run_context,omitempty"`
+}
+
+// RunContextRequest captures the optional run context payload from clients.
+type RunContextRequest struct {
+	RunID       string                 `json:"run_id,omitempty"`
+	ParentRunID string                 `json:"parent_run_id,omitempty"`
+	SessionID   string                 `json:"session_id,omitempty"`
+	UserID      string                 `json:"user_id,omitempty"`
+	WorkflowID  string                 `json:"workflow_id,omitempty"`
+	TeamID      string                 `json:"team_id,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 var (
@@ -126,8 +139,13 @@ func (s *Server) handleAgentRun(c *gin.Context) {
 		"media_count", len(attachments),
 	)
 
+	ctxWithRunContext, runCtx := deriveRunContext(c.Request.Context(), req.RunContext, req.SessionID)
+	if req.SessionID == "" && runCtx != nil && runCtx.SessionID != "" {
+		req.SessionID = runCtx.SessionID
+	}
+
 	if shouldStreamRequest(c, req.Stream) {
-		s.streamAgentRun(c, agentID, ag, req, attachments)
+		s.streamAgentRun(c, agentID, ag, req, attachments, ctxWithRunContext, runCtx)
 		return
 	}
 
@@ -154,11 +172,9 @@ func (s *Server) handleAgentRun(c *gin.Context) {
 	}
 
 	// Run the agent (inject a run-context id for correlation)
-	baseCtx := c.Request.Context()
-	runCtxID := "rc-" + uuid.NewString()
-	runCtx := agent.WithRunContext(baseCtx, runCtxID)
+	baseCtx := ctxWithRunContext
 	// Run the agent
-	output, err := ag.Run(runCtx, req.Input)
+	output, err := ag.Run(baseCtx, req.Input)
 
 	if err != nil {
 		s.logger.Error("agent run failed", "error", err, "agent_id", agentID)
@@ -230,7 +246,15 @@ func shouldStreamRequest(c *gin.Context, bodyFlag bool) bool {
 	return val
 }
 
-func (s *Server) streamAgentRun(c *gin.Context, agentID string, ag *agent.Agent, req AgentRunRequest, attachments []media.Attachment) {
+func (s *Server) streamAgentRun(
+	c *gin.Context,
+	agentID string,
+	ag *agent.Agent,
+	req AgentRunRequest,
+	attachments []media.Attachment,
+	ctxWithRunContext context.Context,
+	baseRunCtx *run.RunContext,
+) {
 	filter := NewEventFilter(splitCommaQuery(c.Query("types")))
 
 	var sess *session.Session
@@ -269,11 +293,16 @@ func (s *Server) streamAgentRun(c *gin.Context, agentID string, ag *agent.Agent,
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(ctxWithRunContext, 5*time.Minute)
 	defer cancel()
 
-	// Generate a stable run context identifier for correlating events in this stream
-	runCtxID := "rc-" + uuid.NewString()
+	runCtxID := ""
+	if baseRunCtx != nil {
+		runCtxID = baseRunCtx.EnsureRunID()
+	}
+	if runCtxID == "" {
+		runCtxID = "rc-" + uuid.NewString()
+	}
 	ctx = agent.WithRunContext(ctx, runCtxID)
 
 	startEvent := NewEvent(EventRunStart, RunStartData{
@@ -380,6 +409,34 @@ func splitCommaQuery(value string) []string {
 		}
 	}
 	return result
+}
+
+func deriveRunContext(ctx context.Context, payload *RunContextRequest, fallbackSessionID string) (context.Context, *run.RunContext) {
+	var rc *run.RunContext
+	if payload != nil {
+		rc = &run.RunContext{
+			RunID:       payload.RunID,
+			ParentRunID: payload.ParentRunID,
+			SessionID:   payload.SessionID,
+			UserID:      payload.UserID,
+			WorkflowID:  payload.WorkflowID,
+			TeamID:      payload.TeamID,
+			Metadata:    payload.Metadata,
+		}
+	}
+	if rc == nil {
+		rc = run.NewContext()
+	}
+	if rc.SessionID == "" {
+		rc.SessionID = fallbackSessionID
+	}
+	rc.EnsureRunID()
+	ctx = run.WithContext(ctx, rc)
+	ctx = agent.WithRunContext(ctx, rc.RunID)
+	if stored, ok := run.FromContext(ctx); ok && stored != nil {
+		return ctx, stored
+	}
+	return ctx, rc
 }
 
 // handleListAgents lists all registered agents

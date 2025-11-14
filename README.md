@@ -66,6 +66,19 @@ docker compose up -d
 curl http://localhost:8080/health
 ```
 
+### AgentOS HTTP tips
+
+- Override the default `GET /health` path via `Config.HealthPath` or attach your
+  own handlers with `server.GetHealthRouter("/health-check").GET("", customHandler)`.
+- `/openapi.yaml` always serves the current OpenAPI document and `/docs` hosts a
+  self-contained Swagger UI bundle. Call `server.Resync()` after hot-swapping
+  routers to remount the documentation routes.
+- Sample probes:
+  ```bash
+  curl http://localhost:8080/health-check
+  curl http://localhost:8080/openapi.yaml | head -n 5
+  ```
+
 ---
 
 ## Documentation
@@ -114,10 +127,50 @@ agent, _ := agent.New(agent.Config{
 
 ---
 
+### Knowledge upload chunking
+
+`POST /api/v1/knowledge/content` now accepts `chunk_size` and `chunk_overlap`
+in both JSON and multipart form uploads. Provide them as query parameters for
+`text/plain` requests or as form fields (`chunk_size=2000&chunk_overlap=250`) when
+streaming files. Both values propagate into the reader metadata, so downstream
+pipelines can inspect how documents were segmented.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/knowledge/content \
+  -F file=@docs/guide.md \
+  -F chunk_size=1800 \
+  -F chunk_overlap=200 \
+  -F metadata='{"source_url":"https://example.com/guide"}'
+```
+
+Each stored chunk automatically records `chunk_size`, `chunk_overlap`, and the
+`chunker_type` used—mirroring the AgentOS Python responses.
+
+---
+
 ## Observability & Reasoning
 
 - **SSE Event Stream** – `POST /api/v1/agents/{id}/run/stream?types=run_start,reasoning,token,complete` emits structured events. `reasoning` events carry token counts, redacted transcripts, and provider metadata; `complete` events summarise the run.
 - **Logfire Integration** – `cmd/examples/logfire_observability` shows how to export spans with OpenTelemetry (build with `-tags logfire`). Detailed walkthrough: [`docs/release/logfire_observability.md`](docs/release/logfire_observability.md).
+
+---
+
+### Anthropic Claude betas & context management
+
+Set `anthropic.Config.Betas` to opt into long-context beta deployments and use
+`anthropic.Config.ContextManagement` (or `req.Extra["context_management"]`) to
+attach `applied_edits` and other context-management hints. The Go client merges
+config-level and per-request metadata, and surfaced `context_management` payloads
+end up in `RunOutput.Metadata`, so tool builders can inspect `applied_edits`
+directly.
+
+```go
+model, _ := anthropic.New("claude-3-5-sonnet", anthropic.Config{
+    APIKey:  os.Getenv("ANTHROPIC_API_KEY"),
+    Betas:   []string{"context-1m-2025-08-07"},
+    ContextManagement: map[string]interface{}{"applied_edits": []string{"trim_history"}},
+})
+```
 
 ---
 

@@ -10,6 +10,7 @@ import (
 	"github.com/rexleimo/agno-go/pkg/agno/agent"
 	"github.com/rexleimo/agno-go/pkg/agno/hooks"
 	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/run"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
@@ -597,7 +598,28 @@ func (t *Team) invokeAgent(ctx context.Context, ag *agent.Agent, input string) (
 	if scope.record != nil {
 		t.recordInheritance(ag.ID, scope.record)
 	}
+	if output != nil && len(output.Events) > 0 {
+		annotateEventsWithTeam(t.ID, output.Events)
+	}
 	return output, err
+}
+
+func annotateEventsWithTeam(teamID string, events run.Events) {
+	if teamID == "" {
+		return
+	}
+	for _, evt := range events {
+		switch e := evt.(type) {
+		case *run.RunContentEvent:
+			if e.TeamID == "" {
+				e.TeamID = teamID
+			}
+		case *run.RunCompletedEvent:
+			if e.TeamID == "" {
+				e.TeamID = teamID
+			}
+		}
+	}
 }
 
 func (t *Team) prepareAgentModel(ag *agent.Agent) modelScope {

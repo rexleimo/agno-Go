@@ -10,6 +10,7 @@ import (
 	"github.com/rexleimo/agno-go/pkg/agno/cache"
 	"github.com/rexleimo/agno-go/pkg/agno/memory"
 	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/run"
 	"github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
 	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
@@ -137,6 +138,41 @@ func TestAgent_Run_SimpleResponse(t *testing.T) {
 
 	if output.RunID == "" {
 		t.Fatalf("expected run id to be set")
+	}
+}
+
+func TestAgent_Run_EmitsEvents(t *testing.T) {
+	agent, err := New(Config{
+		Name: "events-agent",
+		Model: &MockModel{
+			BaseModel: models.BaseModel{ID: "test", Provider: "mock"},
+			InvokeFunc: func(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
+				return &types.ModelResponse{ID: "evt", Content: "event payload", Model: "mock"}, nil
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	output, err := agent.Run(context.Background(), "hello")
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(output.Events) < 1 {
+		t.Fatalf("expected events to be recorded")
+	}
+	contentEvent, ok := output.Events[0].(*run.RunContentEvent)
+	if !ok {
+		t.Fatalf("expected first event to be RunContentEvent, got %T", output.Events[0])
+	}
+	if contentEvent.Content != "event payload" {
+		t.Fatalf("unexpected event content %q", contentEvent.Content)
+	}
+	completed := output.Events[len(output.Events)-1]
+	if completed.EventType() != "run_completed" {
+		t.Fatalf("expected terminal event to be run_completed, got %s", completed.EventType())
 	}
 }
 

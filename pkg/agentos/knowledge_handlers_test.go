@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -214,6 +216,49 @@ func TestHandleKnowledgeSearch_InvalidRequest(t *testing.T) {
 	router.ServeHTTP(w, httpReq)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestIngestContentAppliesChunkOverlap(t *testing.T) {
+	mockVectorDB := new(MockVectorDB)
+	mockEmbedding := new(MockEmbeddingFunc)
+	knowledgeSvc := NewKnowledgeService(mockVectorDB, mockEmbedding, KnowledgeServiceConfig{
+		DefaultCollection: "docs",
+	})
+	server := &Server{}
+
+	var capturedDocs []vectordb.Document
+	mockVectorDB.On("Add", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			docs, _ := args.Get(1).([]vectordb.Document)
+			capturedDocs = docs
+		}).
+		Return(nil)
+
+	resp, err := server.ingestContent(context.Background(), knowledgeSvc, &AddContentRequest{
+		Content:      strings.Repeat("a", 25),
+		ChunkerType:  "character",
+		ChunkSize:    10,
+		ChunkOverlap: 2,
+	})
+	if err != nil {
+		t.Fatalf("ingestContent returned error: %v", err)
+	}
+	if resp.ChunkCount != 3 {
+		t.Fatalf("expected 3 chunks, got %d", resp.ChunkCount)
+	}
+	if len(capturedDocs) != 3 {
+		t.Fatalf("expected 3 documents added, got %d", len(capturedDocs))
+	}
+	for _, doc := range capturedDocs {
+		if got := doc.Metadata["chunk_overlap"]; got != 2 {
+			t.Fatalf("expected chunk_overlap 2, got %v", got)
+		}
+		if got := doc.Metadata["chunk_size"]; got != 10 {
+			t.Fatalf("expected chunk_size 10, got %v", got)
+		}
+	}
+
+	mockVectorDB.AssertExpectations(t)
 }
 
 func TestHandleKnowledgeSearch_Pagination(t *testing.T) {
@@ -522,6 +567,59 @@ func TestHandleAddContent_Success(t *testing.T) {
 	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "demo", resp.Collection)
 	assert.Equal(t, 1, resp.ChunkCount)
+	mockVectorDB.AssertExpectations(t)
+}
+
+func TestHandleAddContent_MultipartWithChunkParams(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockVectorDB := new(MockVectorDB)
+	mockEmbedding := new(MockEmbeddingFunc)
+
+	var captured []vectordb.Document
+	mockVectorDB.On("Add", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		captured = args.Get(1).([]vectordb.Document)
+	}).Return(nil)
+
+	knowledgeSvc := NewKnowledgeService(mockVectorDB, mockEmbedding, KnowledgeServiceConfig{
+		DefaultCollection:    "demo",
+		DefaultChunkerType:   "character",
+		DefaultChunkSize:     100,
+		DefaultOverlap:       10,
+		AllowedSourceSchemes: []string{"https"},
+	})
+
+	server := &Server{knowledgeService: knowledgeSvc, logger: slog.Default()}
+	router := gin.New()
+	router.POST("/upload", server.handleAddContent)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	fileWriter, _ := writer.CreateFormFile("file", "doc.txt")
+	fileWriter.Write([]byte("multipart content"))
+	writer.WriteField("chunk_size", "42")
+	writer.WriteField("chunk_overlap", "7")
+	writer.WriteField("metadata", `{"source_url":"https://example.com"}`)
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/upload", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	if len(captured) == 0 {
+		t.Fatalf("expected documents to be ingested")
+	}
+	for _, doc := range captured {
+		if doc.Metadata == nil {
+			t.Fatalf("metadata must be populated")
+		}
+		if doc.Metadata["chunk_size"] != 42 {
+			t.Fatalf("expected chunk_size metadata override")
+		}
+	}
 	mockVectorDB.AssertExpectations(t)
 }
 

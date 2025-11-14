@@ -1,10 +1,14 @@
 package agentos
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -366,18 +370,30 @@ func (s *Server) handleKnowledgeConfig(c *gin.Context) {
 				Description:      "按字符数量分块，适合通用文本",
 				DefaultChunkSize: 1000,
 				DefaultOverlap:   100,
+				Metadata: map[string]interface{}{
+					"chunk_size":    1000,
+					"chunk_overlap": 100,
+				},
 			},
 			{
 				Name:             "sentence",
 				Description:      "按句子分块，适合对话和文档",
 				DefaultChunkSize: 1000,
 				DefaultOverlap:   0,
+				Metadata: map[string]interface{}{
+					"chunk_size":    1000,
+					"chunk_overlap": 0,
+				},
 			},
 			{
 				Name:             "paragraph",
 				Description:      "按段落分块，适合长文档",
 				DefaultChunkSize: 2000,
 				DefaultOverlap:   0,
+				Metadata: map[string]interface{}{
+					"chunk_size":    2000,
+					"chunk_overlap": 0,
+				},
 			},
 		},
 		AvailableVectorDBs: []string{"chromadb"},
@@ -498,7 +514,59 @@ func (s *Server) handleAddContent(c *gin.Context) {
 	// Check Content-Type
 	contentType := c.ContentType()
 
-	if contentType == "text/plain" {
+	switch {
+	case strings.HasPrefix(contentType, "multipart/form-data"):
+		if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
+			s.logger.Error("failed to parse multipart request", "error", err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "invalid_request",
+				"message": "failed to parse multipart form",
+			})
+			return
+		}
+		fileHeader, err := c.FormFile("file")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "invalid_request",
+				"message": "file field is required",
+			})
+			return
+		}
+		file, err := fileHeader.Open()
+		if err != nil {
+			s.logger.Error("failed to open uploaded file", "error", err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "invalid_request",
+				"message": "failed to read uploaded file",
+			})
+			return
+		}
+		defer file.Close()
+		buf := bytes.NewBuffer(nil)
+		if _, err := io.Copy(buf, file); err != nil {
+			s.logger.Error("failed to copy uploaded file", "error", err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "invalid_request",
+				"message": "failed to read uploaded file",
+			})
+			return
+		}
+		req.Content = buf.String()
+		req.CollectionName = c.PostForm("collection_name")
+		req.ChunkerType = c.DefaultPostForm("chunker_type", knowledgeSvc.config.DefaultChunkerType)
+		req.ChunkSize = parsePositiveInt(c.PostForm("chunk_size"), knowledgeSvc.config.DefaultChunkSize)
+		req.ChunkOverlap = parsePositiveInt(c.PostForm("chunk_overlap"), knowledgeSvc.config.DefaultOverlap)
+		if metadata := c.PostForm("metadata"); metadata != "" {
+			if err := json.Unmarshal([]byte(metadata), &req.Metadata); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "invalid_metadata",
+					"message": "metadata must be JSON",
+				})
+				return
+			}
+		}
+
+	case contentType == "text/plain":
 		// 读取纯文本内容
 		// Read plain text content
 		body, err := c.GetRawData()
@@ -517,8 +585,18 @@ func (s *Server) handleAddContent(c *gin.Context) {
 		// Get optional config from query params
 		req.ChunkerType = c.DefaultQuery("chunker_type", "character")
 		req.CollectionName = c.Query("collection_name")
+		if sizeStr := c.Query("chunk_size"); sizeStr != "" {
+			if parsed, err := strconv.Atoi(sizeStr); err == nil {
+				req.ChunkSize = parsed
+			}
+		}
+		if overlapStr := c.Query("chunk_overlap"); overlapStr != "" {
+			if parsed, err := strconv.Atoi(overlapStr); err == nil {
+				req.ChunkOverlap = parsed
+			}
+		}
 
-	} else if contentType == "application/json" {
+	case contentType == "application/json":
 		// 解析 JSON 请求
 		// Parse JSON request
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -528,7 +606,7 @@ func (s *Server) handleAddContent(c *gin.Context) {
 			})
 			return
 		}
-	} else {
+	default:
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid_content_type",
 			"message": "content type must be text/plain or application/json",
@@ -568,6 +646,9 @@ func (s *Server) handleAddContent(c *gin.Context) {
 	}
 	if req.ChunkSize <= 0 {
 		req.ChunkSize = knowledgeSvc.config.DefaultChunkSize
+	}
+	if req.ChunkOverlap < 0 {
+		req.ChunkOverlap = knowledgeSvc.config.DefaultOverlap
 	}
 
 	// 创建超时上下文
@@ -631,18 +712,35 @@ func (s *Server) ingestContent(ctx context.Context, knowledgeSvc *KnowledgeServi
 	}
 	// 注意：这里简化实现，实际应从 knowledge 包导入 Chunker
 	// Note: Simplified implementation, should import Chunker from knowledge package
-	chunks := []string{req.Content} // 简化版：不分块，直接使用整个内容
-
-	// 如果内容太长，进行简单分块
-	// If content is too long, perform simple chunking
-	if len(req.Content) > req.ChunkSize && req.ChunkSize > 0 {
+	content := req.Content
+	chunks := make([]string, 0)
+	if len(content) == 0 {
 		chunks = []string{}
-		for i := 0; i < len(req.Content); i += req.ChunkSize {
-			end := i + req.ChunkSize
-			if end > len(req.Content) {
-				end = len(req.Content)
+	} else {
+		chunkSize := req.ChunkSize
+		if chunkSize <= 0 || chunkSize > len(content) {
+			chunkSize = len(content)
+		}
+		overlap := req.ChunkOverlap
+		if overlap < 0 {
+			overlap = 0
+		}
+		if overlap >= chunkSize {
+			overlap = 0
+		}
+		for start := 0; start < len(content); {
+			end := start + chunkSize
+			if end > len(content) {
+				end = len(content)
 			}
-			chunks = append(chunks, req.Content[i:end])
+			chunks = append(chunks, content[start:end])
+			if end == len(content) {
+				break
+			}
+			start = end - overlap
+			if start < 0 {
+				start = 0
+			}
 		}
 	}
 
@@ -666,6 +764,8 @@ func (s *Server) ingestContent(ctx context.Context, knowledgeSvc *KnowledgeServi
 		metadata["chunk_index"] = i
 		metadata["chunk_count"] = len(chunks)
 		metadata["chunker_type"] = req.ChunkerType
+		metadata["chunk_size"] = req.ChunkSize
+		metadata["chunk_overlap"] = req.ChunkOverlap
 		metadata["ingested_at"] = time.Now().Format(time.RFC3339)
 
 		documents[i] = vectordb.Document{
@@ -695,6 +795,17 @@ func (s *Server) ingestContent(ctx context.Context, knowledgeSvc *KnowledgeServi
 		Message:     fmt.Sprintf("successfully ingested %d chunks", len(chunks)),
 		Collection:  collectionName,
 	}, nil
+}
+
+func parsePositiveInt(raw string, defaultVal int) int {
+	if raw == "" {
+		return defaultVal
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return defaultVal
+	}
+	return value
 }
 
 // getKnowledgeService 获取知识库服务实例（从 Server 配置中）

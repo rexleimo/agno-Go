@@ -36,12 +36,14 @@ type Anthropic struct {
 // Config contains Anthropic-specific configuration
 // Config 包含Anthropic特定配置
 type Config struct {
-	APIKey      string
-	BaseURL     string
-	Temperature float64
-	MaxTokens   int
-	Timeout     time.Duration // Request timeout / 请求超时时间
-	Thinking    *ThinkingConfig
+	APIKey            string
+	BaseURL           string
+	Temperature       float64
+	MaxTokens         int
+	Timeout           time.Duration // Request timeout / 请求超时时间
+	Thinking          *ThinkingConfig
+	Betas             []string
+	ContextManagement map[string]interface{}
 }
 
 // ThinkingConfig represents Anthropic extended thinking configuration
@@ -286,6 +288,14 @@ func (a *Anthropic) buildClaudeRequest(req *models.InvokeRequest) *ClaudeRequest
 			}
 			thinkingCfg.Type = t
 		}
+		if rawBetas, ok := req.Extra["betas"]; ok {
+			claudeReq.Betas = appendBetas(claudeReq.Betas, rawBetas)
+		}
+		if rawCtx, ok := req.Extra["context_management"]; ok {
+			if ctxMap, ok := rawCtx.(map[string]interface{}); ok {
+				claudeReq.ContextManagement = ctxMap
+			}
+		}
 	}
 
 	if thinkingCfg != nil {
@@ -295,6 +305,22 @@ func (a *Anthropic) buildClaudeRequest(req *models.InvokeRequest) *ClaudeRequest
 		if strings.EqualFold(thinkingCfg.Type, "disabled") || thinkingCfg.BudgetTokens > 0 {
 			claudeReq.Thinking = thinkingCfg
 		}
+	}
+
+	if len(a.config.Betas) > 0 {
+		prefixed := make([]string, 0, len(a.config.Betas)+len(claudeReq.Betas))
+		prefixed = append(prefixed, a.config.Betas...)
+		prefixed = append(prefixed, claudeReq.Betas...)
+		claudeReq.Betas = prefixed
+	}
+	if a.config.ContextManagement != nil {
+		merged := cloneContextMap(a.config.ContextManagement)
+		if claudeReq.ContextManagement != nil {
+			for k, v := range claudeReq.ContextManagement {
+				merged[k] = v
+			}
+		}
+		claudeReq.ContextManagement = merged
 	}
 
 	// Convert messages
@@ -422,8 +448,43 @@ func (a *Anthropic) convertResponse(resp *ClaudeResponse) *types.ModelResponse {
 		}
 		modelResp.Metadata.Extra["thinking_tokens"] = resp.Usage.ThinkingTokens
 	}
+	if resp.ContextManagement != nil {
+		if modelResp.Metadata.Extra == nil {
+			modelResp.Metadata.Extra = make(map[string]interface{})
+		}
+		modelResp.Metadata.Extra["context_management"] = resp.ContextManagement
+	}
 
 	return modelResp
+}
+
+func appendBetas(existing []string, raw interface{}) []string {
+	switch v := raw.(type) {
+	case []string:
+		return append(existing, v...)
+	case []interface{}:
+		for _, item := range v {
+			if s, ok := item.(string); ok && s != "" {
+				existing = append(existing, s)
+			}
+		}
+	case string:
+		if v != "" {
+			existing = append(existing, v)
+		}
+	}
+	return existing
+}
+
+func cloneContextMap(src map[string]interface{}) map[string]interface{} {
+	if src == nil {
+		return nil
+	}
+	cloned := make(map[string]interface{}, len(src))
+	for k, v := range src {
+		cloned[k] = v
+	}
+	return cloned
 }
 
 // convertStreamEvent converts stream event to ResponseChunk
@@ -454,14 +515,16 @@ func (a *Anthropic) setHeaders(req *http.Request) {
 
 // ClaudeRequest represents the Anthropic API request
 type ClaudeRequest struct {
-	Model       string          `json:"model"`
-	Messages    []ClaudeMessage `json:"messages"`
-	System      string          `json:"system,omitempty"`
-	MaxTokens   int             `json:"max_tokens"`
-	Temperature float64         `json:"temperature,omitempty"`
-	Tools       []ClaudeTool    `json:"tools,omitempty"`
-	Stream      bool            `json:"stream,omitempty"`
-	Thinking    *ThinkingConfig `json:"thinking,omitempty"`
+	Model             string                 `json:"model"`
+	Messages          []ClaudeMessage        `json:"messages"`
+	System            string                 `json:"system,omitempty"`
+	MaxTokens         int                    `json:"max_tokens"`
+	Temperature       float64                `json:"temperature,omitempty"`
+	Tools             []ClaudeTool           `json:"tools,omitempty"`
+	Stream            bool                   `json:"stream,omitempty"`
+	Thinking          *ThinkingConfig        `json:"thinking,omitempty"`
+	Betas             []string               `json:"betas,omitempty"`
+	ContextManagement map[string]interface{} `json:"context_management,omitempty"`
 }
 
 // ClaudeMessage represents a message in the conversation
@@ -479,13 +542,14 @@ type ClaudeTool struct {
 
 // ClaudeResponse represents the Anthropic API response
 type ClaudeResponse struct {
-	ID         string         `json:"id"`
-	Type       string         `json:"type"`
-	Role       string         `json:"role"`
-	Content    []ContentBlock `json:"content"`
-	Model      string         `json:"model"`
-	StopReason string         `json:"stop_reason"`
-	Usage      ClaudeUsage    `json:"usage"`
+	ID                string                 `json:"id"`
+	Type              string                 `json:"type"`
+	Role              string                 `json:"role"`
+	Content           []ContentBlock         `json:"content"`
+	Model             string                 `json:"model"`
+	StopReason        string                 `json:"stop_reason"`
+	Usage             ClaudeUsage            `json:"usage"`
+	ContextManagement map[string]interface{} `json:"context_management,omitempty"`
 }
 
 // ContentBlock represents a content block in the response

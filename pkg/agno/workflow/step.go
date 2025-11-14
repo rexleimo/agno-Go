@@ -126,6 +126,16 @@ func (s *Step) Execute(ctx context.Context, execCtx *ExecutionContext) (*Executi
 	execCtx.Output = output.Content
 	execCtx.Set(fmt.Sprintf("step_%s_output", s.ID), output.Content)
 
+	if len(output.Events) > 0 {
+		execCtx.Set(stepEventsKey(s.ID), output.Events)
+		if aggregated := aggregateEventContent(output.Events); aggregated != "" {
+			execCtx.Set(fmt.Sprintf("step_%s_event_output", s.ID), aggregated)
+			if execCtx.Output == "" {
+				execCtx.Output = aggregated
+			}
+		}
+	}
+
 	// 6. Save messages to session state for history recording
 	// 6. 保存消息到会话状态用于历史记录
 	execCtx.AddMessages(output.Messages)

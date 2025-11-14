@@ -157,6 +157,50 @@ func TestWorkflow_Run(t *testing.T) {
 	if _, exists := result.Get("step_step2_output"); !exists {
 		t.Error("step2 output not stored in context")
 	}
+
+	metrics, ok := result.Metadata["workflow_metrics"].(map[string]interface{})
+	if !ok {
+		t.Fatal("workflow metrics metadata missing")
+	}
+	if _, ok := metrics["duration_seconds"]; !ok {
+		t.Fatal("workflow metrics missing duration_seconds")
+	}
+}
+
+func TestWorkflow_RunStoresEvents(t *testing.T) {
+	step, _ := NewStep(StepConfig{
+		ID:    "event-step",
+		Agent: createMockAgent("agent-evt", "streamed output"),
+	})
+
+	store := NewMemoryStorage(10)
+	wf, err := New(Config{
+		ID:            "workflow-events",
+		Name:          "workflow-events",
+		Steps:         []Node{step},
+		EnableHistory: true,
+		HistoryStore:  store,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	if _, err := wf.Run(ctx, "start", "session-events"); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	session, err := store.GetSession(ctx, "session-events")
+	if err != nil {
+		t.Fatalf("failed to load session: %v", err)
+	}
+	runs := session.GetRuns()
+	if len(runs) == 0 {
+		t.Fatalf("expected workflow run to be persisted")
+	}
+	if len(runs[0].Events) == 0 {
+		t.Fatalf("expected workflow run to store events")
+	}
 }
 
 func TestWorkflow_RunEmptyInput(t *testing.T) {

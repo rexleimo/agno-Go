@@ -121,6 +121,7 @@ func (f *FileGenToolkit) createFile(ctx context.Context, args map[string]interfa
 
 	return map[string]interface{}{
 		"file_path": filePath,
+		"filepath":  filePath,
 		"size":      len(content),
 		"created":   true,
 	}, nil
@@ -170,8 +171,8 @@ func (f *FileGenToolkit) generateFromTemplate(ctx context.Context, args map[stri
 	}
 
 	return map[string]interface{}{
-		"template": templateStr,
-		"result":   result,
+		"template":  templateStr,
+		"result":    result,
 		"variables": variables,
 	}, nil
 }

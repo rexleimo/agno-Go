@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rexleimo/agno-go/pkg/agno/cache"
 	"github.com/rexleimo/agno-go/pkg/agno/hooks"
 	"github.com/rexleimo/agno-go/pkg/agno/memory"
 	"github.com/rexleimo/agno-go/pkg/agno/models"
 	"github.com/rexleimo/agno-go/pkg/agno/reasoning"
+	"github.com/rexleimo/agno-go/pkg/agno/run"
 	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
@@ -183,6 +183,7 @@ type RunOutput struct {
 	Content            string                 `json:"content"`
 	Messages           []*types.Message       `json:"messages"`
 	Metadata           map[string]interface{} `json:"metadata,omitempty"`
+	Events             run.Events             `json:"events,omitempty"`
 }
 
 // Run executes the agent with the given input
@@ -192,6 +193,9 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	if input == "" {
 		return nil, types.NewInvalidInputError("input cannot be empty", nil)
 	}
+
+	ctx, runCtx := ensureRunContext(ctx)
+	runID := runCtx.RunID
 
 	currentInstructions := a.GetInstructions()
 	a.logger.Info("agent run started", "agent_id", a.ID, "input", input)
@@ -214,7 +218,7 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	a.Memory.Add(userMsg, a.UserID)
 
 	output := &RunOutput{
-		RunID:     "run-" + uuid.NewString(),
+		RunID:     runID,
 		Status:    RunStatusRunning,
 		StartedAt: time.Now().UTC(),
 		Metadata:  map[string]interface{}{},
@@ -336,6 +340,14 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	output.Metadata["loops"] = loopCount
 	output.Metadata["usage"] = finalResponse.Usage
 	output.Metadata["cache_hit"] = cacheHit
+	addRunContextMetadata(output, runCtx)
+
+	sequence := len(output.Events)
+	if finalResponse.Content != "" {
+		output.appendEvent(run.NewRunContentEvent(runID, a.ID, string(types.RoleAssistant), finalResponse.Content, sequence))
+		sequence++
+	}
+	output.appendEvent(run.NewRunCompletedEvent(runID, a.ID, "", string(output.Status), finalResponse.Content))
 
 	a.scrubRunOutputWithContext(output, initialMessageCount)
 
@@ -398,6 +410,61 @@ func (a *Agent) buildCacheKey(req *models.InvokeRequest) string {
 
 	sum := sha256.Sum256([]byte(builder.String()))
 	return hex.EncodeToString(sum[:])
+}
+
+func (output *RunOutput) appendEvent(evt run.BaseRunOutputEvent) {
+	if output == nil || evt == nil {
+		return
+	}
+	output.Events = append(output.Events, evt)
+}
+
+func ensureRunContext(ctx context.Context) (context.Context, *run.RunContext) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	rc, ok := run.FromContext(ctx)
+	if !ok || rc == nil {
+		rc = run.NewContext()
+	}
+	rc.EnsureRunID()
+	ctx = run.WithContext(ctx, rc)
+	ctx = context.WithValue(ctx, ctxKeyRunContextID, rc.RunID)
+	return ctx, rc
+}
+
+func addRunContextMetadata(output *RunOutput, rc *run.RunContext) {
+	if output == nil || rc == nil {
+		return
+	}
+	if output.Metadata == nil {
+		output.Metadata = make(map[string]interface{})
+	}
+	contextMeta := map[string]interface{}{}
+	if rc.RunID != "" {
+		contextMeta["run_id"] = rc.RunID
+	}
+	if rc.ParentRunID != "" {
+		contextMeta["parent_run_id"] = rc.ParentRunID
+	}
+	if rc.SessionID != "" {
+		contextMeta["session_id"] = rc.SessionID
+	}
+	if rc.UserID != "" {
+		contextMeta["user_id"] = rc.UserID
+	}
+	if rc.WorkflowID != "" {
+		contextMeta["workflow_id"] = rc.WorkflowID
+	}
+	if rc.TeamID != "" {
+		contextMeta["team_id"] = rc.TeamID
+	}
+	if rc.Metadata != nil && len(rc.Metadata) > 0 {
+		contextMeta["metadata"] = rc.Metadata
+	}
+	if len(contextMeta) > 0 {
+		output.Metadata["run_context"] = contextMeta
+	}
 }
 
 // executeToolCalls executes all tool calls and adds results to memory

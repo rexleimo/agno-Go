@@ -124,6 +124,17 @@
     curl -sS -X POST http://localhost:8080/api/v1/knowledge/content \
       -H 'Content-Type: text/plain' --data '示例文本' | jq .status
     ```
+    
+    也可以在 JSON 或 multipart 请求中提供 `chunk_size` / `chunk_overlap` 来控制
+    分块策略，示例：
+
+    ```bash
+    curl -X POST http://localhost:8080/api/v1/knowledge/content \
+      -F file=@docs/guide.md \
+      -F chunk_size=1500 \
+      -F chunk_overlap=150 \
+      -F metadata='{"source_url":"https://example.com/guide"}'
+    ```
 
 ## 实现细节总结
 

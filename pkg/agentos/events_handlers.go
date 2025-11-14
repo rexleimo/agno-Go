@@ -51,8 +51,12 @@ func (s *Server) handleAgentRunStream(c *gin.Context) {
 		return
 	}
 
+	ctxWithRunContext, runCtx := deriveRunContext(c.Request.Context(), req.RunContext, req.SessionID)
+	if req.SessionID == "" && runCtx != nil && runCtx.SessionID != "" {
+		req.SessionID = runCtx.SessionID
+	}
 	req.Stream = true
-	s.streamAgentRun(c, agentID, ag, req, attachments)
+	s.streamAgentRun(c, agentID, ag, req, attachments, ctxWithRunContext, runCtx)
 }
 
 // sendSSE 发送单个 SSE 事件
@@ -146,29 +150,29 @@ func (s *Server) emitRunEvents(w io.Writer, flusher http.Flusher, filter *EventF
 	}
 
 	reasoningEvents, reasoningSummary := buildReasoningEvents(output.Messages, modelProvider, modelID)
-    for _, evt := range reasoningEvents {
-        if evt == nil {
-            continue
-        }
-        evt.AgentID = agentID
-        evt.SessionID = sessionID
-        evt.RunContextID = runContextID
-        if filter.ShouldSend(evt) {
-            s.sendSSE(w, evt)
-            flusher.Flush()
-        }
-    }
+	for _, evt := range reasoningEvents {
+		if evt == nil {
+			continue
+		}
+		evt.AgentID = agentID
+		evt.SessionID = sessionID
+		evt.RunContextID = runContextID
+		if filter.ShouldSend(evt) {
+			s.sendSSE(w, evt)
+			flusher.Flush()
+		}
+	}
 
 	for idx, token := range tokenizeContent(output.Content) {
 		tokenEvent := NewEvent(EventToken, TokenData{Token: token, Index: idx})
-        tokenEvent.AgentID = agentID
-        tokenEvent.SessionID = sessionID
-        tokenEvent.RunContextID = runContextID
-        if filter.ShouldSend(tokenEvent) {
-            s.sendSSE(w, tokenEvent)
-            flusher.Flush()
-        }
-    }
+		tokenEvent.AgentID = agentID
+		tokenEvent.SessionID = sessionID
+		tokenEvent.RunContextID = runContextID
+		if filter.ShouldSend(tokenEvent) {
+			s.sendSSE(w, tokenEvent)
+			flusher.Flush()
+		}
+	}
 
 	usageSummary := buildUsageSummary(output.Metadata)
 	if usageSummary != nil && reasoningSummary != nil && reasoningSummary.TokenCount != nil {
@@ -205,13 +209,13 @@ func (s *Server) emitRunEvents(w io.Writer, flusher http.Flusher, filter *EventF
 		RunID:              output.RunID,
 		CancellationReason: output.CancellationReason,
 	})
-    complete.AgentID = agentID
-    complete.SessionID = sessionID
-    complete.RunContextID = runContextID
-    if filter.ShouldSend(complete) {
-        s.sendSSE(w, complete)
-        flusher.Flush()
-    }
+	complete.AgentID = agentID
+	complete.SessionID = sessionID
+	complete.RunContextID = runContextID
+	if filter.ShouldSend(complete) {
+		s.sendSSE(w, complete)
+		flusher.Flush()
+	}
 }
 
 func tokenizeContent(content string) []string {
