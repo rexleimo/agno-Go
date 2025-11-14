@@ -92,6 +92,12 @@ curl http://localhost:8080/health
 | Release Notes | https://rexleimo.github.io/agno-Go/release-notes |
 | Internal / WIP Docs | [`docs/`](docs/) |
 
+## What's New in v1.2.9
+
+- **EvoLink Media Agents** – First-class EvoLink provider under `pkg/agno/providers/evolink` and `pkg/agno/models/evolink/*` for text, image, and video generation, with example workflows in `website/examples/evolink-media-agents.md`.
+- **Knowledge Upload Chunking** – `POST /api/v1/knowledge/content` now accepts `chunk_size` and `chunk_overlap` (JSON, `text/plain` query params, multipart form fields) and records these values plus `chunker_type` in stored chunk metadata.
+- **AgentOS HTTP Tips in Docs** – The AgentOS API page now documents how to customize health endpoints, rely on `/openapi.yaml` and `/docs`, and when to call `server.Resync()` after router changes.
+
 ## Session Runtime & Storage Parity
 
 - **Session reuse & history:** `POST /api/v1/sessions/{id}/reuse` shares conversations between agents, teams, and workflows, while `GET /api/v1/sessions/{id}/history?num_messages=N&stream_events=true` mirrors Python-style pagination and SSE toggles.
