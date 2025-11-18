@@ -318,33 +318,29 @@ func (s *Server) streamAgentRun(
 		flusher.Flush()
 	}
 
-	resultChan := make(chan struct {
-		output *agent.RunOutput
-		err    error
-	}, 1)
+	result, err := ag.RunStream(ctx, req.Input)
+	if err != nil {
+		code := "AGENT_ERROR"
+		if agnoErr, ok := err.(*types.AgnoError); ok {
+			code = string(agnoErr.Code)
+		}
+		errorEvent := NewEvent(EventError, ErrorData{
+			Error: err.Error(),
+			Code:  code,
+		})
+		errorEvent.AgentID = agentID
+		errorEvent.SessionID = req.SessionID
+		errorEvent.RunContextID = runCtxID
+		if filter.ShouldSend(errorEvent) {
+			s.sendSSE(c.Writer, errorEvent)
+			flusher.Flush()
+		}
+		return
+	}
 
-	go func() {
-		output, err := ag.Run(ctx, req.Input)
-		if output != nil && len(attachments) > 0 {
-			if output.Metadata == nil {
-				output.Metadata = make(map[string]interface{})
-			}
-			output.Metadata["media"] = attachments
-		}
-		if sess != nil && output != nil {
-			sess.AddRun(output)
-			updateCtx, cancelUpdate := context.WithTimeout(context.Background(), 2*time.Second)
-			if updateErr := s.sessionStorage.Update(updateCtx, sess); updateErr != nil {
-				s.logger.Warn("failed to update session with run", "error", updateErr, "session_id", req.SessionID)
-			}
-			cancelUpdate()
-		}
-		resultChan <- struct {
-			output *agent.RunOutput
-			err    error
-		}{output: output, err: err}
-		close(resultChan)
-	}()
+	eventsCh := result.Events
+	doneCh := result.Done
+	tokenIndex := 0
 
 	for {
 		select {
@@ -362,13 +358,49 @@ func (s *Server) streamAgentRun(
 			}
 			return
 
-		case res, ok := <-resultChan:
+		case evt, ok := <-eventsCh:
 			if !ok {
-				return
+				eventsCh = nil
+				if doneCh == nil {
+					return
+				}
+				continue
 			}
 
-			output := res.output
-			err := res.err
+			contentEvent, ok := evt.(*run.RunContentEvent)
+			if !ok || strings.TrimSpace(contentEvent.Content) == "" {
+				continue
+			}
+
+			for _, token := range tokenizeContent(contentEvent.Content) {
+				if token == "" {
+					continue
+				}
+				tokenEvent := NewEvent(EventToken, TokenData{
+					Token: token,
+					Index: tokenIndex,
+				})
+				tokenIndex++
+				tokenEvent.AgentID = agentID
+				tokenEvent.SessionID = req.SessionID
+				tokenEvent.RunContextID = runCtxID
+				if filter.ShouldSend(tokenEvent) {
+					s.sendSSE(c.Writer, tokenEvent)
+					flusher.Flush()
+				}
+			}
+
+		case res, ok := <-doneCh:
+			if !ok {
+				doneCh = nil
+				if eventsCh == nil {
+					return
+				}
+				continue
+			}
+
+			output := res.Output
+			err := res.Err
 
 			if err != nil {
 				code := "AGENT_ERROR"
@@ -386,9 +418,26 @@ func (s *Server) streamAgentRun(
 					s.sendSSE(c.Writer, errorEvent)
 					flusher.Flush()
 				}
+				if output == nil {
+					return
+				}
 			}
 
 			if output != nil {
+				if len(attachments) > 0 {
+					if output.Metadata == nil {
+						output.Metadata = make(map[string]interface{})
+					}
+					output.Metadata["media"] = attachments
+				}
+				if sess != nil {
+					sess.AddRun(output)
+					updateCtx, cancelUpdate := context.WithTimeout(context.Background(), 2*time.Second)
+					if updateErr := s.sessionStorage.Update(updateCtx, sess); updateErr != nil {
+						s.logger.Warn("failed to update session with run", "error", updateErr, "session_id", req.SessionID)
+					}
+					cancelUpdate()
+				}
 				s.emitRunEvents(c.Writer, flusher, filter, agentID, req.SessionID, runCtxID, output, ag)
 			}
 			return

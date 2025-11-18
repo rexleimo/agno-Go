@@ -199,6 +199,28 @@ func (t *Team) Run(ctx context.Context, input string) (*RunOutput, error) {
 		return nil, types.NewInvalidInputError("input cannot be empty", nil)
 	}
 
+	// Ensure a shared RunContext for the team execution so that downstream
+	// agents and tools can correlate telemetry with a stable run identifier
+	// and team identifier, mirroring Python's run context behaviour.
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if rc, ok := run.FromContext(ctx); ok && rc != nil {
+		rc = rc.Clone()
+		if rc.TeamID == "" && t.ID != "" {
+			rc.TeamID = t.ID
+		}
+		rc.EnsureRunID()
+		ctx = run.WithContext(ctx, rc)
+	} else {
+		rc := run.NewContext()
+		if t.ID != "" {
+			rc.TeamID = t.ID
+		}
+		rc.EnsureRunID()
+		ctx = run.WithContext(ctx, rc)
+	}
+
 	t.resetInheritance()
 
 	t.logger.Info("team run started",

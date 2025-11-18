@@ -252,3 +252,16 @@ func (ec *ExecutionContext) MergeMetadata(metadata map[string]interface{}) {
 		ec.Metadata[k] = v
 	}
 }
+
+// SetRunContextMetadata stores the run context payload into metadata under the
+// "run_context" key so callers can inspect correlation identifiers (run_id,
+// session_id, workflow_id, user_id, etc.) without reaching into context.Context.
+func (ec *ExecutionContext) SetRunContextMetadata(runCtx map[string]interface{}) {
+	if len(runCtx) == 0 {
+		return
+	}
+	if ec.Metadata == nil {
+		ec.Metadata = make(map[string]interface{}, 1)
+	}
+	ec.Metadata["run_context"] = runCtx
+}

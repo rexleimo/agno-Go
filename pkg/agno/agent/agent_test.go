@@ -141,6 +141,62 @@ func TestAgent_Run_SimpleResponse(t *testing.T) {
 	}
 }
 
+func TestAgent_RunStream_Basic(t *testing.T) {
+	mockModel := &MockModel{
+		BaseModel: models.BaseModel{ID: "test", Provider: "mock"},
+		InvokeStreamFunc: func(ctx context.Context, req *models.InvokeRequest) (<-chan types.ResponseChunk, error) {
+			ch := make(chan types.ResponseChunk, 2)
+			ch <- types.ResponseChunk{Content: "Hello"}
+			ch <- types.ResponseChunk{Content: " world"}
+			close(ch)
+			return ch, nil
+		},
+	}
+
+	ag, err := New(Config{
+		Name:  "StreamAgent",
+		Model: mockModel,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create agent: %v", err)
+	}
+
+	result, err := ag.RunStream(context.Background(), "Hi")
+	if err != nil {
+		t.Fatalf("RunStream() error = %v", err)
+	}
+	if result == nil {
+		t.Fatal("RunStream() returned nil result")
+	}
+
+	var chunks []string
+	for evt := range result.Events {
+		contentEvt, ok := evt.(*run.RunContentEvent)
+		if !ok {
+			t.Fatalf("expected RunContentEvent, got %T", evt)
+		}
+		chunks = append(chunks, contentEvt.Content)
+	}
+
+	done := <-result.Done
+	if done.Err != nil {
+		t.Fatalf("RunStream() Done error = %v", done.Err)
+	}
+	if done.Output == nil {
+		t.Fatal("RunStream() Done output is nil")
+	}
+
+	if want := "Hello world"; done.Output.Content != want {
+		t.Errorf("RunStream() content = %q, want %q", done.Output.Content, want)
+	}
+	if len(chunks) != 2 {
+		t.Fatalf("expected 2 streamed chunks, got %d", len(chunks))
+	}
+	if len(done.Output.Events) != 3 {
+		t.Fatalf("expected 3 events (2 content + 1 completed), got %d", len(done.Output.Events))
+	}
+}
+
 func TestAgent_Run_EmitsEvents(t *testing.T) {
 	agent, err := New(Config{
 		Name: "events-agent",

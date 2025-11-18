@@ -12,6 +12,7 @@ import (
 	"github.com/rexleimo/agno-go/pkg/agno/agent"
 	"github.com/rexleimo/agno-go/pkg/agno/embeddings/openai"
 	"github.com/rexleimo/agno-go/pkg/agno/session"
+	"github.com/rexleimo/agno-go/pkg/agno/team"
 	"github.com/rexleimo/agno-go/pkg/agno/vectordb"
 	"github.com/rexleimo/agno-go/pkg/agno/vectordb/chromadb"
 )
@@ -22,6 +23,7 @@ type Server struct {
 	config           *Config
 	sessionStorage   session.Storage
 	agentRegistry    *AgentRegistry
+	teamRegistry     *TeamRegistry
 	logger           *slog.Logger
 	httpServer       *http.Server
 	knowledgeService *KnowledgeService // 知识库服务
@@ -269,6 +271,7 @@ func NewServer(config *Config) (*Server, error) {
 		config:         config,
 		sessionStorage: config.SessionStorage,
 		agentRegistry:  NewAgentRegistry(),
+		teamRegistry:   NewTeamRegistry(),
 		logger:         config.Logger,
 		summaryManager: config.SummaryManager,
 		instantiatedAt: time.Now().UTC(),
@@ -340,6 +343,19 @@ func (s *Server) GetAgentRegistry() *AgentRegistry {
 	return s.agentRegistry
 }
 
+// RegisterTeam registers a team with the server.
+func (s *Server) RegisterTeam(teamID string, tm *team.Team) error {
+	if s.teamRegistry == nil {
+		s.teamRegistry = NewTeamRegistry()
+	}
+	return s.teamRegistry.Register(teamID, tm)
+}
+
+// GetTeamRegistry returns the team registry.
+func (s *Server) GetTeamRegistry() *TeamRegistry {
+	return s.teamRegistry
+}
+
 // registerRoutes registers all API routes
 // registerRoutes 注册所有 API 路由
 func (s *Server) registerRoutes() {
@@ -384,6 +400,12 @@ func (s *Server) registerRoutes() {
 			agents.GET("", s.handleListAgents)
 			agents.POST("/:id/run", s.handleAgentRun)
 			agents.POST("/:id/run/stream", s.handleAgentRunStream) // P1: SSE 流式输出
+		}
+
+		// Team endpoints
+		teams := v1.Group("/teams")
+		{
+			teams.GET("/:id/tools", s.handleTeamTools)
 		}
 
 		// Knowledge endpoints

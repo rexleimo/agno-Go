@@ -311,6 +311,40 @@ func TestExecutionContext_NewExecutionContextWithSession(t *testing.T) {
 	}
 }
 
+// TestExecutionContext_RunContextMetadata 测试 Run Context 元数据挂载
+// TestExecutionContext_RunContextMetadata verifies SetRunContextMetadata behaviour
+func TestExecutionContext_RunContextMetadata(t *testing.T) {
+	execCtx := NewExecutionContext("test")
+
+	if execCtx.Metadata != nil {
+		t.Fatal("expected Metadata to be nil before setting run context")
+	}
+
+	rcMeta := map[string]interface{}{
+		"run_id":      "run-123",
+		"session_id":  "sess-456",
+		"workflow_id": "wf-789",
+	}
+	execCtx.SetRunContextMetadata(rcMeta)
+
+	if execCtx.Metadata == nil {
+		t.Fatal("expected Metadata to be initialised after setting run context")
+	}
+
+	raw, ok := execCtx.Metadata["run_context"]
+	if !ok {
+		t.Fatalf("expected run_context key in Metadata, got %#v", execCtx.Metadata)
+	}
+
+	stored, ok := raw.(map[string]interface{})
+	if !ok {
+		t.Fatalf("run_context has wrong type: %#v", raw)
+	}
+	if stored["run_id"] != "run-123" || stored["session_id"] != "sess-456" || stored["workflow_id"] != "wf-789" {
+		t.Fatalf("unexpected run_context payload: %#v", stored)
+	}
+}
+
 // TestExecutionContext_DataAndMetadata 测试数据和元数据操作
 // TestExecutionContext_DataAndMetadata tests data and metadata operations
 func TestExecutionContext_DataAndMetadata(t *testing.T) {

@@ -140,6 +140,9 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 	} else {
 		sessionID = runCtx.SessionID
 	}
+	if runCtx.WorkflowID == "" && w.ID != "" {
+		runCtx.WorkflowID = w.ID
+	}
 	runCtx.EnsureRunID()
 	ctx = run.WithContext(ctx, runCtx)
 
@@ -154,6 +157,7 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 	defer metrics.Stop()
 
 	execCtx := NewExecutionContextWithSession(input, sessionID, options.userID)
+	execCtx.SetRunContextMetadata(runContextMetadata(runCtx))
 	execCtx.ApplySessionState(options.sessionState)
 	execCtx.MergeMetadata(options.metadata)
 
@@ -176,14 +180,25 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 
 	var workflowRun *WorkflowRun
 	if w.enableHistory {
-		runID := generateRunID()
+		runID := runCtx.RunID
 		workflowRun = NewWorkflowRun(runID, sessionID, w.ID, input)
 		workflowRun.MarkStarted()
 		if options.resumeFromStep != "" {
 			workflowRun.ResumedFrom = options.resumeFromStep
 		}
 		if len(options.mediaPayload) > 0 {
+			if workflowRun.Metadata == nil {
+				workflowRun.Metadata = make(map[string]interface{})
+			}
 			workflowRun.Metadata["media"] = options.mediaPayload
+		}
+		// Attach run context identifiers to the stored workflow run so history
+		// consumers can correlate executions with upstream orchestrators.
+		if rcMeta := runContextMetadata(runCtx); len(rcMeta) > 0 {
+			if workflowRun.Metadata == nil {
+				workflowRun.Metadata = make(map[string]interface{})
+			}
+			workflowRun.Metadata["run_context"] = rcMeta
 		}
 	}
 
@@ -478,4 +493,38 @@ func generateSessionID() string {
 // generateRunID generates a unique run ID
 func generateRunID() string {
 	return "run-" + uuid.New().String()
+}
+
+// runContextMetadata extracts a serialisable view of the run context identifiers
+// suitable for storing in workflow metadata or logs.
+func runContextMetadata(rc *run.RunContext) map[string]interface{} {
+	if rc == nil {
+		return nil
+	}
+	meta := map[string]interface{}{}
+	if rc.RunID != "" {
+		meta["run_id"] = rc.RunID
+	}
+	if rc.SessionID != "" {
+		meta["session_id"] = rc.SessionID
+	}
+	if rc.WorkflowID != "" {
+		meta["workflow_id"] = rc.WorkflowID
+	}
+	if rc.UserID != "" {
+		meta["user_id"] = rc.UserID
+	}
+	if rc.ParentRunID != "" {
+		meta["parent_run_id"] = rc.ParentRunID
+	}
+	if rc.TeamID != "" {
+		meta["team_id"] = rc.TeamID
+	}
+	if rc.Metadata != nil && len(rc.Metadata) > 0 {
+		meta["metadata"] = rc.Metadata
+	}
+	if len(meta) == 0 {
+		return nil
+	}
+	return meta
 }

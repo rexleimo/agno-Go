@@ -118,6 +118,23 @@ func TestWorkflow_WithHistory(t *testing.T) {
 	if runs[0].Status != RunStatusCompleted {
 		t.Errorf("expected first run to be completed, got %s", runs[0].Status)
 	}
+
+	// 验证 run_context 元数据已写入 WorkflowRun
+	// Verify run_context metadata is attached to workflow runs
+	rcRaw, ok := runs[0].Metadata["run_context"]
+	if !ok {
+		t.Fatalf("expected run_context metadata on first run, got %#v", runs[0].Metadata)
+	}
+	rcMeta, ok := rcRaw.(map[string]interface{})
+	if !ok {
+		t.Fatalf("run_context metadata has wrong type: %#v", rcRaw)
+	}
+	if rcMeta["workflow_id"] != workflow.ID {
+		t.Fatalf("expected workflow_id %q in run_context, got %#v", workflow.ID, rcMeta["workflow_id"])
+	}
+	if rcMeta["session_id"] != sessionID {
+		t.Fatalf("expected session_id %q in run_context, got %#v", sessionID, rcMeta["session_id"])
+	}
 }
 
 // TestWorkflow_WithoutHistory 测试未启用历史的工作流

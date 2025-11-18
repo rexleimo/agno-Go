@@ -55,18 +55,18 @@ func (h *Handler) handleListSessions(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	sessionType, err := parseSessionType(r.URL.Query().Get("type"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
+		writeError(w, http.StatusBadRequest, "INVALID_SESSION_TYPE", err.Error(), nil)
 		return
 	}
 
 	limit, err := parseIntDefault(r.URL.Query().Get("limit"), 20)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, errors.New("limit must be an integer"))
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "limit must be an integer", nil)
 		return
 	}
 	page, err := parseIntDefault(r.URL.Query().Get("page"), 1)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, errors.New("page must be an integer"))
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "page must be an integer", nil)
 		return
 	}
 
@@ -93,13 +93,13 @@ func (h *Handler) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	sessionType, err := parseSessionType(r.URL.Query().Get("type"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
+		writeError(w, http.StatusBadRequest, "INVALID_SESSION_TYPE", err.Error(), nil)
 		return
 	}
 
 	var req createSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.New("invalid JSON payload"))
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "invalid JSON payload", nil)
 		return
 	}
 
@@ -134,7 +134,7 @@ func (h *Handler) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	sessionType, err := parseSessionType(r.URL.Query().Get("type"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
+		writeError(w, http.StatusBadRequest, "INVALID_SESSION_TYPE", err.Error(), nil)
 		return
 	}
 
@@ -155,7 +155,7 @@ func (h *Handler) handleDeleteSession(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	sessionType, err := parseSessionType(r.URL.Query().Get("type"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
+		writeError(w, http.StatusBadRequest, "INVALID_SESSION_TYPE", err.Error(), nil)
 		return
 	}
 
@@ -175,17 +175,17 @@ func (h *Handler) handleRenameSession(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	sessionType, err := parseSessionType(r.URL.Query().Get("type"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
+		writeError(w, http.StatusBadRequest, "INVALID_SESSION_TYPE", err.Error(), nil)
 		return
 	}
 
 	var req renameSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.New("invalid JSON payload"))
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "invalid JSON payload", nil)
 		return
 	}
 	if req.SessionName == "" {
-		writeError(w, http.StatusBadRequest, errors.New("session_name is required"))
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "session_name is required", nil)
 		return
 	}
 
@@ -207,7 +207,7 @@ func (h *Handler) handleGetSessionRuns(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	sessionType, err := parseSessionType(r.URL.Query().Get("type"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
+		writeError(w, http.StatusBadRequest, "INVALID_SESSION_TYPE", err.Error(), nil)
 		return
 	}
 
@@ -242,23 +242,31 @@ func parseIntDefault(value string, defaultValue int) (int, error) {
 func writeServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		writeError(w, http.StatusNotFound, err)
+		writeError(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, service.ErrDatabaseRequired):
-		writeError(w, http.StatusBadRequest, err)
+		writeError(w, http.StatusBadRequest, "DATABASE_REQUIRED", err.Error(), nil)
 	case errors.Is(err, service.ErrDatabaseNotFound):
-		writeError(w, http.StatusNotFound, err)
+		writeError(w, http.StatusNotFound, "DATABASE_NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, dto.ErrInvalidSessionType):
-		writeError(w, http.StatusBadRequest, err)
+		writeError(w, http.StatusBadRequest, "INVALID_SESSION_TYPE", err.Error(), nil)
 	default:
-		writeError(w, http.StatusInternalServerError, err)
+		// Hide internal details from the top-level message but preserve them in details
+		writeError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "internal server error", map[string]any{
+			"error": err.Error(),
+		})
 	}
 }
 
-func writeError(w http.ResponseWriter, status int, err error) {
-	writeJSON(w, status, map[string]any{
-		"error":   http.StatusText(status),
-		"message": err.Error(),
-	})
+func writeError(w http.ResponseWriter, status int, code, message string, details map[string]any) {
+	payload := map[string]any{
+		"status":  "error",
+		"code":    code,
+		"message": message,
+	}
+	if details != nil && len(details) > 0 {
+		payload["details"] = details
+	}
+	writeJSON(w, status, payload)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

@@ -153,6 +153,117 @@ func TestGetSessionRunsMatchesFixture(t *testing.T) {
 	assertJSONEqual(t, map[string]any{"runs": expectedRuns}, got)
 }
 
+func TestListSessionsInvalidTypeMatchesErrorFixture(t *testing.T) {
+	store := newFixtureStore()
+	svc := serviceFromStore(store)
+	server := httptest.NewServer(router.New(svc))
+	defer server.Close()
+
+	resp := doRequest(t, http.MethodGet, server.URL+"/sessions?type=invalid", nil)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for invalid type, got %d", resp.StatusCode)
+	}
+
+	var got map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+
+	expected := map[string]any{}
+	require.NoError(t, json.Unmarshal(loadRawFixture(t, "get_sessions_invalid_type_error.json"), &expected))
+
+	assertJSONEqual(t, expected, got)
+}
+
+func TestGetSessionDetailNotFoundMatchesErrorFixture(t *testing.T) {
+	store := newFixtureStore()
+	// Do not seed any records so the store returns ErrNotFound.
+
+	svc := serviceFromStore(store)
+	server := httptest.NewServer(router.New(svc))
+	defer server.Close()
+
+	url := server.URL + "/sessions/non-existent-session?type=agent"
+	resp := doRequest(t, http.MethodGet, url, nil)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected status 404 for missing session, got %d", resp.StatusCode)
+	}
+
+	var got map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+
+	expected := map[string]any{}
+	require.NoError(t, json.Unmarshal(loadRawFixture(t, "get_session_not_found_error.json"), &expected))
+
+	assertJSONEqual(t, expected, got)
+}
+
+func TestListSessionsDatabaseRequiredMatchesErrorFixture(t *testing.T) {
+	// Configure service with multiple stores and no default so db_id is required.
+	st := newFixtureStore()
+	svc, err := service.New(service.Config{
+		Stores: map[string]store.Store{
+			"primary":   st,
+			"secondary": st,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to init service with multiple stores: %v", err)
+	}
+
+	server := httptest.NewServer(router.New(svc))
+	defer server.Close()
+
+	// Missing db_id when multiple databases are configured should produce DATABASE_REQUIRED.
+	resp := doRequest(t, http.MethodGet, server.URL+"/sessions?type=agent", nil)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for missing db_id, got %d", resp.StatusCode)
+	}
+
+	var got map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+
+	expected := map[string]any{}
+	require.NoError(t, json.Unmarshal(loadRawFixture(t, "list_sessions_database_required_error.json"), &expected))
+
+	assertJSONEqual(t, expected, got)
+}
+
+func TestListSessionsDatabaseNotFoundMatchesErrorFixture(t *testing.T) {
+	// Configure service with a known store but request an unknown db_id.
+	st := newFixtureStore()
+	svc, err := service.New(service.Config{
+		Stores: map[string]store.Store{
+			"default": st,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to init service with single store: %v", err)
+	}
+
+	server := httptest.NewServer(router.New(svc))
+	defer server.Close()
+
+	resp := doRequest(t, http.MethodGet, server.URL+"/sessions?type=agent&db_id=unknown", nil)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected status 404 for unknown db_id, got %d", resp.StatusCode)
+	}
+
+	var got map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+
+	expected := map[string]any{}
+	require.NoError(t, json.Unmarshal(loadRawFixture(t, "list_sessions_database_not_found_error.json"), &expected))
+
+	assertJSONEqual(t, expected, got)
+}
+
 func doRequest(t *testing.T, method, url string, payload []byte) *http.Response {
 	t.Helper()
 	var bodyReader io.Reader

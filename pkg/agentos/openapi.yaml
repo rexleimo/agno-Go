@@ -34,6 +34,8 @@ tags:
     description: Session management operations
   - name: Agents
     description: Agent management and execution
+  - name: Teams
+    description: Team configuration and inspection
   - name: Knowledge
     description: Knowledge base search and configuration operations
 
@@ -368,6 +370,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/teams/{id}/tools:
+    get:
+      tags:
+        - Teams
+      summary: List tools available to a team
+      description: Returns aggregated tool definitions from all member agents in the team.
+      operationId: listTeamTools
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Team ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Team tool definitions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamToolsResponse'
+        '404':
+          description: Team not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/knowledge/search:
     post:
       tags:
@@ -676,6 +706,51 @@ components:
           type: string
           description: Provider name
           example: "openai"
+
+    ToolDefinition:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Tool type (currently always `function`)
+          example: "function"
+        function:
+          type: object
+          description: Function schema describing the callable tool
+          properties:
+            name:
+              type: string
+              description: Function name
+              example: "search_documents"
+            description:
+              type: string
+              description: Human readable description of the tool
+              example: "Searches documentation by keyword"
+            parameters:
+              type: object
+              additionalProperties: true
+              description: JSON Schema describing the input parameters
+              example:
+                type: object
+                properties:
+                  query:
+                    type: string
+                  limit:
+                    type: integer
+                required: ["query"]
+
+    TeamToolsResponse:
+      type: object
+      properties:
+        team_id:
+          type: string
+          description: Team identifier
+          example: "team-tools"
+        tools:
+          type: array
+          description: Aggregated tool definitions from all member agents
+          items:
+            $ref: '#/components/schemas/ToolDefinition'
 
     ErrorResponse:
       type: object

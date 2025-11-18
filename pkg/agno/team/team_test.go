@@ -563,3 +563,68 @@ func TestTeam_AgentError(t *testing.T) {
 		t.Error("Run() should return error when agent fails")
 	}
 }
+
+func TestTeam_RunAttachesRunContextToAgents(t *testing.T) {
+	var capturedExtra map[string]interface{}
+
+	model := &MockModel{
+		BaseModel: models.BaseModel{ID: "runctx", Provider: "mock"},
+		InvokeFunc: func(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
+			if req != nil {
+				capturedExtra = req.Extra
+			}
+			return &types.ModelResponse{
+				ID:      "resp-runctx",
+				Content: "ok",
+				Model:   "runctx",
+			}, nil
+		},
+	}
+
+	ag, err := agent.New(agent.Config{
+		ID:    "agent-runctx",
+		Model: model,
+	})
+	if err != nil {
+		t.Fatalf("failed to create agent: %v", err)
+	}
+
+	team, err := New(Config{
+		Name:   "team-runctx",
+		Agents: []*agent.Agent{ag},
+		Mode:   ModeSequential,
+	})
+	if err != nil {
+		t.Fatalf("failed to create team: %v", err)
+	}
+
+	// Seed a run context identifier from the caller so we can assert it flows
+	// through the team and into the underlying model request metadata.
+	ctx := agent.WithRunContext(context.Background(), "rc-team-1")
+
+	out, err := team.Run(ctx, "hello")
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if out == nil || out.Content != "ok" {
+		t.Fatalf("unexpected team output: %#v", out)
+	}
+
+	if capturedExtra == nil {
+		t.Fatalf("expected InvokeRequest.Extra to be populated")
+	}
+	raw, ok := capturedExtra["run_context"]
+	if !ok {
+		t.Fatalf("expected run_context key in InvokeRequest.Extra, got %#v", capturedExtra)
+	}
+	rcMap, ok := raw.(map[string]interface{})
+	if !ok {
+		t.Fatalf("run_context has wrong type: %#v", raw)
+	}
+	if rcMap["run_id"] != "rc-team-1" {
+		t.Fatalf("expected run_id rc-team-1 in run_context, got %#v", rcMap["run_id"])
+	}
+	if rcMap["team_id"] != team.ID {
+		t.Fatalf("expected team_id %q in run_context, got %#v", team.ID, rcMap["team_id"])
+	}
+}

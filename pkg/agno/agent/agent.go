@@ -186,6 +186,31 @@ type RunOutput struct {
 	Events             run.Events             `json:"events,omitempty"`
 }
 
+// RunStreamDone represents the terminal result of a streaming run.
+// It always carries either a non-nil Output or a non-nil Err.
+type RunStreamDone struct {
+	Output *RunOutput
+	Err    error
+}
+
+// RunStreamResult groups the channels produced by a streaming run.
+// Events streams incremental RunContentEvent values while Done carries
+// the final RunOutput once the model stream completes.
+type RunStreamResult struct {
+	Events <-chan run.BaseRunOutputEvent
+	Done   <-chan RunStreamDone
+}
+
+// singleDoneChannel constructs a buffered Done channel carrying a single value.
+func singleDoneChannel(output *RunOutput, err error) <-chan RunStreamDone {
+	ch := make(chan RunStreamDone, 1)
+	ch <- RunStreamDone{
+		Output: output,
+		Err:    err,
+	}
+	return ch
+}
+
 // Run executes the agent with the given input
 func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	defer a.ClearTempInstructions()
@@ -195,6 +220,10 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	}
 
 	ctx, runCtx := ensureRunContext(ctx)
+	// Enrich run context with known identifiers so downstream models can access them
+	if runCtx != nil && runCtx.UserID == "" && a.UserID != "" {
+		runCtx.UserID = a.UserID
+	}
 	runID := runCtx.RunID
 
 	currentInstructions := a.GetInstructions()
@@ -245,6 +274,7 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 		if len(a.Toolkits) > 0 {
 			req.Tools = toolkit.ToModelToolDefinitions(a.Toolkits)
 		}
+		attachRunContextToRequest(ctx, req)
 
 		var (
 			resp      *types.ModelResponse
@@ -419,6 +449,247 @@ func (output *RunOutput) appendEvent(evt run.BaseRunOutputEvent) {
 	output.Events = append(output.Events, evt)
 }
 
+// RunStream executes the agent using the model's streaming API and returns
+// a pair of channels: one for incremental content events and one that carries
+// the final RunOutput once aggregation completes.
+//
+// The initial behaviour focuses on single-pass streaming responses:
+// - Pre-hooks, memory, run-context and post-hooks are honoured.
+// - Model.InvokeStream is used to stream content chunks.
+// - Tool calls present in streaming chunks are aggregated but not executed.
+// - Cache is bypassed for streaming runs.
+func (a *Agent) RunStream(ctx context.Context, input string) (*RunStreamResult, error) {
+	defer a.ClearTempInstructions()
+
+	if strings.TrimSpace(input) == "" {
+		return nil, types.NewInvalidInputError("input cannot be empty", nil)
+	}
+
+	ctx, runCtx := ensureRunContext(ctx)
+	if runCtx != nil && runCtx.UserID == "" && a.UserID != "" {
+		runCtx.UserID = a.UserID
+	}
+	runID := runCtx.RunID
+
+	currentInstructions := a.GetInstructions()
+	a.logger.Info("agent run (stream) started", "agent_id", a.ID, "input", input)
+
+	initialMessageCount := len(a.Memory.GetMessages(a.UserID))
+
+	if len(a.PreHooks) > 0 {
+		a.logger.Debug("executing pre-hooks (stream)", "count", len(a.PreHooks))
+		hookInput := hooks.NewHookInput(input).
+			WithAgentID(a.ID).
+			WithMessages([]interface{}{})
+
+		if err := hooks.ExecuteHooks(ctx, a.PreHooks, hookInput); err != nil {
+			a.logger.Error("pre-hook failed (stream)", "error", err)
+			return nil, types.NewInputCheckError("pre-hook validation failed", err)
+		}
+	}
+
+	userMsg := types.NewUserMessage(input)
+	a.Memory.Add(userMsg, a.UserID)
+
+	output := &RunOutput{
+		RunID:     runID,
+		Status:    RunStatusRunning,
+		StartedAt: time.Now().UTC(),
+		Metadata:  map[string]interface{}{},
+	}
+
+	// Prepare messages and request for streaming invocation (single-pass).
+	messages := a.Memory.GetMessages(a.UserID)
+	if currentInstructions != a.Instructions && currentInstructions != "" {
+		messages = a.updateSystemMessage(messages, currentInstructions)
+	}
+
+	req := &models.InvokeRequest{Messages: messages}
+	if len(a.Toolkits) > 0 {
+		req.Tools = toolkit.ToModelToolDefinitions(a.Toolkits)
+	}
+	attachRunContextToRequest(ctx, req)
+
+	stream, err := a.Model.InvokeStream(ctx, req)
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+			cancelled := a.markRunCancelled(output, 0, false, err, initialMessageCount)
+			return &RunStreamResult{
+				Events: nil,
+				Done:   singleDoneChannel(cancelled, types.NewCancellationError("agent run cancelled", err)),
+			}, nil
+		}
+		a.logger.Error("model streaming invocation failed", "error", err)
+		return nil, types.NewAPIError("model streaming invocation failed", err)
+	}
+
+	eventsCh := make(chan run.BaseRunOutputEvent)
+	doneCh := make(chan RunStreamDone, 1)
+
+	go func() {
+		defer close(eventsCh)
+		aggregatorCh := make(chan types.ResponseChunk)
+		doneAgg := make(chan struct{})
+
+		var (
+			resp   *types.ModelResponse
+			aggErr error
+		)
+
+		go func() {
+			defer close(doneAgg)
+			// Aggregate the same chunks we stream out so we can build
+			// a final ModelResponse bound to this run.
+			resp, aggErr = AggregateResponseStream(ctx, aggregatorCh)
+		}()
+
+		aggregatorClosed := false
+		closeAggregator := func() {
+			if !aggregatorClosed {
+				close(aggregatorCh)
+				aggregatorClosed = true
+			}
+		}
+
+		sequence := 0
+
+		finishCancelled := func(reason error) {
+			closeAggregator()
+			<-doneAgg
+			cancelled := a.markRunCancelled(output, 0, false, reason, initialMessageCount)
+			doneCh <- RunStreamDone{
+				Output: cancelled,
+				Err:    types.NewCancellationError("agent run cancelled", reason),
+			}
+		}
+
+		finishError := func(err error) {
+			closeAggregator()
+			<-doneAgg
+			doneCh <- RunStreamDone{
+				Output: nil,
+				Err:    err,
+			}
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				finishCancelled(ctx.Err())
+				return
+
+			case chunk, ok := <-stream:
+				if !ok {
+					// Streaming complete; finalise aggregation.
+					closeAggregator()
+					<-doneAgg
+
+					if aggErr != nil {
+						if errors.Is(aggErr, context.Canceled) || errors.Is(aggErr, context.DeadlineExceeded) {
+							finishCancelled(aggErr)
+						} else {
+							finishError(aggErr)
+						}
+						return
+					}
+
+					if resp == nil {
+						resp = &types.ModelResponse{}
+					}
+
+					// Attach reasoning (if any) and store assistant message.
+					reasoningContent := a.extractReasoning(ctx, resp)
+					assistantMsg := &types.Message{
+						Role:             types.RoleAssistant,
+						Content:          resp.Content,
+						ToolCalls:        resp.ToolCalls,
+						ReasoningContent: reasoningContent,
+					}
+					a.Memory.Add(assistantMsg, a.UserID)
+
+					if len(a.PostHooks) > 0 {
+						a.logger.Debug("executing post-hooks (stream)", "count", len(a.PostHooks))
+						hookInput := hooks.NewHookInput(input).
+							WithOutput(resp.Content).
+							WithAgentID(a.ID).
+							WithMessages([]interface{}{})
+
+						if err := hooks.ExecuteHooks(ctx, a.PostHooks, hookInput); err != nil {
+							a.logger.Error("post-hook failed (stream)", "error", err)
+							doneCh <- RunStreamDone{
+								Output: nil,
+								Err:    types.NewOutputCheckError("post-hook validation failed", err),
+							}
+							return
+						}
+					}
+
+					a.logger.Info("agent run (stream) completed", "agent_id", a.ID)
+
+					output.Status = RunStatusCompleted
+					output.CompletedAt = time.Now().UTC()
+					output.Content = resp.Content
+					output.Messages = a.Memory.GetMessages(a.UserID)
+					output.Metadata["loops"] = 1
+					output.Metadata["usage"] = resp.Usage
+					output.Metadata["cache_hit"] = false
+					addRunContextMetadata(output, runCtx)
+
+					// Append terminal completion event (incremental content events
+					// were recorded as chunks arrived).
+					completed := run.NewRunCompletedEvent(runID, a.ID, "", string(output.Status), output.Content)
+					output.appendEvent(completed)
+
+					a.scrubRunOutputWithContext(output, initialMessageCount)
+
+					doneCh <- RunStreamDone{
+						Output: output,
+						Err:    nil,
+					}
+					return
+				}
+
+				// Forward chunk to aggregator so we can reconstruct a final response.
+				if !aggregatorClosed {
+					select {
+					case aggregatorCh <- chunk:
+					case <-ctx.Done():
+						finishCancelled(ctx.Err())
+						return
+					}
+				}
+
+				if chunk.Error != nil {
+					if errors.Is(chunk.Error, context.Canceled) || errors.Is(chunk.Error, context.DeadlineExceeded) || ctx.Err() != nil {
+						finishCancelled(chunk.Error)
+					} else {
+						finishError(chunk.Error)
+					}
+					return
+				}
+
+				if chunk.Content != "" {
+					evt := run.NewRunContentEvent(runID, a.ID, string(types.RoleAssistant), chunk.Content, sequence)
+					sequence++
+					output.appendEvent(evt)
+
+					select {
+					case eventsCh <- evt:
+					case <-ctx.Done():
+						finishCancelled(ctx.Err())
+						return
+					}
+				}
+			}
+		}
+	}()
+
+	return &RunStreamResult{
+		Events: eventsCh,
+		Done:   doneCh,
+	}, nil
+}
+
 func ensureRunContext(ctx context.Context) (context.Context, *run.RunContext) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -439,6 +710,15 @@ func addRunContextMetadata(output *RunOutput, rc *run.RunContext) {
 	}
 	if output.Metadata == nil {
 		output.Metadata = make(map[string]interface{})
+	}
+	if meta := buildRunContextMetadata(rc); len(meta) > 0 {
+		output.Metadata["run_context"] = meta
+	}
+}
+
+func buildRunContextMetadata(rc *run.RunContext) map[string]interface{} {
+	if rc == nil {
+		return nil
 	}
 	contextMeta := map[string]interface{}{}
 	if rc.RunID != "" {
@@ -462,9 +742,28 @@ func addRunContextMetadata(output *RunOutput, rc *run.RunContext) {
 	if rc.Metadata != nil && len(rc.Metadata) > 0 {
 		contextMeta["metadata"] = rc.Metadata
 	}
-	if len(contextMeta) > 0 {
-		output.Metadata["run_context"] = contextMeta
+	return contextMeta
+}
+
+// attachRunContextToRequest copies selected run context fields into the InvokeRequest.Extra
+// so model implementations can forward them to downstream providers (for tracing or telemetry).
+func attachRunContextToRequest(ctx context.Context, req *models.InvokeRequest) {
+	if req == nil {
+		return
 	}
+	rc, ok := run.FromContext(ctx)
+	if !ok || rc == nil {
+		return
+	}
+	meta := buildRunContextMetadata(rc)
+	if len(meta) == 0 {
+		return
+	}
+	if req.Extra == nil {
+		req.Extra = make(map[string]interface{})
+	}
+	// Use a stable key so providers can rely on it.
+	req.Extra["run_context"] = meta
 }
 
 // executeToolCalls executes all tool calls and adds results to memory

@@ -163,17 +163,6 @@ func (s *Server) emitRunEvents(w io.Writer, flusher http.Flusher, filter *EventF
 		}
 	}
 
-	for idx, token := range tokenizeContent(output.Content) {
-		tokenEvent := NewEvent(EventToken, TokenData{Token: token, Index: idx})
-		tokenEvent.AgentID = agentID
-		tokenEvent.SessionID = sessionID
-		tokenEvent.RunContextID = runContextID
-		if filter.ShouldSend(tokenEvent) {
-			s.sendSSE(w, tokenEvent)
-			flusher.Flush()
-		}
-	}
-
 	usageSummary := buildUsageSummary(output.Metadata)
 	if usageSummary != nil && reasoningSummary != nil && reasoningSummary.TokenCount != nil {
 		usageSummary.ReasoningTokens = *reasoningSummary.TokenCount
