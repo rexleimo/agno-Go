@@ -33,8 +33,11 @@
 - [ ] **Go + DDD / 热插拔**：明确受影响的限界上下文、接口契约与可插拔模块，阐述停用该模块时系统如何保持可运行。
 - [ ] **Compose-First 可部署性**：列出需要新增/更新的 Compose 服务、健康检查与 `.env` 变量，并说明如何通过 `make compose-*` 目标验证。
 - [ ] **GORM + 迁移版本控制**：说明本迭代涉及的表/实体、需要新增的迁移文件名及验证策略，确认 `make migrate` / `make rollback` 流程完整。
+- [ ] **多存储适配矩阵**：列出需要支持/新增的 SQLite、MySQL、PostgreSQL、MongoDB、Redis、DynamoDB、Firestore 驱动，说明所在适配器路径、`make data-matrix`/`make compose-data` 验证方式以及禁用某驱动时的替代策略。
 - [ ] **Makefile 自动化**：标记需要新增或调整的 `make` 目标，并说明 CI 复用方式，避免出现与文档不一致的裸命令。
 - [ ] **Remix + React Router V7 + pnpm + shadcn**：枚举要交付的前端 workspace、路由、shadcn 组件与 Apple/Microsoft 设计引用章节，说明如何保证热插拔的 UI 配置。
+- [ ] **Vitepress + GitHub Docs Workflow**：说明本功能涉及的文档章节、`docs/vitepress` 目录增量、`make docs-*`/`pnpm docs:*` 操作以及 `.github/workflows/docs.yml` 的部署策略。
+- [ ] **测试纪律 + 85% 覆盖率**：列出需要新增/更新的 Go/Remix/文档单元测试、契约/集成测试、`make test|ui-test|docs-test|data-matrix|coverage` 的执行方式以及若覆盖率下降的补救方案。
 - [ ] **平台运行约束**：确认 Compose 环境的可观察性、安全（Secrets/SOPS）和默认数据库/缓存策略未被破坏，如有例外需附上补偿控制。
 
 ## 项目结构
@@ -80,6 +83,15 @@ frontend/
 deploy/compose/
 ├── docker-compose.local.yml
 └── docker-compose.ci.yml
+
+docs/vitepress/
+├── .vitepress/config.ts      # 文档导航、部署配置
+└── content/                  # 组件/数据库/部署文档
+
+configs/datastores/           # 多存储矩阵配置（可选）
+
+.github/workflows/
+└── docs.yml                  # Vitepress 自动化部署
 
 Makefile                      # 单一入口（dev/test/build/release）
 ```

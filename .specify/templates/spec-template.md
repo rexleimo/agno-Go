@@ -99,6 +99,9 @@
 - **Go + DDD / 热插拔**：本规格涉及的限界上下文、接口、领域事件、可插拔模块；说明禁用该模块时的替代流程。
 - **Compose-First 可部署性**：列出需要新增/更新的 Compose 服务、环境变量、健康检查以及 `docker compose` / `make compose-*` 验证步骤。
 - **GORM 数据治理与迁移**：说明需要创建/修改的迁移文件名、受影响的实体以及 `make migrate` / `make rollback` 的验证计划。
+- **多存储适配矩阵**：列出本功能所依赖的 SQLite/MySQL/PostgreSQL/MongoDB/Redis/DynamoDB/Firestore 驱动，描述如何通过 `backend/internal/.../infra/datastore/` 实现热插拔以及 `make data-matrix` 的验证策略。
 - **Makefile 自动化**：枚举需要新增或扩展的 `make` 目标（dev/test/build/release/observe），并指明 CI 如何复用。
 - **Remix + React Router V7 + pnpm + shadcn**：列出新增/修改的 pnpm workspace、Remix 路由、shadcn 组件以及所遵循的 Apple/Microsoft 设计语言章节。
+- **Vitepress + GitHub Docs Workflow**：说明需要更新的 `docs/vitepress` 章节、导航、示例及 `.github/workflows/docs.yml` 的自动化影响。
+- **测试纪律 + 85% 覆盖率**：阐明需要追加的后端/前端/文档单元测试、契约/集成测试、`make test|ui-test|docs-test|data-matrix|coverage` 的执行以及如何确保覆盖率 ≥85%。
 - **平台运行约束**：描述默认数据库/缓存、可观察性（Prometheus/Otel）、Secrets/SOPS 管理在本规格中的变动或依赖。
