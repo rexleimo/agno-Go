@@ -1,0 +1,7 @@
+.codex/auth.json
+.codex/config.toml
+.codex/sessions/
+.codex/version.json
+.codex/history.jsonl
+.codex/log/
+agno/
