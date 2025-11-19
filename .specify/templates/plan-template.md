@@ -30,15 +30,12 @@
 
 *Gate：Phase 0 调研前必须通过；Phase 1 设计后需再次检查。*
 
-- [ ] **Go + DDD / 热插拔**：明确受影响的限界上下文、接口契约与可插拔模块，阐述停用该模块时系统如何保持可运行。
-- [ ] **Compose-First 可部署性**：列出需要新增/更新的 Compose 服务、健康检查与 `.env` 变量，并说明如何通过 `make compose-*` 目标验证。
-- [ ] **GORM + 迁移版本控制**：说明本迭代涉及的表/实体、需要新增的迁移文件名及验证策略，确认 `make migrate` / `make rollback` 流程完整。
-- [ ] **多存储适配矩阵**：列出需要支持/新增的 SQLite、MySQL、PostgreSQL、MongoDB、Redis、DynamoDB、Firestore 驱动，说明所在适配器路径、`make data-matrix`/`make compose-data` 验证方式以及禁用某驱动时的替代策略。
-- [ ] **Makefile 自动化**：标记需要新增或调整的 `make` 目标，并说明 CI 复用方式，避免出现与文档不一致的裸命令。
-- [ ] **Remix + React Router V7 + pnpm + shadcn**：枚举要交付的前端 workspace、路由、shadcn 组件与 Apple/Microsoft 设计引用章节，说明如何保证热插拔的 UI 配置。
-- [ ] **Vitepress + GitHub Docs Workflow**：说明本功能涉及的文档章节、`docs/vitepress` 目录增量、`make docs-*`/`pnpm docs:*` 操作以及 `.github/workflows/docs.yml` 的部署策略。
-- [ ] **测试纪律 + 85% 覆盖率**：列出需要新增/更新的 Go/Remix/文档单元测试、契约/集成测试、`make test|ui-test|docs-test|data-matrix|coverage` 的执行方式以及若覆盖率下降的补救方案。
-- [ ] **平台运行约束**：确认 Compose 环境的可观察性、安全（Secrets/SOPS）和默认数据库/缓存策略未被破坏，如有例外需附上补偿控制。
+- [ ] **Python 参考实现与行为对齐**：列出本迭代涉及的 Python 模块、类与函数（例如 `agno/` 下的路径），说明在 Go 侧需要迁移或保持兼容的行为，并标注哪些差异是有意设计。
+- [ ] **Go API 设计与包结构**：说明目标 Go 包结构（例如 `go/agent`、`go/workflow` 等）、导出类型与接口边界，以及它们如何映射到 Python 抽象；避免直接照搬 Python 的动态模式。
+- [ ] **跨语言测试纪律与 85%+ 覆盖率**：列出需要新增或更新的 Go 测试（单元、集成、契约）、对照测试策略（Python vs Go），以及 `go test ./...` 和其它工具如何确保覆盖率 ≥85%。
+- [ ] **性能与资源使用基线**：说明本迭代对性能或资源占用的影响，标注需要基准测试的路径，并描述如何对比 Python 与 Go 的性能（包括测试场景与指标）。
+- [ ] **安全、配置与 Telemetry**：标明本功能涉及的配置项、Secrets、日志与 Telemetry 事件，说明与 Python 版本的差异及保护措施（例如关闭默认上报、最小权限访问）。
+- [ ] **文档与示例对齐**：列出需要更新的 README、Cookbook 或其它说明文档，说明如何在文档中标注 Python 与 Go 的支持状态，以及新增的示例路径。
 
 ## 项目结构
 
@@ -56,47 +53,25 @@ specs/[###-feature]/
 
 ### 源码（仓库根目录）
 <!--
-  必须：将占位树替换为真实结构，删除未用选项，补上真实路径（如 apps/admin、packages/foo）。交付的计划中不得保留 Option 标签。
+  必须：将占位树替换为本仓库的真实结构，补上真实路径（如 go/agent、go/workflow 等）。交付的计划中不得保留示例占位。
 -->
 
 ```text
-backend/
-├── cmd/
-│   └── api/                  # Go 入口（组合限界上下文）
-├── internal/
-│   ├── <contextA>/           # 限界上下文：entity、aggregate、service、ports
-│   └── <contextB>/
-├── pkg/                      # 可复用适配器/工具
-└── tests/
-    ├── contract/
-    ├── integration/
-    └── unit/
+agno/                         # Python 参考实现（上游项目镜像）
+└── libs/agno/agno/           # 核心 Python 包与子模块
 
-db/
-└── migrations/               # `<timestamp>_<name>.sql|.go`
+go/                           # Go 实现（本仓库新增）
+├── agent/                    # Agent 抽象与实现
+├── workflow/                 # Workflow 引擎
+├── models/                   # 模型封装
+├── tools/                    # 工具与集成
+└── ...                       # 其它模块（memory、knowledge、os 等）
 
-frontend/
-├── apps/web/                 # Remix + React Router V7 应用
-├── packages/ui/              # 基于 shadcn/ui 的设计系统
-└── packages/<feature>/       # 可热插拔组件/模块
-
-deploy/compose/
-├── docker-compose.local.yml
-└── docker-compose.ci.yml
-
-docs/vitepress/
-├── .vitepress/config.ts      # 文档导航、部署配置
-└── content/                  # 组件/数据库/部署文档
-
-configs/datastores/           # 多存储矩阵配置（可选）
-
-.github/workflows/
-└── docs.yml                  # Vitepress 自动化部署
-
-Makefile                      # 单一入口（dev/test/build/release）
+scripts/                      # 开发与对照测试脚本（Python/Go 桥接等）
+specs/                        # speckit 规格、计划与任务
 ```
 
-**结构决策**： [记录所选结构，并引用上方列出的真实目录]
+**结构决策**： [记录所选结构，并引用上方列出的真实目录或实际替换后的目录]
 
 ## 复杂度追踪
 
