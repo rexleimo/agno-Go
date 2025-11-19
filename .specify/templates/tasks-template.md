@@ -5,31 +5,31 @@ description: "功能实施任务模板"
 
 # 任务清单：[FEATURE NAME]
 
-**输入**：`/specs/[###-feature-name]/` 中的设计文档
+**输入**：`/specs/[###-feature-name]/` 中的设计文档  
 **前置**：plan.md（必需）、spec.md（用户故事必需）、research.md、data-model.md、contracts/
 
 **测试**：示例中包含测试任务。测试是可选项——仅当功能规格明确要求或用户主动请求时才加入。
 
-**覆盖率**：所有功能必须交付匹配的单元测试，`make test`、`make ui-test`、`make docs-test`、`make data-matrix`、`make coverage` 必须可运行并产出 ≥85% 的综合覆盖率；任务描述需明确测试文件与命令。
+**覆盖率**：所有功能必须交付匹配的单元测试，Go 侧 `go test ./...` 必须可运行并产出 ≥85% 的覆盖率；如有 Python 对照测试或基准脚本，任务需要明确其路径与执行命令。
 
-**栈约束**：所有任务必须指向真实路径，覆盖 `backend/internal/<context>/`（Go + DDD + 热插拔）、`backend/internal/<context>/infra/datastore/<provider>/`（多存储适配器）、`db/migrations/`（GORM 迁移）、`frontend/apps/*` 与 `frontend/packages/*`（Remix + React Router V7 + shadcn）、`docs/vitepress/`（文档）、`deploy/compose/`（Docker Compose）、`.github/workflows/docs.yml`（自动化部署）以及 `Makefile`（自动化入口）。
+**栈约束**：所有任务必须指向真实路径，覆盖 Python 参考实现（`agno/libs/agno/agno/` 与相关 tests）、Go 实现（例如 `go/agent`、`go/workflow` 等）、必要的脚手架脚本与配置；避免引用不存在的前端或基础设施目录。
 
-**组织方式**：任务按用户故事分组，确保每个故事都能独立实现与测试。
+**组织方式**：任务按用户故事或迁移单元分组，确保每个单元都能独立实现与测试，并清晰标注其对应的 Python 模块与 Go 包。
 
-## 格式：`[ID] [P?] [Story] 描述`
+## 格式：`[ID] [P?] [Unit] 描述`
 
 - **[P]**：可并行执行（不同文件，且无依赖）
-- **[Story]**：所属用户故事（如 US1、US2、US3）
+- **[Unit]**：所属迁移单元或用户故事（如 U1、U2、US1、US2）
 - 描述中必须包含精确文件路径
 
 ## 路径约定
 
-- **后端（Go + DDD）**：`backend/cmd/`（入口），`backend/internal/<context>/`（聚合/服务/ports），`backend/pkg/`（公共适配器），`backend/tests/`（contract/integration/unit）。
-- **数据层/多存储**：`db/migrations/`（受版本控制的 GORM 迁移），`backend/internal/<context>/infra/datastore/<provider>/`（SQLite/MySQL/PostgreSQL/MongoDB/Redis/DynamoDB/Firestore 适配器），`configs/datastores/`（可选矩阵配置），`db/seed/`（可选种子数据）。
-- **前端（Remix + React Router V7）**：`frontend/apps/web/app/`（routes, loaders, actions），`frontend/packages/ui/`（shadcn 主题），`frontend/packages/<feature>/`（热插拔组件）。
-- **文档与自动化**：`docs/vitepress/`（内容 + `.vitepress/config.ts`）、`.github/workflows/docs.yml`（文档部署流水线）、`pnpm-workspace.yaml`（包含 docs 包）、`Makefile`（dev/test/build/release/docs/observe）。
-- **基础设施**：`deploy/compose/*.yml`（Compose 环境）、`.env*` 模板、`scripts/`（如需的 helper）。
-- 下文示例均以该结构为例，交付时请替换为真实路径。
+- **Python 参考实现**：`agno/libs/agno/agno/` 下的核心模块（如 `agent`、`team`、`workflow`、`memory`、`knowledge`、`models`、`tools`、`os` 等），以及相应的 tests 目录。
+- **Go 实现**：集中在约定的 Go 根目录（例如 `go/`），按模块或领域划分子包（如 `go/agent`、`go/workflow` 等），并通过 `go.mod` 管理依赖。
+- **测试与工具**：Go 侧 `*_test.go` 文件、基准测试和辅助脚本（如用于对照测试的 Python/Go 桥接脚本），需要在任务中写明路径和执行命令。
+- **文档与脚本**：README、Cookbook、迁移说明文档以及用于本地开发的脚本（例如 `scripts/*.sh` 或等价工具）；若文档中描述了 Python 与 Go 的支持矩阵，任务需确保与实际实现一致。
+
+下文示例以上述结构为参考，实际交付时请替换为本仓库真实路径。
 
 <!-- 
   ============================================================================
@@ -39,7 +39,7 @@ description: "功能实施任务模板"
   - plan.md 描述的功能需求
   - data-model.md 中的实体
   - contracts/ 中的端点
-  任务必须按用户故事组织，以便：
+  任务必须按迁移单元或用户故事组织，以便：
   - 独立实现
   - 独立测试
   - 按 MVP 增量交付
@@ -49,135 +49,110 @@ description: "功能实施任务模板"
 
 ## Phase 1: Setup（共享基础设施）
 
-**目的**：搭建 Go + Remix + Vitepress 双栈骨架、Compose 环境与 Makefile/Workflow 入口
+**目的**：为 Python–Go 迁移搭建基础设施，包括 Go module、测试框架与最小对照测试环境。
 
-- [ ] T001 在 `backend/` 初始化 Go module（`go.mod`）、`cmd/api/main.go` 与基础限界上下文目录结构
-- [ ] T002 在 `frontend/` 通过 pnpm 初始化 workspace、创建 Remix 应用（`apps/web`）、shadcn/ui 基础包（`packages/ui`）以及 `docs/vitepress` workspace（含 `.vitepress/config.ts`）
-- [ ] T003 [P] 在 `deploy/compose/docker-compose.local.yml` 中声明 API、前端、SQLite、MySQL、PostgreSQL、MongoDB、Redis、LocalStack（DynamoDB/Firestore）与 Vitepress 预览服务，并生成 `.env.example`
-- [ ] T004 [P] 扩展根 `Makefile`：`dev`（Go/Remix/Vitepress）、`test`、`lint`、`compose-up/down`、`migrate/rollback`、`ui-test`、`data-matrix`、`docs-build`、`docs-deploy`、`coverage`
-- [ ] T005 配置统一的 lint/格式化/测试/覆盖率工具与 PNPM scripts（`golangci-lint`, `gofumpt`, `go test ./... -coverprofile`, `pnpm lint`, `pnpm test --coverage`, `pnpm docs:lint`, `stylelint` 等），并在 CI 中通过 `make lint`、`make coverage`
-- [ ] T006 [P] 创建/更新 `.github/workflows/ci.yml` 与 `.github/workflows/docs.yml`，确保调用 `make test`, `make data-matrix`, `make docs-build`, `make docs-deploy`
-- [ ] T007 [P] 生成 `configs/datastores/*.yaml`（或等价配置）用于声明多存储矩阵及默认驱动，供 speckit 与运行时引用
+- [ ] T001 在仓库中初始化 Go module（`go.mod`），并创建用于迁移的基础目录结构（例如 `go/agent`、`go/workflow` 等）。
+- [ ] T002 配置统一的 Go 开发工具链（如 `golangci-lint`、`gofumpt`），并提供脚本或 Make 目标执行 `go test ./...` 与静态检查。
+- [ ] T003 [P] 搭建最小的跨语言对照测试环境（例如通过 CLI、JSON 文件或 gRPC 调用 Python 实现），以便比较 Go 与 Python 的行为。
+- [ ] T004 [P] 在 `specs/` 中创建或更新用于迁移的规格与计划，明确首批迁移模块（例如 `agent`、`models` 或 `workflow`）及其优先级。
 
 ---
 
 ## Phase 2: Foundational（阻塞性前置）
 
-**目的**：准备限界上下文、GORM 迁移、Compose 服务与可观察性，解除后续故事阻塞
+**目的**：为首批迁移模块准备稳定的 Go 包结构、公共抽象和测试基线，解除后续迁移任务阻塞。
 
-**⚠️ 关键**：在此阶段完成前，禁止开始用户故事任务。
+**⚠️ 关键**：在此阶段完成前，禁止开始具体模块迁移任务。
 
 示例（按项目调整）：
 
-- [ ] T008 在 `backend/internal/<context>/` 中实现聚合、仓储接口以及 `service` 层，确保符合热插拔接口
-- [ ] T009 [P] 在 `db/migrations/` 中新增 `<timestamp>_<feature>.sql|.go`，包含 up/down，并通过 `make migrate`、`make rollback` 验证
-- [ ] T010 [P] 在 `deploy/compose/` 中为新增依赖（DB/Redis/队列等）添加服务、健康检查与 `.env` 条目
-- [ ] T011 [P] 在 `Makefile` 中追加 `observe`, `constitution-check`, `feature-toggle` 等目标，并在 CI workflow 中引用
-- [ ] T012 在 `backend/tests/contract/` 与 `backend/tests/integration/` 中补充测试骨架，覆盖限界上下文 API/事件
-- [ ] T013 在 `frontend/packages/ui/` 定义 shadcn 主题 tokens（Apple Human Interface + Microsoft Fluent 配色/间距）
-- [ ] T014 在 `frontend/apps/web/app/routes/` 中创建基础路由/loader/action，并将 UI 包以 pnpm workspace 链接
-
-**检查点**：基础完备，可开始并行处理用户故事
+- [ ] T008 为 Go 侧定义核心公共抽象（例如 Agent 接口、Tool 接口、Workflow 节点结构），并在合适的包中暴露。
+- [ ] T009 [P] 在 Go 侧编写基础测试工具与测试数据生成函数，便于在多个模块中重用。
+- [ ] T010 [P] 分析 Python 侧的错误模型与日志字段，为 Go 定义统一的错误类型与日志结构。
+- [ ] T011 建立最小的性能基线（例如针对简单 Agent 调用的 benchmark），记录当前 Python 与 Go 实现的对比数据。
 
 ---
 
-## Phase 3: 用户故事 1 - [标题]（优先级：P1）🎯 MVP
+## Phase 3: 迁移单元 1 - [模块名]（优先级：P1）
 
-**目标**：[该故事交付的能力]
+**目标**：迁移首个关键模块（例如 Agent 核心或 Workflow 内核），建立 Python–Go 行为对齐的标杆。
 
-**独立测试**：[如何单独验证该故事]
+**独立测试**：应能在仅依赖该模块的情况下，对 Go 实现进行单独测试与对照测试。
 
-### 用户故事 1 的测试（可选）⚠️
+### 迁移单元 1 的测试（可选）⚠️
 
-> **注意：若包含测试，先编写并确保失败，再实现功能。**
+- [ ] T012 [P] [U1] 在 Go 侧为该模块编写单元测试（`*_test.go`），覆盖主要路径与边界条件。
+- [ ] T013 [P] [U1] 设计并实现对照测试：对相同输入调用 Python 与 Go 实现，比对输出或事件序列。
 
-- [ ] T015 [P] [US1] 在 `backend/tests/contract/<context>_contract_test.go` 中编写契约测试，并在 `backend/internal/<context>/domain/<aggregate>_test.go`/`infra/<adapter>_test.go` 中补充单元测试
-- [ ] T016 [P] [US1] 在 `backend/tests/integration/<journey>_integration_test.go` 与 `frontend/apps/web/tests/<journey>.spec.ts`、`frontend/packages/ui/components/__tests__/<component>.spec.tsx` 中编写端到端 + UI 单元测试
+### 迁移单元 1 的实现
 
-### 用户故事 1 的实现
+- [ ] T014 [P] [U1] 在 Go 包中实现该模块的核心数据结构与接口（如 Agent、Tool、Workflow 节点等）。
+- [ ] T015 [U1] 将实现接入基础抽象（如公共错误类型、日志与配置），并确保与 Python 行为对齐。
+- [ ] T016 [U1] 如有需要，在 Python 项目中补充或校正测试，以澄清行为边界，并记录在文档中。
 
-- [ ] T017 [P] [US1] 在 `backend/internal/<context>/domain/<aggregate>.go` 中创建聚合/值对象
-- [ ] T018 [P] [US1] 在 `backend/internal/<context>/infra/<adapter>.go` 中实现 GORM 仓储/外部适配器
-- [ ] T019 [US1] 在 `backend/internal/<context>/app/service.go` 中实现应用服务并注册热插拔接口
-- [ ] T020 [US1] 在 `backend/cmd/api/handlers/<route>.go` 或 `frontend/apps/web/app/routes/<route>.tsx` 中暴露 HTTP/API/页面
-- [ ] T021 [US1] 更新 `db/migrations/<timestamp>_<name>.sql|.go` 及 `deploy/compose/` 中相关服务配置
-- [ ] T022 [US1] 在 `frontend/packages/ui/components/` 中构建/扩展 shadcn 组件并对齐 Apple/Microsoft 设计语言
-- [ ] T023 [US1] 更新 `Makefile` 功能开关/自测目标并追加可观察性日志
-- [ ] T024 [US1] 在 `docs/vitepress/<context>/<story>.md` 中记录接口、Compose/Make 命令与设计规范，并在 `.github/workflows/docs.yml` 中验证部署
-
-**检查点**：故事 1 应可独立运行并测试
+**检查点**：迁移单元 1 可独立测试，且对照测试通过。
 
 ---
 
-## Phase 4: 用户故事 2 - [标题]（优先级：P2）
+## Phase 4: 迁移单元 2 - [模块名]（优先级：P2）
 
-**目标**：[该故事交付的能力]
+**目标**：迁移第二个关键模块或在首个迁移单元之上扩展能力。
 
-**独立测试**：[如何单独验证]
+**独立测试**：仍应保持可以针对该模块进行单独测试与对照测试。
 
-### 用户故事 2 的测试（可选）⚠️
+### 迁移单元 2 的测试（可选）⚠️
 
-- [ ] T025 [P] [US2] 在 `backend/tests/contract/<context>_contract_test.go` 中补充契约测试，并在 `backend/internal/<context>/domain/<aggregate>_test.go`/`infra/<adapter>_test.go` 中覆盖单元测试
-- [ ] T026 [P] [US2] 在 `frontend/apps/web/tests/<journey>.spec.ts` 与 `frontend/packages/ui/components/__tests__/<component>.spec.tsx` 中实现用户旅程集成 + UI 单元测试
+- [ ] T019 [P] [U2] 在 Go 侧为该模块编写单元测试，并扩展对照测试覆盖新的行为。
 
-### 用户故事 2 的实现
+### 迁移单元 2 的实现
 
-- [ ] T027 [P] [US2] 在 `backend/internal/<context>/domain/<aggregate>.go` 中建模实体
-- [ ] T028 [US2] 在 `backend/internal/<context>/app/<usecase>.go` 中实现用例逻辑并通过接口注册
-- [ ] T029 [US2] 在 `frontend/apps/web/app/routes/<route>.tsx` 中创建 Remix 路由/loader/action，与 React Router V7 data APIs 对齐
-- [ ] T030 [US2] 在 `frontend/packages/ui/components/<component>.tsx` 中扩展 shadcn 组件或主题 token
-- [ ] T031 [US2] 在 `deploy/compose/docker-compose.local.yml` 中为该故事依赖的外部服务添加配置并更新 `.env`
-- [ ] T032 [US2] （如需）与用户故事 1 的热插拔模块集成，同时保持可独立启停
-- [ ] T033 [US2] 在 `docs/vitepress/<context>/<story>.md` 中补充 API、UI、数据库驱动及 `make docs-*`、`.github/workflows/docs.yml` 的验证结果
+- [ ] T021 [P] [U2] 在 Go 包中实现或扩展该模块的功能，保持与 Python 行为对齐。
+- [ ] T022 [U2] 根据需要更新 Python 测试或文档，避免对行为理解产生偏差。
 
-**检查点**：故事 1 与 2 均可独立运行
+**检查点**：迁移单元 1 与 2 均可独立运行并通过对照测试。
 
 ---
 
-## Phase 5: 用户故事 3 - [标题]（优先级：P3）
+## Phase 5: 迁移单元 3 - [模块名]（优先级：P3）
 
-**目标**：[该故事交付的能力]
+**目标**：迁移优先级较低但仍重要的模块，补齐整体能力。
 
-**独立测试**：[如何单独验证]
+**独立测试**：保持可以单独测试与对照测试。
 
-### 用户故事 3 的测试（可选）⚠️
+### 迁移单元 3 的测试（可选）⚠️
 
-- [ ] T034 [P] [US3] 在 `backend/tests/contract/<context>_contract_test.go` 中编写契约测试，并在 `backend/internal/<context>/domain/<aggregate>_test.go`/`infra/<adapter>_test.go` 中补充单元测试
-- [ ] T035 [P] [US3] 在 `frontend/apps/web/tests/<journey>.spec.ts` 与 `frontend/packages/ui/components/__tests__/<component>.spec.tsx` 中编写集成 + UI 单元测试
+- [ ] T034 [P] [U3] 在 Go 侧为该模块编写单元测试，并纳入对照测试矩阵。
 
-### 用户故事 3 的实现
+### 迁移单元 3 的实现
 
-- [ ] T036 [P] [US3] 在 `backend/internal/<context>/domain/<aggregate>.go` 中建模实体
-- [ ] T037 [US3] 在 `backend/internal/<context>/app/<workflow>.go` 中实现服务，并在 `backend/cmd/api/handlers/` 或 gRPC/事件层暴露
-- [ ] T038 [US3] 在 `frontend/apps/web/app/routes/<route>.tsx` 中实现页面/loader/action，并在 `frontend/packages/ui/` 中扩展组件
-- [ ] T039 [US3] 更新 `db/migrations/`、`Makefile`、`deploy/compose/` 中的增量配置，确保该模块可单独启停
-- [ ] T040 [US3] 在 `docs/vitepress/<context>/<story>.md` 中更新发布说明、数据库切换指南及 GitHub Workflow 验证结果
+- [ ] T036 [P] [U3] 在 Go 包中完成该模块的实现或重构。
+- [ ] T037 [U3] 更新相关文档与迁移说明，确保用户理解 Python 与 Go 的支持情况。
 
-**检查点**：所有用户故事可独立运行
+**检查点**：所有迁移单元可独立运行并通过对照测试。
 
 ---
 
-[如需更多故事，按同样模式扩展]
+[如需更多迁移单元或用户故事，按同样模式扩展]
 
 ---
 
 ## Phase N: 抛光与跨领域事项
 
-**目的**：影响多个用户故事的改进
+**目的**：影响多个迁移单元或全局行为的改进
 
-- [ ] TXXX [P] 更新 docs/ 文档
+- [ ] TXXX [P] 更新 README / Cookbooks / 迁移说明文档
 - [ ] TXXX 代码清理与重构
-- [ ] TXXX 全局性能优化
+- [ ] TXXX 全局性能优化与基准测试完善
 - [ ] TXXX [P] 如需新增的单元测试（tests/unit/）
-- [ ] TXXX 安全加固
-- [ ] TXXX 验证 quickstart.md 场景
+- [ ] TXXX 安全加固（如配置校验、敏感信息屏蔽）
+- [ ] TXXX 验证 quickstart 场景或端到端示例
 
 ---
 
-## 覆盖率 Gate（所有故事完成后执行）
+## 覆盖率 Gate（所有迁移单元完成后执行）
 
-- [ ] T041 运行 `make test`, `make ui-test`, `make docs-test`, `make data-matrix`, `make coverage`，确保综合覆盖率 ≥85%，并上传覆盖率报告/构建工件
-- [ ] T042 在 `docs/vitepress/status/coverage.md`、README badge 或 CI 注释中更新覆盖率、测试结果及 `make coverage` 命令输出链接
+- [ ] T041 运行 `go test ./... -cover`（以及必要的基准测试），确保 Go 侧综合覆盖率 ≥85%，并上传覆盖率报告或构建工件。
+- [ ] T042 在 README、迁移文档或 CI 注释中更新覆盖率、测试结果及关键性能指标，清晰呈现 Python 与 Go 的对比情况。
 
 ---
 
@@ -186,83 +161,84 @@ description: "功能实施任务模板"
 ### 阶段依赖
 
 - **Setup（Phase 1）**：无依赖，可立即开始
-- **Foundational（Phase 2）**：依赖 Setup，阻塞所有用户故事
-- **用户故事（Phase 3+）**：均依赖 Foundational 完成
+- **Foundational（Phase 2）**：依赖 Setup，阻塞后续迁移单元
+- **迁移单元（Phase 3+）**：均依赖 Foundational 完成
   - 若人手充足，可并行
   - 否则按优先级顺序（P1→P2→P3）串行
-- **Polish（最终阶段）**：依赖所有目标用户故事完成
+- **Polish（最终阶段）**：依赖所有目标迁移单元完成
 
-### 用户故事依赖
+### 迁移单元依赖
 
-- **US1 (P1)**：Foundational 后即可开始，无其他故事依赖
-- **US2 (P2)**：Foundational 后即可开始，若需与 US1 集成也应保持可独立测试
-- **US3 (P3)**：同上
+- **U1 (P1)**：Foundational 后即可开始，无其他单元依赖
+- **U2 (P2)**：在 U1 稳定的基础上扩展或可独立迁移，需明确与 U1 的依赖关系
+- **U3 (P3)**：同上，可依赖前序单元的接口或抽象，但应保持可独立测试
 
-### 单个故事内的顺序
+### 单个迁移单元内的顺序
 
 - 若有测试，必须“先写测试并看到失败”
-- 模型 → 服务 → 端点
-- 核心实现完成后再做整合
-- 完成一个故事后再进入下一优先级
+- 先定义抽象与数据结构，再实现核心行为
+- 实现完成后补充对照测试与基准测试
+- 完成一个迁移单元后再进入下一个优先级
 
 ### 可并行机会
 
 - 所有标记 [P] 的 Setup/Foundational 任务
-- Foundational 完成后，各用户故事可并行
-- 同一故事内标记 [P] 的测试/模型可并行
-- 不同用户故事可由不同成员并行推进
+- Foundational 完成后，各迁移单元可并行
+- 同一迁移单元内标记 [P] 的测试/模型可并行
+- 不同迁移单元可由不同成员并行推进
 
 ---
 
-## 并行示例：用户故事 1
+## 并行示例：迁移单元 1
 
 ```bash
 # 若需要测试，可同时启动：
-Task: "在 backend/tests/contract/<context>_contract_test.go 编写契约测试"
-Task: "在 backend/tests/integration/<journey>_integration_test.go 或 frontend/apps/web/tests/<journey>.spec.ts 编写集成测试"
+Task: "为 go/agent 编写 *_test.go 覆盖主要行为"
+Task: "实现 Python 与 Go 对照测试脚本，比较输出差异"
 
 # 可同时创建的模型：
-Task: "在 backend/internal/<context>/domain/<aggregate>.go 定义聚合"
-Task: "在 backend/internal/<context>/infra/<adapter>.go 实现 GORM 仓储"
+Task: "在 go/agent 定义核心接口与状态结构"
+Task: "在 go/agent/internal/ 实现具体行为，并接入日志与错误处理"
 ```
 
 ---
 
 ## 实施策略
 
-### MVP 优先（仅交付故事 1）
+### MVP 优先（仅交付迁移单元 1）
 
 1. 完成 Phase 1
 2. 完成 Phase 2（⚠️ 阻塞）
-3. 完成 Phase 3（US1）
-4. **暂停并验证**：独立测试 US1
-5. 若准备好，可部署/演示
+3. 完成 Phase 3（迁移单元 1）
+4. **暂停并验证**：通过单元测试与对照测试验证迁移单元 1
+5. 若准备好，可发布实验版本或内部演示
 
 ### 渐进式交付
 
 1. Setup + Foundational → 基础完成
-2. 加入 US1 → 独立测试 → 部署/演示（MVP）
-3. 加入 US2 → 独立测试 → 部署/演示
-4. 加入 US3 → 独立测试 → 部署/演示
-5. 每个故事都能带来增量价值且不破坏前面成果
+2. 加入 U1 → 独立测试与对照测试 → 部署/演示（MVP）
+3. 加入 U2 → 独立测试与对照测试 → 部署/演示
+4. 加入 U3 → 独立测试与对照测试 → 部署/演示
+5. 每个迁移单元都能带来增量价值且不破坏前面成果
 
 ### 并行团队策略
 
 1. 团队协作完成 Setup + Foundational
 2. 基础完成后：
-   - 开发者 A：US1
-   - 开发者 B：US2
-   - 开发者 C：US3
-3. 各故事独立完成并集成
+   - 开发者 A：U1
+   - 开发者 B：U2
+   - 开发者 C：U3
+3. 各迁移单元独立完成并集成
 
 ---
 
 ## 备注
 
 - 标记 [P] 表示不同文件、无依赖，可并行
-- [Story] 标签便于溯源到具体用户故事
-- 每个故事都应可独立完成与测试
+- [Unit] 标签便于溯源到具体迁移单元或用户故事
+- 每个迁移单元都应可独立完成与测试
 - 若写测试，必须先失败后实现
 - 建议每个任务或逻辑组完成后提交
 - 任意检查点都可暂停做独立验证
-- 避免模糊任务、同文件冲突、跨故事依赖打破独立性
+- 避免模糊任务、同文件冲突、跨单元依赖打破独立性
+

@@ -1,94 +1,132 @@
 <!--
-版本变更：1.1.0 → 1.2.0
+版本变更：1.2.0 → 2.0.0
 被修改的原则：
-- GORM 数据治理与迁移（SQL 驱动矩阵） → GORM 数据治理与迁移（SQL 驱动矩阵 + 覆盖率校验）
-- 多存储适配与数据服务矩阵 → 多存储适配与数据服务矩阵（含测试矩阵）
-- Remix + React Router V7 体验标准 → Remix + React Router V7 体验标准（前端单测约束）
-- Vitepress 文档与 GitHub 自动化发布 → Vitepress 文档与 GitHub 自动化发布（文档测试门）
-新增原则：
-- 全栈测试纪律与 85%+ 覆盖率
-新增章节：无（既有章节扩写）
-移除章节：无
+- Go + DDD 内核与热插拔服务 → Python–Go 行为对齐与模块迁移
+- Compose-First 可部署性 → 移除（当前仓库仅关注库级迁移）
+- GORM 数据治理与迁移（SQL 驱动矩阵） → Go 存储适配器与一致性（库级）
+- 多存储适配与数据服务矩阵 → Go 存储适配器与一致性（库级）
+- Makefile 驱动的自动化流水线 → Go 模块化构建与工具化工作流
+- Remix + React Router V7 体验标准 → 移除（本仓库不包含前端）
+- Vitepress 文档与 GitHub 自动化发布 → 文档与示例对齐 Python 生态
+- 全栈测试纪律与 85%+ 覆盖率 → 跨语言测试纪律与 85%+ 覆盖率
+新增章节：
+- 项目使命与范围
+- Python 参考实现与对齐原则
+移除章节：
+- 全栈技术栈要求
+- 开发流程与质量门（前后端/Compose/Vitepress 相关部分）
 模板同步：
 - ✅ .specify/templates/plan-template.md
 - ✅ .specify/templates/spec-template.md
 - ✅ .specify/templates/tasks-template.md
 - ⚠️ .specify/templates/commands/（目录不存在，无文件可同步）
-未完成的 TODO：无
+未完成的 TODO：
+- 无
 -->
-# Agno Go 宪章
+
+# Agno-Go 宪章
+
+## 项目使命与范围
+
+- 本仓库的使命是为 Python 项目 `./agno` 中的 Agno 框架提供高质量、可维护的 Go 语言实现，使核心能力（Agents、Teams、Workflows、AgentOS 等）在 Go 中具备与 Python 版本尽可能一致的行为与开发体验。
+- Python 代码库（`./agno/libs/agno/agno/` 及其 tests）是事实规范：Go 实现必须以其公开行为、文档和测试为主要参考，而不是随意自创不兼容语义。
+- Go 版本应服务于以下目标：
+  - 为追求性能、静态类型和简化部署的团队提供一流体验；
+  - 在关键抽象（Agent、Tool、Memory、Knowledge、Workflow 等）上保持与 Python 版本概念上的一致性；
+  - 通过契约测试与文档确保两种语言实现可以互相作为示例和规范。
 
 ## 核心原则
 
-### Go + DDD 内核与热插拔服务
-- 所有后端应用 MUST 使用 Go，并以领域驱动设计（DDD）的限界上下文、聚合、仓储、应用服务模式组织代码，禁止临时脚本或其他运行时语言直接进入生产路径。
-- 每个能力必须实现稳定的 Go 接口（`/internal/<context>/ports.go` 等），并通过依赖注入或插件注册方式提供实现，以便按需装载/卸载，确保“所有功能可热插拔”。
-- 领域逻辑与适配器需完全解耦；变更不得跨越上下文耦合数据库模型或 HTTP handler，热插拔模块只能依赖接口和领域事件。
-- 针对每个上下文，必须提供契约级别的单元/集成测试，并在禁用该模块时保持其它上下文可运行，以验证热插拔能力。
+### Python 参考实现与行为对齐
 
-### Compose-First 可部署性
-- 仓库必须提供单条 `docker compose up` 流程，将 Go 服务、Remix 前端、数据库、队列、缓存、Vitepress 及其它依赖全部启动，新增依赖必须同步更新 Compose 文件及 `.env.example`。
-- Compose 服务需定义健康检查、卷与网络隔离，且默认镜像均源自本仓库构建的镜像或已验证的公开镜像；临时脚本或手动步骤不得作为部署前提。
-- 任何基础设施或依赖服务变更都必须在 PR 中更新 Compose 文件、文档以及对应的 `make compose-*` 目标，确保 CI/CD 与本地体验一致。
+- Python 实现是功能与语义的首要参考源：任何 Go 功能都必须在 Python 侧找到对应模块、类或 API，或者在规格中明确说明差异与理由。
+- 当 Python 版本新增能力时，必须在规格和计划中记录该能力是否需要 Go 侧跟进，以及跟进优先级；禁止在没有说明的情况下让两边语义长期漂移。
+- 行为对齐以可观察行为为准（函数输入输出、错误类型/状态、事件序列等），而不是逐行翻译实现细节；Go 实现可以采用不同算法或数据结构，但不得改变对外契约。
+- 若 Go 侧出于性能或安全考虑需要偏离 Python 行为，必须在 spec/plan 中记录偏离点、理由以及对调用方的影响，并为此新增或更新测试与文档。
 
-### GORM 数据治理与迁移（SQL 驱动矩阵）
-- SQL 数据访问层 MUST 使用 GORM；SQLite、MySQL、PostgreSQL 的仓储均需共享领域接口及统一迁移定义，并禁止绕过 GORM 直接拼接 SQL。
-- 所有 schema 变更需通过受版本控制的迁移（`/db/migrations/<timestamp>_<name>.sql|.go`），迁移必须包含 up/down、变更说明及回滚验证，且覆盖三种 SQL 驱动。
-- `make migrate`、`make rollback`、`make sqldb-test` 需要串联 gormigrate/golang-migrate，并在 CI 中针对 SQLite/MySQL/PostgreSQL 并行运行；直接修改数据库或导出 dump 被禁止。
-- 每次发布必须记录当前迁移版本号，并在 Compose 启动、健康检查与 `make coverage` 报告中验证三种 SQL 数据库迁移与测试均通过。
+### Go API 设计与包结构
 
-### 多存储适配与数据服务矩阵
-- 项目内必须提供 SQLite、MySQL、PostgreSQL、MongoDB、Redis、DynamoDB、Firestore 的独立适配器，并通过 DDD 仓储接口热插拔；NoSQL/缓存驱动需位于 `backend/internal/<context>/infra/datastore/<provider>/` 并以依赖注入启用。
-- `deploy/compose/` 必须包含相应服务或本地模拟器（MongoDB/Redis 原生镜像，DynamoDB/Firestore 可使用 LocalStack/Firestore emulator），并提供 `make compose-data` 快速启停。
-- `make data-matrix` 必须运行跨存储契约/单元/集成测试，确保任一驱动被禁用或替换时其余驱动仍可运行，且测试结果纳入覆盖率统计。
-- 规格与实现需要说明某个功能依赖哪种存储，并提供切换说明，禁止引入未列出的数据库类型。
+- Go 源码必须采用清晰、可预期的包结构，将 Python 中的核心模块（如 `agent`、`team`、`workflow`、`memory`、`knowledge`、`models`、`tools`、`os` 等）映射到 Go 包（例如 `agent`、`team`、`workflow`、`memory`、`knowledge`、`models`、`tools`、`os` 等），避免杂乱或高度耦合的 “utils” 包。
+- Go API 设计 MUST 遵循 Go 社区最佳实践：显式错误返回、`context.Context` 传递、不可变配置结构体、清晰的接口边界；禁止直接照搬 Python 风格的动态参数或魔法行为到 Go。
+- 包内部实现应保持单一职责和稳定接口：对外导出的类型和函数一旦发布，需要通过语义化版本管理变更并提供迁移指南。
+- Go 实现不得强制依赖具体的 HTTP 框架、数据库或队列实现；这类依赖应通过接口、适配器或可替换的模块暴露，以便在不同部署环境中灵活组合。
 
-### Makefile 驱动的自动化流水线
-- Makefile 是唯一入口，涵盖初始化、依赖安装、构建、测试、代码生成、Compose 管理、迁移、Vitepress、部署打包；文档中禁止调用裸命令而绕过 Make。
-- 新增工作流（如 `pnpm install`, `go generate`, `docker build`, `pnpm docs:build`, `pnpm test --coverage`）必须对应 `make` 目标或扩展现有目标，且目标需通过 `help`/注释描述用途与依赖顺序。
-- 所有 CI 任务必须复用相同的 `make` 目标，确保本地与流水线行为一致；绕过 Make 的脚本将被拒绝。
+### 跨语言测试纪律与 85%+ 覆盖率
 
-### Remix + React Router V7 体验标准
-- 前端唯一合法栈为 Remix + React Router V7，项目需通过 pnpm workspace 管理 `apps/*` 与 `packages/*`；新增应用或包必须注册在 `pnpm-workspace.yaml` 中，并与 Vitepress workspace 共存。
-- UI 组件基于 shadcn/ui 原子组件构建，并通过 Apple Human Interface Guidelines 与 Microsoft Fluent 设计语言定义的 tokens（色彩、动效、间距）驱动；提交中需说明引用的设计规范。
-- 路由、数据加载、action 必须使用 Remix/React Router 提供的 data APIs（loader/action/defer）；任何自定义路由实现需经架构评审。
-- 组件库与页面布局需保持主题化和按需分发，支持在不破坏 API 的情况下替换视觉层，以匹配“热插拔”理念。
+- 测试是行为对齐的主要工具：针对每个被迁移的模块，应在 Python 与 Go 两侧维护对应的测试场景（或共享的契约测试描述），确保关键路径在两种语言下都得到验证。
+- Go 侧必须使用标准 `go test` 和表驱动测试模式；对外导出 API 必须有单元测试，重要组合流程需有集成或契约测试。综合覆盖率（按 Go 代码统计）必须达到或超过 85%。
+- 推荐引入 “对照测试”（parity tests）：对相同输入，分别调用 Python 与 Go 实现，将输出或中间结果序列化为可比较格式（例如 JSON 或结构化日志），以检测行为差异。
+- 任何跳过测试（`t.Skip` 或等价机制）都必须在任务和 PR 描述中说明原因和补救计划；禁止长期存在未解释的跳过。
 
-### Vitepress 文档与 GitHub 自动化发布
-- `docs/vitepress` 是唯一权威文档站点，必须纳入 pnpm workspace，提供 `pnpm docs:dev`、`pnpm docs:build`、`pnpm docs:preview`，并在 Makefile 中映射 `make docs-*` 目标。
-- 每个功能、数据库适配器或 UI 组件在交付前必须更新 Vitepress 内容，新增或修改条目需包含设计语言引用、API/CLI 示例以及 `docker compose`/`make` 操作指南。
-- `.github/workflows/docs.yml`（或等价文件）必须在 docs 目录变更时自动构建并部署 Vitepress（GitHub Pages/静态存储）；禁用该流程需提交架构批准与替代方案。
-- 文档构建必须在 CI 中运行（`make docs-test`），并阻止破坏性变更；缺失文档更新的 PR 不得合并。
+### 性能与资源使用基线
 
-### 全栈测试纪律与 85%+ 覆盖率
-- 所有 Go 包、Remix/shadcn 组件、数据适配器与 Vitepress 自定义逻辑必须具备单元测试文件（`*_test.go`、`*.spec.ts(x)`、`docs/vitepress/tests/*.ts` 等），并在 PR 中随实现同时提交。
-- `make test`（Go + 多数据库驱动）、`make ui-test`（Remix/shadcn）、`make docs-test`（Vitepress）与 `make data-matrix` 必须在 CI 中执行，任何跳过都需架构批准并附补救计划。
-- `make coverage` 需聚合 Go 覆盖率（`go test ./... -coverpkg=./...`）、pnpm/Remix 覆盖率（`pnpm test --coverage`）、Vitepress 自测，综合覆盖率 MUST ≥85%，并通过构建日志、badge 或 PR 机器人公布；低于阈值的 PR 必须补测或缩小改动范围。
-- 临时跳过测试（`t.Skip`, `test.skip`, `describe.skip` 等）必须在 PR 描述中列出并登记补测 issue，禁止在生产分支长期存在。
+- Go 迁移的一个核心目标是性能与资源效率；在同等功能下，Go 实现 SHOULD 至少达到 Python 版本的性能表现，且在 CPU 与内存占用上不显著劣于 Python。
+- 对关键路径（如模型调用封装、工具执行调度、工作流执行引擎）必须基于基准测试（benchmark）评估 Go 与 Python 的性能差异，并在性能退化时优先优化 Go 实现。
+- 对性能敏感的功能（例如并发任务调度、长连接管理、批量 I/O）必须提供基准测试和性能文档，记录测试环境、输入规模和结果，用于指导后续优化与回归检测。
 
-## 全栈技术栈要求
-- **语言与运行时**：后端锁定 Go 1.23+（升级需验证所有模块兼容），前端锁定 TypeScript 5.x + Remix 2.x；跨语言组件通过 gRPC/REST 契约通信。
-- **项目结构**：`backend/` 容纳 Go 服务（按限界上下文划分子模块），`frontend/` 由 pnpm workspace 管理 Remix 应用与 shadcn 基础库，`docs/vitepress/` 保存文档站点，`deploy/compose/` 储存环境特定 Compose 文件，`db/migrations/` 保存迁移。
-- **数据与缓存矩阵**：SQLite 使用本地文件卷，MySQL/PostgreSQL 通过独立容器，MongoDB/Redis 使用官方镜像，DynamoDB/Firestore 通过 LocalStack 或官方 emulator；全量驱动需在 `configs/datastores/*.yaml` 或等价目录声明。
-- **可观察性**：Compose 环境必须暴露 Prometheus/OpenTelemetry collector，Makefile 中需提供 `make observe` 以启动/查看指标，并在多存储模式下产出独立指标命名空间。
-- **文档与知识**：Vitepress 主题必须实现 Apple/Microsoft 设计语言 tokens，`docs/vitepress/.vitepress/config.ts` 需记录版本信息、导航与多存储矩阵；GitHub Workflow 的部署密钥必须通过 SOPS/secret manager 注入。
-- **测试与覆盖**：必须配置 `make test`、`make ui-test`、`make docs-test`、`make data-matrix`、`make coverage`，并在 CI 中强制运行；覆盖率报告需上传至构建工件或 README/Docs badge。
-- **安全性**：所有 secrets 通过 `.env` 模板 + SOPS/密管注入，禁止硬编码；CI 必须在密文缺失时失败，且多数据库凭据需分离。
+### 安全、配置与 Telemetry
 
-## 开发流程与质量门
-1. **设计前置**：所有 speckit 规格需声明所涉限界上下文、需要热插拔的模块、依赖的数据库/缓存驱动、需要新增的 Compose 服务、数据库迁移、Vitepress 页面、必须补齐的测试类型（unit/contract/integration/docs）以及必需的 Make/coverage 目标。
-2. **计划 Gate**：Plan 中的 “宪章检查” 必须逐条验证 Go+DDD、Compose、GORM+迁移、多存储矩阵、Makefile 自动化、Remix+pnpm+shadcn、Vitepress+GitHub Workflow、测试与 85% 覆盖率以及平台运行约束。
-3. **实现 Gate**：
-   - 新增后端功能前先生成/修改迁移、SQL/NoSQL 驱动以及契约/单元测试，并通过 `make test`、`make lint`、`make compose-test`、`make data-matrix`；未覆盖的新代码不得合并。
-   - 前端变更需在 pnpm workspace 中新增/更新包并运行 `make ui-test`、`pnpm test --coverage`，且 PR 描述需链接所采用的设计语言章节与 UI 测试路径。
-   - 文档更新必须包含 Vitepress 页面/导航、示例代码与部署步骤，并通过 `make docs-build`、`make docs-test`；PR 需附带 GitHub workflow 运行记录。
-   - 任意 PR 都必须附带 Compose、Makefile、Docs 变更与 `make coverage` 报告的验证结果（日志或截图）。
-4. **发布 Gate**：`make release` 必须打包 Go 二进制、前端构建产物、Vitepress 静态资源与 Compose 清单，记录 SQL 迁移版本号、多存储驱动版本、最新覆盖率及 Vitepress 构建号；发布说明中必须包含热插拔模块、数据库驱动的启用/禁用、测试与覆盖率报告及文档链接。
+- 所有凭据与敏感配置必须通过环境变量、配置文件或密钥管理系统注入，严禁硬编码到 Go 源码中；需要与 Python 侧的配置约定保持兼容或在文档中清晰对比。
+- Go 实现的日志与 Telemetry（如 metrics、traces）应与 Python 版本在语义上保持一致，便于跨语言排障，例如相同的事件名称、标签与错误分类。
+- 任何可能影响用户隐私或数据安全的行为（如默认上报 Telemetry、外部网络调用）必须在文档中显式说明，并提供禁用方案；默认配置应倾向于隐私友好。
+
+### 文档与示例对齐
+
+- Go 相关文档和示例必须与 Python 文档保持互补关系：每当 Python 文档新增关键概念（如新的 Agent 类型、工具模式或工作流模式），应评估是否需要 Go 端示例或说明。
+- 面向用户的文档必须清晰标注哪些功能在 Go 中可用、哪些仍为 Python-only，并在迁移计划中跟踪缺失部分，避免让用户误以为两边已经完全对齐。
+- 示例项目、Cookbook 和 Quickstart 应覆盖 Go 与 Python 两端的典型使用场景（至少一个端到端示例），并标明代码路径、运行命令以及预期输出。
+
+## 技术栈与项目结构
+
+- **语言与运行时**：
+  - Python：用于参考实现，当前代码位于 `./agno/`，核心包在 `./agno/libs/agno/agno/`。
+  - Go：用于迁移与新实现，代码需集中管理（例如在 `./go/` 或等价目录），并通过 `go.mod` 声明模块路径。
+- **测试与工具**：
+  - Python 测试使用 `pytest` 等现有工具，沿用上游项目约定。
+  - Go 测试使用 `go test`、基准测试以及必要的静态检查工具（如 `golangci-lint`），并通过统一脚本或 Makefile 入口调度。
+- **目录与职责**（示例约定，具体由 `plan.md` 落实）：
+  - `agno/`：上游 Python 项目镜像，不在本宪章下重构，仅作为规范与回归基线。
+  - `go/`（或等价目录）：Go 源码，按领域或模块划分子包，如 `agent`、`models`、`tools`、`workflow`、`os` 等。
+  - `specs/`：特性规格与计划（由 speckit 管理），需说明 Python 与 Go 影响面。
+
+## 迁移流程与质量门
+
+1. **分析 Python 行为**
+   - 在编写任何 Go 代码前，必须阅读相关 Python 模块、测试与文档，明确要迁移的能力边界、输入输出、错误处理以及依赖关系。
+   - 在 `spec.md` 中记录该迁移涉及的 Python 路径（模块、类、函数）和预期使用场景。
+
+2. **设计 Go API 与数据结构**
+   - 在 `plan.md` 中描述目标 Go 包、公开 API、主要数据结构和依赖接口，并说明与 Python 抽象的映射关系。
+   - 如需对 Python API 做语义调整（例如将动态参数拆解为结构体配置），必须在规格与计划中给出理由与迁移路径。
+
+3. **先写测试再实现**
+   - 在 Go 侧先编写失败的单元测试或契约测试，理想情况下可参照 Python 测试用例或从中提炼测试数据。
+   - 对于跨语言对照测试，建议首先实现一个最小的桥接层（例如通过 CLI、JSON 文件或 gRPC 调用 Python 实现），用来比对 Go 输出与 Python 结果。
+
+4. **实现与重构**
+   - 实现 Go 代码时优先考虑可读性和可测试性，而不是逐行翻译 Python；必要时通过重构 Python 测试或新增规格来澄清模糊行为。
+   - 对于共享概念（例如 Agent 生命周期、Session 管理、Tool 调用协议），应在 Go 与 Python 两侧保持统一命名与状态机定义。
+
+5. **质量门与回归验证**
+   - 每个迁移单元（一个包或一组特性）完成后，必须通过：
+     - 相关 Go 单元测试与对照测试；
+     - Python 侧原有测试（确保未引入对上游行为的误解）；
+     - 必要时的性能基准测试。
+   - 在 `tasks.md` 中勾选对应任务，并在 PR 描述中链接涉及的 Python 模块、Go 包和测试文件。
 
 ## 治理
-- 本宪章优于其他工程规范；任何冲突由架构小组裁决，未列明主题默认遵循 Go/Remix/Vitepress 社区最佳实践。
-- 修订流程：提出 RFC → 在 speckit 文档中描述影响（涵盖多存储矩阵、Vitepress 部署与测试覆盖）→ 更新宪章与相关模板 → 依据变更范围更新版本号（MAJOR：原则重写或删除；MINOR：新增原则/章节或大幅扩写；PATCH：措辞澄清）。
-- 监督机制：每次 PR 审查必须引用 Plan 的宪章检查项；CI 需运行 `make constitution-check`（调用 lint/test/migration/data/compose/docs/coverage 验证）并在失败时阻塞。
-- 合规审查：季度审查要回顾 Compose 可用性、多数据库驱动一致性、迁移版本差异、Make 目标覆盖率、前端体验一致性、Vitepress/GitHub Workflow 成功率与覆盖率指标；发现违规需在两周内补齐或提交宪章修订提案。
 
-**Version**: 1.2.0 | **Ratified**: 2025-11-18 | **Last Amended**: 2025-11-18
+- 本宪章优先于其他工程规范，并专注于 Python–Go 行为对齐与代码迁移；如与上游 Python 项目的贡献指南或风格约定冲突，应在 RFC 中明确权衡并更新本宪章。
+- 修订流程：
+  - 提出 RFC，说明变更对 Python 与 Go 两侧行为、测试与文档的影响；
+  - 在 speckit 的 plan/spec 中记录治理变更；
+  - 同步更新本宪章及相关模板（`plan-template.md`、`spec-template.md`、`tasks-template.md`），并根据影响范围更新版本号：
+    - MAJOR：原则删除或重写，导致已有实现需要显著调整；
+    - MINOR：新增原则或章节，或显著扩写指南；
+    - PATCH：措辞澄清、拼写修复或非语义性微调。
+- 合规机制：
+  - speckit 生成的 `plan.md` 与 `tasks.md` 必须包含“Python 行为分析”“Go 实现与测试”“跨语言对照测试”等任务；
+  - 代码评审需检查是否遵守本宪章的行为对齐、测试与文档要求。
+
+**Version**: 2.0.0 | **Ratified**: 2025-11-18 | **Last Amended**: 2025-11-19
+

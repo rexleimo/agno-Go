@@ -5,3 +5,9 @@
 .codex/history.jsonl
 .codex/log/
 agno/
+
+# Go build artifacts
+*.exe
+*.test
+*.out
+vendor/

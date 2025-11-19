@@ -1,0 +1,160 @@
+openapi: 3.0.3
+info:
+  title: Agno-Go Migration Parity API
+  version: 0.1.0
+  description: |
+    API contracts for orchestrating parity tests between Python agno and Go agno-Go
+    implementations, based on the "agno 核心 agents 能力迁移" specification.
+
+servers:
+  - url: https://example.com # Placeholder; actual deployment is out of scope for this plan.
+
+paths:
+  /v1/parity/runs:
+    post:
+      summary: Start a new parity test run
+      description: >
+        Starts a new parity test run for one or more ParityTestScenario definitions,
+        executing each scenario against both Python and Go implementations and
+        recording comparable outputs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParityRunRequest'
+      responses:
+        '201':
+          description: Parity run created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParityRun'
+        '400':
+          description: Invalid request (unknown scenarios or invalid configuration)
+        '503':
+          description: Parity runner temporarily unavailable
+
+  /v1/parity/runs/{run_id}:
+    get:
+      summary: Get parity run status and summary
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Parity run details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParityRun'
+        '404':
+          description: Parity run not found
+
+  /v1/parity/scenarios:
+    get:
+      summary: List available parity test scenarios
+      responses:
+        '200':
+          description: List of parity test scenarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ParityTestScenario'
+
+components:
+  schemas:
+    ParityRunRequest:
+      type: object
+      required:
+        - scenario_ids
+      properties:
+        scenario_ids:
+          type: array
+          items:
+            type: string
+          description: IDs of ParityTestScenario definitions to execute.
+        strict_mode:
+          type: boolean
+          description: >
+            When true, all scenarios are treated as "must_match" and any deviation
+            between Python and Go results is considered a failure.
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional metadata (e.g., branch name, build id).
+
+    ParityRun:
+      type: object
+      required:
+        - id
+        - status
+        - scenarios
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        scenarios:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParityRunScenarioResult'
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    ParityRunScenarioResult:
+      type: object
+      required:
+        - scenario_id
+        - status
+      properties:
+        scenario_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, passed, failed]
+        python_output:
+          type: object
+          description: Normalized Python implementation output (for comparison).
+        go_output:
+          type: object
+          description: Normalized Go implementation output (for comparison).
+        diff_summary:
+          type: string
+          description: Human-readable summary of differences, if any.
+
+    ParityTestScenario:
+      type: object
+      required:
+        - id
+        - description
+        - severity
+        - input_payload
+      properties:
+        id:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [must_match, should_match]
+        input_payload:
+          type: object
+          description: Fixed input data for both Python and Go implementations.
+        tolerance:
+          type: object
+          description: |
+            Optional tolerance definition (e.g., string similarity threshold)
+            used when comparing Python and Go outputs.
+

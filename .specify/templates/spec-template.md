@@ -96,12 +96,9 @@
 
 ## 宪章对齐 *(必填)*
 
-- **Go + DDD / 热插拔**：本规格涉及的限界上下文、接口、领域事件、可插拔模块；说明禁用该模块时的替代流程。
-- **Compose-First 可部署性**：列出需要新增/更新的 Compose 服务、环境变量、健康检查以及 `docker compose` / `make compose-*` 验证步骤。
-- **GORM 数据治理与迁移**：说明需要创建/修改的迁移文件名、受影响的实体以及 `make migrate` / `make rollback` 的验证计划。
-- **多存储适配矩阵**：列出本功能所依赖的 SQLite/MySQL/PostgreSQL/MongoDB/Redis/DynamoDB/Firestore 驱动，描述如何通过 `backend/internal/.../infra/datastore/` 实现热插拔以及 `make data-matrix` 的验证策略。
-- **Makefile 自动化**：枚举需要新增或扩展的 `make` 目标（dev/test/build/release/observe），并指明 CI 如何复用。
-- **Remix + React Router V7 + pnpm + shadcn**：列出新增/修改的 pnpm workspace、Remix 路由、shadcn 组件以及所遵循的 Apple/Microsoft 设计语言章节。
-- **Vitepress + GitHub Docs Workflow**：说明需要更新的 `docs/vitepress` 章节、导航、示例及 `.github/workflows/docs.yml` 的自动化影响。
-- **测试纪律 + 85% 覆盖率**：阐明需要追加的后端/前端/文档单元测试、契约/集成测试、`make test|ui-test|docs-test|data-matrix|coverage` 的执行以及如何确保覆盖率 ≥85%。
-- **平台运行约束**：描述默认数据库/缓存、可观察性（Prometheus/Otel）、Secrets/SOPS 管理在本规格中的变动或依赖。
+- **Python 参考实现与行为对齐**：本规格涉及的 Python 模块、类、函数路径（例如 `agno/libs/agno/agno/agent/...`），以及在 Go 中需要保持一致的行为或明确允许的差异。
+- **Go API 设计与包结构**：说明 Go 侧目标包与导出 API（例如 `go/agent`、`go/workflow` 等），以及它们如何映射到 Python 抽象；若存在语义调整，请解释理由与迁移路径。
+- **跨语言测试纪律与 85% 覆盖率**：阐明需要新增或更新的 Go 单元测试、集成或契约测试，以及如何设计对照测试来验证 Python 与 Go 行为一致；给出 `go test` 和其它工具的执行方式与覆盖率目标。
+- **性能与资源使用基线**：描述性能敏感路径、预期性能目标，以及如何对比 Python 与 Go 在相同场景下的延迟与资源占用；如需基准测试，请说明位置与指标。
+- **安全、配置与 Telemetry**：说明本规格涉及的配置项、Secrets、外部依赖与 Telemetry 事件，并描述如何在 Go 中避免泄露、滥用或与 Python 约定不一致。
+- **文档与示例对齐**：列出需要更新或新增的文档（如 README、Cookbook、Quickstart 等）与示例代码路径，说明如何向用户清晰展示 Python 与 Go 的支持矩阵。
