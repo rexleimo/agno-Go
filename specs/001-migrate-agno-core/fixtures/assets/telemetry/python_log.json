@@ -1,0 +1,57 @@
+[
+  {
+    "eventId": "py-run-1",
+    "timestamp": "2025-11-19T08:00:00Z",
+    "runtime": "python",
+    "eventType": "run_started",
+    "sessionId": "session-1",
+    "workflowRunId": "run-123",
+    "payload": {
+      "prompt_tokens": 120,
+      "latency_ms": 10
+    }
+  },
+  {
+    "eventId": "py-reason-1",
+    "timestamp": "2025-11-19T08:00:02Z",
+    "runtime": "python",
+    "eventType": "reasoning_step",
+    "sessionId": "session-1",
+    "payload": {
+      "thought": "Collecting context"
+    }
+  },
+  {
+    "eventId": "py-tool-1",
+    "timestamp": "2025-11-19T08:00:03Z",
+    "runtime": "python",
+    "eventType": "tool_call",
+    "sessionId": "session-1",
+    "payload": {
+      "tool": "hackernews-tools",
+      "completion_tokens": 80,
+      "total_tokens": 200
+    }
+  },
+  {
+    "eventId": "py-session-summary",
+    "timestamp": "2025-11-19T08:00:05Z",
+    "runtime": "python",
+    "eventType": "session_summary",
+    "sessionId": "session-1",
+    "payload": {
+      "summary": "Placeholder summary"
+    }
+  },
+  {
+    "eventId": "py-run-complete",
+    "timestamp": "2025-11-19T08:00:06Z",
+    "runtime": "python",
+    "eventType": "run_completed",
+    "sessionId": "session-1",
+    "payload": {
+      "status": "success",
+      "latency_ms": 42
+    }
+  }
+]

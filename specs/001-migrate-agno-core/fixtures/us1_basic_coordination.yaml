@@ -1,0 +1,88 @@
+fixture_id: us1_basic_coordination
+description: |
+  Canonical fixture covering the cookbook "US1 Basic Coordination" scenario.
+  Includes single-agent reasoning, coordinator/worker collaboration, and the
+  multi-step workflow summarized in spec.md.
+workflow_template:
+  id: us1-basic-coordination
+  version: "1.0.0"
+  pattern_type: sequential
+  entry_points:
+    - search_hackernews
+  agents:
+    - id: hn_researcher
+      role: HackerNews Researcher
+      provider: openai-chat-gpt-5-mini
+    - id: article_reader
+      role: Article Reader
+      provider: openai-chat-gpt-5-mini
+  metadata:
+    cookbook: agno/cookbook/workflows/us1_basic_coordination
+    provider_manifest: go/providers/providers.go
+user_inputs:
+  - role: user
+    content: |
+      Summarize remote-work insights from today's HackerNews front page and keep
+      the answer under 200 words.
+    references: []
+    timestamp: 2025-11-19T08:00:00Z
+    seed: 7
+    metadata:
+      scenario: single-agent
+  - role: coordinator
+    content: |
+      Gather the top two stories and hand off URLs to the article_reader agent.
+    references:
+      - hackernews-tools:search_hackernews
+    timestamp: 2025-11-19T08:00:05Z
+    metadata:
+      scenario: team
+  - role: user
+    content: |
+      Provide the final executive summary that merges researcher + reader notes.
+    references:
+      - hackernews-tools:search_hackernews
+      - newspaper4k-tools:read_articles
+    timestamp: 2025-11-19T08:00:12Z
+    metadata:
+      scenario: workflow
+tool_responses:
+  - tool_name: hackernews-tools
+    run_id: search_hackernews
+    outputs:
+      stories:
+        - title: "Go overtakes Python for backend teams"
+          url: https://news.ycombinator.com/item?id=123
+        - title: "Distributed teams learn to love async"
+          url: https://news.ycombinator.com/item?id=456
+    metadata:
+      provider_id: hackernews-tools
+  - tool_name: newspaper4k-tools
+    run_id: read_articles
+    outputs:
+      summaries:
+        - title: "Go overtakes Python for backend teams"
+          summary: |
+            The article argues that Go's static tooling and concurrency model
+            reduce coordination overhead compared to Python when teams deploy
+            hundreds of services.
+        - title: "Distributed teams learn to love async"
+          summary: |
+            Remote-first orgs lean on async rituals and lightweight agents to
+            keep projects moving without daily sync meetings.
+    metadata:
+      provider_id: newspaper4k-tools
+expected_assertions:
+  - type: equality
+    path: workflow_template.id
+    expected: us1-basic-coordination
+  - type: contains
+    path: tool_responses[0].outputs.stories[0].title
+    expected: Go overtakes Python
+  - type: contains
+    path: user_inputs[0].content
+    expected: HackerNews
+  - type: tolerance
+    path: metrics.prompt_tokens
+    expected: 120
+    tolerance: 15

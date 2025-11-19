@@ -23,13 +23,13 @@ type Schema struct {
 // memory.
 type MemoryPolicy struct {
 	// Persist indicates whether memory should be persisted beyond a single run.
-	Persist bool
+	Persist bool `json:"persist,omitempty"`
 	// WindowSize indicates the preferred number of recent interactions to keep
 	// in active context. Zero means implementation-defined default.
-	WindowSize int
+	WindowSize int `json:"windowSize,omitempty"`
 	// SensitiveFiltering notes whether sensitive data should be filtered from
 	// stored memory.
-	SensitiveFiltering bool
+	SensitiveFiltering bool `json:"sensitiveFiltering,omitempty"`
 }
 
 // Agent represents an executable unit with a clear role and capabilities.

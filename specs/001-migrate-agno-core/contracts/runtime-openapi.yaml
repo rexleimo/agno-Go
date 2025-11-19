@@ -1,0 +1,515 @@
+openapi: 3.1.0
+info:
+  title: Agno Go Runtime Management API
+  version: 0.1.0
+  description: |
+    REST API contract derived from the "Agno 核心模块 Go 迁移" specification. Covers
+    agent runtime instantiation, workflow execution, telemetry retrieval, parity testing,
+    and support-matrix queries required by platform engineers, reliability teams, and
+    ecosystem developers.
+servers:
+  - url: https://api.agno.com
+    description: Production control plane
+  - url: https://staging.api.agno.com
+    description: Staging control plane for parity + performance tests
+paths:
+  /v1/runtime/go/agents:
+    post:
+      summary: Register or update an AgentRuntime configuration
+      description: Mirrors `agno.agent.Agent` semantics in Go; called by platform engineers before executing workflows.
+      operationId: registerAgentRuntime
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRuntime'
+      responses:
+        '201':
+          description: Agent registered and ready for execution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRuntime'
+        '409':
+          description: Agent ID already registered with conflicting config
+  /v1/runtime/go/workflows/{workflowId}:run:
+    post:
+      summary: Execute a WorkflowRun using the Go runtime
+      description: Accepts workflow metadata + session context and produces RunOutput aligned with Python baseline.
+      operationId: runWorkflow
+      parameters:
+        - in: path
+          name: workflowId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: runtime
+          required: false
+          schema:
+            type: string
+            enum: [go, python]
+            default: go
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowRunRequest'
+      responses:
+        '200':
+          description: Workflow completed or paused; RunOutput provided for parity comparison
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRunResult'
+        '409':
+          description: Workflow definition inconsistent with registered agents
+  /v1/runtime/go/sessions/{sessionId}:
+    get:
+      summary: Retrieve a SessionRecord snapshot
+      operationId: getSessionRecord
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session state aligned with Python DB schema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionRecord'
+        '404':
+          description: Session not found in Go runtime store
+  /v1/runtime/go/telemetry/events:
+    get:
+      summary: Query TelemetryEnvelopes emitted by the Go runtime
+      operationId: listTelemetryEvents
+      parameters:
+        - in: query
+          name: sessionId
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: workflowRunId
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: agentId
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: eventType
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: runtime
+          required: false
+          schema:
+            type: string
+            enum: [go, python]
+            default: go
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Structured telemetry stream for dashboards and parity tests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TelemetryEnvelope'
+  /v1/runtime/go/benchmarks:
+    post:
+      summary: Submit or retrieve benchmark comparisons between Python and Go runtimes
+      operationId: recordBenchmarks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BenchmarkSubmission'
+      responses:
+        '202':
+          description: Benchmark queued or updated
+  /v1/runtime/go/parity-tests:run:
+    post:
+      summary: Execute a parity fixture across Python and Go implementations
+      operationId: runParityFixture
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParityFixture'
+      responses:
+        '200':
+          description: Comparison results containing pass/fail + diffs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParityTestResult'
+  /v1/runtime/go/support-matrix:
+    get:
+      summary: Surface feature availability across Python & Go stacks
+      operationId: getSupportMatrix
+      responses:
+        '200':
+          description: Matrix consumed by docs + quickstart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportMatrix'
+components:
+  schemas:
+    AgentRuntime:
+      type: object
+      required: [id, modelRef, memoryPolicy, sessionPolicy]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        modelRef:
+          type: string
+        toolkits:
+          type: array
+          items:
+            type: string
+        memoryPolicy:
+          $ref: '#/components/schemas/MemoryPolicy'
+        sessionPolicy:
+          $ref: '#/components/schemas/SessionPolicy'
+        hooks:
+          type: object
+          additionalProperties:
+            type: string
+        timeouts:
+          type: object
+          properties:
+            runMs:
+              type: integer
+            toolCallMs:
+              type: integer
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    MemoryPolicy:
+      type: object
+      properties:
+        persist:
+          type: boolean
+        windowSize:
+          type: integer
+        sensitiveFiltering:
+          type: boolean
+    SessionPolicy:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        overwriteDbSessionState:
+          type: boolean
+        enableAgenticState:
+          type: boolean
+        cacheSession:
+          type: boolean
+    WorkflowRunRequest:
+      type: object
+      required: [sessionId, agents, steps]
+      properties:
+        sessionId:
+          type: string
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentRuntime'
+        workflowManifest:
+          $ref: '#/components/schemas/WorkflowManifest'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowStepInput'
+        sessionState:
+          type: object
+          description: Mirrors Python session_state blob
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunMessage'
+    WorkflowManifest:
+      type: object
+      properties:
+        id:
+          type: string
+        patternType:
+          type: string
+          enum: [sequential, parallel, coordinator-worker, loop]
+        terminationCondition:
+          type: object
+          properties:
+            maxIterations:
+              type: integer
+            onError:
+              type: string
+    WorkflowStepInput:
+      type: object
+      properties:
+        stepId:
+          type: string
+        agentId:
+          type: string
+        input:
+          type: object
+          additionalProperties: true
+    WorkflowRunResult:
+      type: object
+      properties:
+        runId:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed, paused]
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunMessage'
+        reasoningTrace:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReasoningStep'
+        metrics:
+          $ref: '#/components/schemas/RunMetrics'
+        sessionRecord:
+          $ref: '#/components/schemas/SessionRecord'
+    SessionRecord:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        userId:
+          type: string
+        stateBlob:
+          type: object
+          additionalProperties: true
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunMessage'
+        summary:
+          type: object
+          properties:
+            text:
+              type: string
+            version:
+              type: string
+        metrics:
+          type: object
+          additionalProperties:
+            type: number
+        cachePolicy:
+          type: object
+          properties:
+            searchSessionHistory:
+              type: boolean
+            numHistorySessions:
+              type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RunMessage:
+      type: object
+      properties:
+        role:
+          type: string
+        content:
+          type: string
+        references:
+          type: array
+          items:
+            type: string
+        toolResults:
+          type: array
+          items:
+            type: object
+            properties:
+              toolName:
+                type: string
+              payload:
+                type: object
+                additionalProperties: true
+    ReasoningStep:
+      type: object
+      properties:
+        order:
+          type: integer
+        type:
+          type: string
+        text:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    RunMetrics:
+      type: object
+      properties:
+        promptTokens:
+          type: integer
+        completionTokens:
+          type: integer
+        totalTokens:
+          type: integer
+        latencyMs:
+          type: integer
+        toolCalls:
+          type: integer
+    TelemetryEnvelope:
+      type: object
+      required: [eventId, timestamp, runtime, eventType]
+      properties:
+        eventId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        runtime:
+          type: string
+          enum: [go, python]
+        eventType:
+          type: string
+        sessionId:
+          type: string
+        workflowRunId:
+          type: string
+        agentId:
+          type: string
+        providerId:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        attachments:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              reference:
+                type: string
+        correlationIds:
+          type: array
+          items:
+            type: string
+    BenchmarkSubmission:
+      type: object
+      properties:
+        scenarioId:
+          type: string
+        pythonMetrics:
+          $ref: '#/components/schemas/RunMetrics'
+        goMetrics:
+          $ref: '#/components/schemas/RunMetrics'
+        datasetSize:
+          type: integer
+        createdBy:
+          type: string
+    ParityFixture:
+      type: object
+      required: [fixtureId, workflowTemplate, userInputs]
+      properties:
+        fixtureId:
+          type: string
+        description:
+          type: string
+        workflowTemplate:
+          $ref: '#/components/schemas/WorkflowManifest'
+        userInputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunMessage'
+        toolResponses:
+          type: array
+          items:
+            type: object
+            properties:
+              toolName:
+                type: string
+              response:
+                type: object
+                additionalProperties: true
+        expectedAssertions:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [equality, contains, tolerance]
+              path:
+                type: string
+              expected:
+                type: string
+              tolerance:
+                type: number
+    ParityTestResult:
+      type: object
+      properties:
+        fixtureId:
+          type: string
+        status:
+          type: string
+          enum: [pass, fail, error]
+        diffs:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              pythonValue:
+                type: string
+              goValue:
+                type: string
+              severity:
+                type: string
+    SupportMatrix:
+      type: object
+      properties:
+        runtimeVersions:
+          type: array
+          items:
+            type: string
+        features:
+          type: array
+          items:
+            type: object
+            properties:
+              feature:
+                type: string
+              python:
+                type: string
+              go:
+                type: string
+              status:
+                type: string
+                enum: [available, limited, planned]

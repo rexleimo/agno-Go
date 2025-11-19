@@ -27,6 +27,80 @@ REQUIRE_TASKS=false
 INCLUDE_TASKS=false
 PATHS_ONLY=false
 
+REQUIRED_GO_VERSION="1.25.1"
+REQUIRED_PYTHON_VERSION="3.11.0"
+
+version_ge() {
+    # Returns 0 if $1 >= $2
+    local ver_a="$1"
+    local ver_b="$2"
+    if [[ "$ver_a" == "$ver_b" ]]; then
+        return 0
+    fi
+    local sorted
+    sorted=$(printf '%s\n%s\n' "$ver_a" "$ver_b" | sort -V | head -n1)
+    [[ "$sorted" == "$ver_b" ]]
+}
+
+check_go_version() {
+    if ! command -v go >/dev/null 2>&1; then
+        echo "ERROR: Go >= $REQUIRED_GO_VERSION is required but 'go' command was not found." >&2
+        echo "Install Go $REQUIRED_GO_VERSION (as specified in plan.md) before continuing." >&2
+        exit 1
+    fi
+
+    local go_output
+    go_output=$(go version 2>/dev/null || true)
+    local go_version="${go_output#go version go}"
+    go_version="${go_version%% *}"
+
+    if [[ -z "$go_version" ]]; then
+        echo "ERROR: Unable to determine Go version from 'go version' output." >&2
+        exit 1
+    fi
+
+    if ! version_ge "$go_version" "$REQUIRED_GO_VERSION"; then
+        echo "ERROR: Go $REQUIRED_GO_VERSION or newer is required (found $go_version)." >&2
+        exit 1
+    fi
+}
+
+detect_python_command() {
+    if command -v python3 >/dev/null 2>&1; then
+        echo "python3"
+    elif command -v python >/dev/null 2>&1; then
+        echo "python"
+    else
+        echo ""
+    fi
+}
+
+check_python_version() {
+    local python_cmd
+    python_cmd=$(detect_python_command)
+    if [[ -z "$python_cmd" ]]; then
+        echo "ERROR: Python >= $REQUIRED_PYTHON_VERSION is required but no python interpreter was found." >&2
+        exit 1
+    fi
+
+    local py_version
+    py_version=$("$python_cmd" - <<'EOF'
+import platform
+print(platform.python_version())
+EOF
+)
+
+    if [[ -z "$py_version" ]]; then
+        echo "ERROR: Unable to determine Python version via $python_cmd." >&2
+        exit 1
+    fi
+
+    if ! version_ge "$py_version" "$REQUIRED_PYTHON_VERSION"; then
+        echo "ERROR: Python $REQUIRED_PYTHON_VERSION or newer is required (found $py_version via $python_cmd)." >&2
+        exit 1
+    fi
+}
+
 for arg in "$@"; do
     case "$arg" in
         --json)
@@ -111,6 +185,10 @@ if [[ ! -f "$IMPL_PLAN" ]]; then
     echo "Run /speckit.plan first to create the implementation plan." >&2
     exit 1
 fi
+
+# Validate required runtime versions before continuing
+check_go_version
+check_python_version
 
 # Check for tasks.md if required
 if $REQUIRE_TASKS && [[ ! -f "$TASKS" ]]; then

@@ -22,7 +22,7 @@ func RecordNotMigratedWorkflow(rec telemetry.Recorder, wfID ID, pattern PatternT
 		ID:        "workflow-not-migrated",
 		Timestamp: time.Now(),
 		SessionID: "",
-		Type:      telemetry.EventWorkflowStepTransition,
+		Type:      telemetry.EventWorkflowStep,
 		Payload: map[string]any{
 			"workflow_id": string(wfID),
 			"pattern":     string(pattern),

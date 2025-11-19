@@ -1,8 +1,8 @@
-# Specification Quality Checklist: agno 核心 agents 能力迁移
+# Specification Quality Checklist: Agno 核心模块 Go 迁移
 
-**Purpose**: Validate specification completeness and quality before proceeding to planning  
-**Created**: 2025-11-19  
-**Feature**: specs/001-migrate-agno-agents/spec.md
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Created**: 2025-11-19
+**Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 
@@ -32,4 +32,3 @@
 ## Notes
 
 - Items marked incomplete require spec updates before `/speckit.clarify` or `/speckit.plan`
-- 本轮已根据干系人回答清理所有 [NEEDS CLARIFICATION] 标记，并在 `## Clarifications` 中记录决策，可直接进入 `/speckit.plan` 阶段。
