@@ -439,6 +439,33 @@ func (s *Service) tokenWindow(agentID uuid.UUID) int {
 	return 0
 }
 
+// DebugSessions returns an internal snapshot of sessions for testing purposes.
+func (s *Service) DebugSessions() map[uuid.UUID]map[uuid.UUID]*agent.Session {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make(map[uuid.UUID]map[uuid.UUID]*agent.Session, len(s.sessions))
+	for agentID, m := range s.sessions {
+		copyMap := make(map[uuid.UUID]*agent.Session, len(m))
+		for sid, sess := range m {
+			copySess := *sess
+			copyMap[sid] = &copySess
+		}
+		out[agentID] = copyMap
+	}
+	return out
+}
+
+// SetSessionStateForTest mutates a session state; intended for testing flows.
+func (s *Service) SetSessionStateForTest(agentID, sessionID uuid.UUID, state agent.SessionState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if sessMap, ok := s.sessions[agentID]; ok {
+		if sess, ok := sessMap[sessionID]; ok {
+			sess.State = state
+		}
+	}
+}
+
 func contains(list []string, v string) bool {
 	for _, item := range list {
 		if item == v {

@@ -48,6 +48,7 @@ type Config struct {
 	ErrorParser         func(body map[string]any) string
 	UsageExtractorChat  func(resp oaCompatChatResp) agent.Usage
 	UsageExtractorEmbed func(resp oaCompatEmbedResp) agent.Usage
+	HTTPClient          *http.Client
 }
 
 type oaCompatChatReq struct {
@@ -119,6 +120,10 @@ func NewOpenAICompat(provider agent.Provider, cfg Config) *OpenAICompatClient {
 	if timeout == 0 {
 		timeout = 60 * time.Second
 	}
+	httpClient := cfg.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: timeout}
+	}
 	chatPath := cfg.ChatPath
 	if chatPath == "" {
 		chatPath = "/chat/completions"
@@ -140,7 +145,7 @@ func NewOpenAICompat(provider agent.Provider, cfg Config) *OpenAICompatClient {
 		endpoint:            strings.TrimSuffix(cfg.Endpoint, "/"),
 		apiKey:              cfg.APIKey,
 		status:              cfg.Status,
-		http:                &http.Client{Timeout: timeout},
+		http:                httpClient,
 		chatPath:            chatPath,
 		embedPath:           embedPath,
 		authHeader:          authHeader,

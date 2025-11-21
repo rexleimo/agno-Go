@@ -42,3 +42,8 @@ func mapHTTPError(resp *http.Response) error {
 		return fmt.Errorf("openai error: %s", resp.Status)
 	}
 }
+
+// MapHTTPErrorForTest is exposed for tests to validate error classification.
+func MapHTTPErrorForTest(resp *http.Response) error {
+	return mapHTTPError(resp)
+}
