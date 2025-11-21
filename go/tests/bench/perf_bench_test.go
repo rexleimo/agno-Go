@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,7 +23,7 @@ import (
 // BenchmarkChatStream simulates the P2 perf scenario (100 concurrency, 128 token input, 10m duration by default).
 // It uses the stub provider to avoid external calls; duration can be shortened via BENCH_DURATION env.
 func BenchmarkChatStream(b *testing.B) {
-	cfg, err := runtimeconfig.LoadWithEnv(filepath.Join("..", "config", "default.yaml"), "")
+	cfg, err := runtimeconfig.LoadWithEnv(filepath.Join(repoRoot(b), "config", "default.yaml"), "")
 	if err != nil {
 		b.Fatalf("load config: %v", err)
 	}
@@ -127,4 +128,13 @@ func BenchmarkChatStream(b *testing.B) {
 		b.Fatalf("no operations recorded in duration %s", benchCfg.Duration)
 	}
 	b.ReportMetric(float64(total)/benchCfg.Duration.Seconds(), "ops/sec")
+}
+
+func repoRoot(tb testing.TB) string {
+	tb.Helper()
+	_, file, _, ok := goruntime.Caller(0)
+	if !ok {
+		tb.Fatalf("cannot resolve caller path")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
 }
