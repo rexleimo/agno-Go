@@ -96,12 +96,9 @@
 
 ## 宪章对齐 *(必填)*
 
-- **Go + DDD / 热插拔**：本规格涉及的限界上下文、接口、领域事件、可插拔模块；说明禁用该模块时的替代流程。
-- **Compose-First 可部署性**：列出需要新增/更新的 Compose 服务、环境变量、健康检查以及 `docker compose` / `make compose-*` 验证步骤。
-- **GORM 数据治理与迁移**：说明需要创建/修改的迁移文件名、受影响的实体以及 `make migrate` / `make rollback` 的验证计划。
-- **多存储适配矩阵**：列出本功能所依赖的 SQLite/MySQL/PostgreSQL/MongoDB/Redis/DynamoDB/Firestore 驱动，描述如何通过 `backend/internal/.../infra/datastore/` 实现热插拔以及 `make data-matrix` 的验证策略。
-- **Makefile 自动化**：枚举需要新增或扩展的 `make` 目标（dev/test/build/release/observe），并指明 CI 如何复用。
-- **Remix + React Router V7 + pnpm + shadcn**：列出新增/修改的 pnpm workspace、Remix 路由、shadcn 组件以及所遵循的 Apple/Microsoft 设计语言章节。
-- **Vitepress + GitHub Docs Workflow**：说明需要更新的 `docs/vitepress` 章节、导航、示例及 `.github/workflows/docs.yml` 的自动化影响。
-- **测试纪律 + 85% 覆盖率**：阐明需要追加的后端/前端/文档单元测试、契约/集成测试、`make test|ui-test|docs-test|data-matrix|coverage` 的执行以及如何确保覆盖率 ≥85%。
-- **平台运行约束**：描述默认数据库/缓存、可观察性（Prometheus/Otel）、Secrets/SOPS 管理在本规格中的变动或依赖。
+- **纯 Go / 禁止桥接**：说明迁移的 Python 能力、对应的 Go 接口与模块路径，确认不会通过 cgo/FFI/子进程调用 `./agno`。
+- **模型供应商矩阵**：列出使用的供应商（ollm、Gemini、OpenAI、GLM4、OpenRouter、SiliconFlow、Cerebras、ModelScope、Groq），能力需求（chat/embedding/流式）与 env 变量。
+- **契约/治具与基准**：描述需要生成/更新的 fixtures 位置（`specs/.../contracts/fixtures`）、golden/契约测试与基准目标，确认运行时不依赖 Python。
+- **自动化与 Make**：枚举需要新增或扩展的 make 目标（fmt/lint/test/providers-test/coverage/bench/gen-fixtures/release），并指明 CI 复用方式。
+- **测试纪律 + 85% 覆盖率**：阐明要追加的 Go 单元、契约、供应商集成测试与覆盖率策略，确保综合覆盖率 ≥85%。
+- **密钥与安全**：说明 `.env.example` 中的变量、secret 注入方式与脱敏措施，避免提交真实 key。

@@ -8,11 +8,11 @@ description: "功能实施任务模板"
 **输入**：`/specs/[###-feature-name]/` 中的设计文档
 **前置**：plan.md（必需）、spec.md（用户故事必需）、research.md、data-model.md、contracts/
 
-**测试**：示例中包含测试任务。测试是可选项——仅当功能规格明确要求或用户主动请求时才加入。
+**测试**：所有功能必须交付对应的 Go 单元/契约/供应商集成测试；示例请根据规格替换。
 
-**覆盖率**：所有功能必须交付匹配的单元测试，`make test`、`make ui-test`、`make docs-test`、`make data-matrix`、`make coverage` 必须可运行并产出 ≥85% 的综合覆盖率；任务描述需明确测试文件与命令。
+**覆盖率**：`make test`、`make providers-test`、`make coverage` 必须可运行并产出 ≥85% 的综合覆盖率；任务需写明测试文件与命令。
 
-**栈约束**：所有任务必须指向真实路径，覆盖 `backend/internal/<context>/`（Go + DDD + 热插拔）、`backend/internal/<context>/infra/datastore/<provider>/`（多存储适配器）、`db/migrations/`（GORM 迁移）、`frontend/apps/*` 与 `frontend/packages/*`（Remix + React Router V7 + shadcn）、`docs/vitepress/`（文档）、`deploy/compose/`（Docker Compose）、`.github/workflows/docs.yml`（自动化部署）以及 `Makefile`（自动化入口）。
+**栈约束**：任务必须指向真实路径，覆盖 Go 模块（`go/internal/...`、`go/pkg/...`、`go/tests/...`）、供应商适配器（`go/pkg/providers/<provider>/`）、治具/契约（`specs/.../contracts/fixtures`）、基准/报告（`specs/.../artifacts/`）、脚本（`scripts/`）以及 `Makefile`（自动化入口）。禁止将 `./agno` Python 代码作为运行时依赖。
 
 **组织方式**：任务按用户故事分组，确保每个故事都能独立实现与测试。
 
@@ -24,11 +24,11 @@ description: "功能实施任务模板"
 
 ## 路径约定
 
-- **后端（Go + DDD）**：`backend/cmd/`（入口），`backend/internal/<context>/`（聚合/服务/ports），`backend/pkg/`（公共适配器），`backend/tests/`（contract/integration/unit）。
-- **数据层/多存储**：`db/migrations/`（受版本控制的 GORM 迁移），`backend/internal/<context>/infra/datastore/<provider>/`（SQLite/MySQL/PostgreSQL/MongoDB/Redis/DynamoDB/Firestore 适配器），`configs/datastores/`（可选矩阵配置），`db/seed/`（可选种子数据）。
-- **前端（Remix + React Router V7）**：`frontend/apps/web/app/`（routes, loaders, actions），`frontend/packages/ui/`（shadcn 主题），`frontend/packages/<feature>/`（热插拔组件）。
-- **文档与自动化**：`docs/vitepress/`（内容 + `.vitepress/config.ts`）、`.github/workflows/docs.yml`（文档部署流水线）、`pnpm-workspace.yaml`（包含 docs 包）、`Makefile`（dev/test/build/release/docs/observe）。
-- **基础设施**：`deploy/compose/*.yml`（Compose 环境）、`.env*` 模板、`scripts/`（如需的 helper）。
+- **核心运行时（Go）**：`go/cmd/`（入口）、`go/internal/{agent,runtime,model,memory,tool}/`（核心能力）、`go/pkg/`（可复用组件）、`go/tests/{contract,providers,bench}/`（测试）。
+- **模型供应商适配器**：`go/pkg/providers/<provider>/`（ollm/Gemini/OpenAI/GLM4/OpenRouter/SiliconFlow/Cerebras/ModelScope/Groq 客户端）及其配置/错误映射。
+- **状态/工具**：`go/pkg/memory/`、`go/pkg/tools/` 或等价目录；需保持与核心接口一致。
+- **治具与基准**：`specs/<feature>/contracts/fixtures/`（Python 对照治具）、`specs/<feature>/contracts/deviations.md`、`specs/<feature>/artifacts/`（覆盖率/基准/报告）。
+- **自动化与配置**：`Makefile`（fmt/lint/test/providers-test/coverage/bench/gen-fixtures/release）、`.env.example`（供应商变量占位）、`scripts/`（Go/标准工具脚本）。
 - 下文示例均以该结构为例，交付时请替换为真实路径。
 
 <!-- 
@@ -49,33 +49,29 @@ description: "功能实施任务模板"
 
 ## Phase 1: Setup（共享基础设施）
 
-**目的**：搭建 Go + Remix + Vitepress 双栈骨架、Compose 环境与 Makefile/Workflow 入口
+**目的**：搭建 Go-only 骨架、自动化入口、供应商/治具配置
 
-- [ ] T001 在 `backend/` 初始化 Go module（`go.mod`）、`cmd/api/main.go` 与基础限界上下文目录结构
-- [ ] T002 在 `frontend/` 通过 pnpm 初始化 workspace、创建 Remix 应用（`apps/web`）、shadcn/ui 基础包（`packages/ui`）以及 `docs/vitepress` workspace（含 `.vitepress/config.ts`）
-- [ ] T003 [P] 在 `deploy/compose/docker-compose.local.yml` 中声明 API、前端、SQLite、MySQL、PostgreSQL、MongoDB、Redis、LocalStack（DynamoDB/Firestore）与 Vitepress 预览服务，并生成 `.env.example`
-- [ ] T004 [P] 扩展根 `Makefile`：`dev`（Go/Remix/Vitepress）、`test`、`lint`、`compose-up/down`、`migrate/rollback`、`ui-test`、`data-matrix`、`docs-build`、`docs-deploy`、`coverage`
-- [ ] T005 配置统一的 lint/格式化/测试/覆盖率工具与 PNPM scripts（`golangci-lint`, `gofumpt`, `go test ./... -coverprofile`, `pnpm lint`, `pnpm test --coverage`, `pnpm docs:lint`, `stylelint` 等），并在 CI 中通过 `make lint`、`make coverage`
-- [ ] T006 [P] 创建/更新 `.github/workflows/ci.yml` 与 `.github/workflows/docs.yml`，确保调用 `make test`, `make data-matrix`, `make docs-build`, `make docs-deploy`
-- [ ] T007 [P] 生成 `configs/datastores/*.yaml`（或等价配置）用于声明多存储矩阵及默认驱动，供 speckit 与运行时引用
-
+- [ ] T001 在 `go/` 初始化 Go module（`go.mod`）、`cmd/agno/main.go` 与 `internal/{agent,runtime,model,memory,tool}/` 目录
+- [ ] T002 [P] 扩展根 `Makefile`：`fmt`、`lint`、`test`、`providers-test`、`coverage`、`bench`、`gen-fixtures`、`release`，并添加 `help` 说明
+- [ ] T003 [P] 在 `.env.example` 中列出 ollm、Gemini、OpenAI、GLM4、OpenRouter、SiliconFlow、Cerebras、ModelScope、Groq 的必需/可选变量，附备注
+- [ ] T004 [P] 配置 `golangci-lint`, `gofumpt`, `go test ./... -coverpkg=./...`, `benchstat` 等基础工具，`Makefile` 中映射目标
+- [ ] T005 创建/更新 `.github/workflows/ci.yml`，复用 make 目标（fmt/lint/test/providers-test/coverage/bench），输出报告到 `specs/<feature>/artifacts/`
+- [ ] T006 [P] 在 `scripts/` 添加 Go/标准工具脚本用于生成脱敏 fixtures（读取 `./agno` 参考输出），并在 `specs/<feature>/contracts/fixtures/` 放置示例
 ---
 
 ## Phase 2: Foundational（阻塞性前置）
 
-**目的**：准备限界上下文、GORM 迁移、Compose 服务与可观察性，解除后续故事阻塞
+**目的**：准备核心接口、供应商路由、治具/契约/基准基础，解除后续故事阻塞
 
 **⚠️ 关键**：在此阶段完成前，禁止开始用户故事任务。
 
 示例（按项目调整）：
 
-- [ ] T008 在 `backend/internal/<context>/` 中实现聚合、仓储接口以及 `service` 层，确保符合热插拔接口
-- [ ] T009 [P] 在 `db/migrations/` 中新增 `<timestamp>_<feature>.sql|.go`，包含 up/down，并通过 `make migrate`、`make rollback` 验证
-- [ ] T010 [P] 在 `deploy/compose/` 中为新增依赖（DB/Redis/队列等）添加服务、健康检查与 `.env` 条目
-- [ ] T011 [P] 在 `Makefile` 中追加 `observe`, `constitution-check`, `feature-toggle` 等目标，并在 CI workflow 中引用
-- [ ] T012 在 `backend/tests/contract/` 与 `backend/tests/integration/` 中补充测试骨架，覆盖限界上下文 API/事件
-- [ ] T013 在 `frontend/packages/ui/` 定义 shadcn 主题 tokens（Apple Human Interface + Microsoft Fluent 配色/间距）
-- [ ] T014 在 `frontend/apps/web/app/routes/` 中创建基础路由/loader/action，并将 UI 包以 pnpm workspace 链接
+- [ ] T007 在 `go/internal/agent/` 定义 Agent、Workflow/Step Engine、Memory/Tool/MCP 接口与公共类型
+- [ ] T008 [P] 在 `go/internal/model/` 定义模型客户端接口、错误规约与路由器，提供 `go/pkg/providers/mock` 作为占位实现
+- [ ] T009 [P] 在 `go/tests/contract/` 添加契约/fixture 加载与 golden 断言骨架，引用 `specs/<feature>/contracts/fixtures/`
+- [ ] T010 [P] 实现 `make providers-test` 框架：读取 `.env`，串行/并行调用供应商 stub，输出报告到 `specs/<feature>/artifacts/`
+- [ ] T011 在 `Makefile` 添加 `constitution-check` 聚合目标，串联 fmt/lint/test/providers-test/coverage/bench
 
 **检查点**：基础完备，可开始并行处理用户故事
 
@@ -91,19 +87,16 @@ description: "功能实施任务模板"
 
 > **注意：若包含测试，先编写并确保失败，再实现功能。**
 
-- [ ] T015 [P] [US1] 在 `backend/tests/contract/<context>_contract_test.go` 中编写契约测试，并在 `backend/internal/<context>/domain/<aggregate>_test.go`/`infra/<adapter>_test.go` 中补充单元测试
-- [ ] T016 [P] [US1] 在 `backend/tests/integration/<journey>_integration_test.go` 与 `frontend/apps/web/tests/<journey>.spec.ts`、`frontend/packages/ui/components/__tests__/<component>.spec.tsx` 中编写端到端 + UI 单元测试
+- [ ] T012 [P] [US1] 在 `go/tests/contract/<context>_contract_test.go` 中编写契约/golden 测试，引用 `specs/<feature>/contracts/fixtures/<case>.json`
+- [ ] T013 [P] [US1] 在 `go/tests/providers/<provider>_integration_test.go` 中编写供应商集成测试（需真实 key），验证 chat/流式/错误路径
 
 ### 用户故事 1 的实现
 
-- [ ] T017 [P] [US1] 在 `backend/internal/<context>/domain/<aggregate>.go` 中创建聚合/值对象
-- [ ] T018 [P] [US1] 在 `backend/internal/<context>/infra/<adapter>.go` 中实现 GORM 仓储/外部适配器
-- [ ] T019 [US1] 在 `backend/internal/<context>/app/service.go` 中实现应用服务并注册热插拔接口
-- [ ] T020 [US1] 在 `backend/cmd/api/handlers/<route>.go` 或 `frontend/apps/web/app/routes/<route>.tsx` 中暴露 HTTP/API/页面
-- [ ] T021 [US1] 更新 `db/migrations/<timestamp>_<name>.sql|.go` 及 `deploy/compose/` 中相关服务配置
-- [ ] T022 [US1] 在 `frontend/packages/ui/components/` 中构建/扩展 shadcn 组件并对齐 Apple/Microsoft 设计语言
-- [ ] T023 [US1] 更新 `Makefile` 功能开关/自测目标并追加可观察性日志
-- [ ] T024 [US1] 在 `docs/vitepress/<context>/<story>.md` 中记录接口、Compose/Make 命令与设计规范，并在 `.github/workflows/docs.yml` 中验证部署
+- [ ] T014 [P] [US1] 在 `go/internal/<context>/` 中实现核心逻辑/接口适配（如 Agent/Workflow/Memory/Tool）
+- [ ] T015 [P] [US1] 在 `go/pkg/providers/<provider>/` 中实现/扩展供应商客户端与错误映射
+- [ ] T016 [US1] 在 `go/internal/runtime/` 或 `cmd/agno/` 中公开 API/CLI，并与路由/中间件对齐
+- [ ] T017 [US1] 更新 `specs/<feature>/contracts/fixtures/` 与 `specs/<feature>/contracts/deviations.md`，同步 `specs/<feature>/quickstart.md` 示例
+- [ ] T018 [US1] 更新 `Makefile` 相关目标与日志，确保 `make providers-test`/`make coverage` 覆盖新能力
 
 **检查点**：故事 1 应可独立运行并测试
 
@@ -117,18 +110,15 @@ description: "功能实施任务模板"
 
 ### 用户故事 2 的测试（可选）⚠️
 
-- [ ] T025 [P] [US2] 在 `backend/tests/contract/<context>_contract_test.go` 中补充契约测试，并在 `backend/internal/<context>/domain/<aggregate>_test.go`/`infra/<adapter>_test.go` 中覆盖单元测试
-- [ ] T026 [P] [US2] 在 `frontend/apps/web/tests/<journey>.spec.ts` 与 `frontend/packages/ui/components/__tests__/<component>.spec.tsx` 中实现用户旅程集成 + UI 单元测试
+- [ ] T019 [P] [US2] 在 `go/tests/contract/<context>_contract_test.go` 中补充契约/golden 测试，覆盖新增参数/分支
+- [ ] T020 [P] [US2] 在 `go/tests/providers/<provider>_integration_test.go` 中扩展供应商集成测试，验证真实 key 下的新能力
 
 ### 用户故事 2 的实现
 
-- [ ] T027 [P] [US2] 在 `backend/internal/<context>/domain/<aggregate>.go` 中建模实体
-- [ ] T028 [US2] 在 `backend/internal/<context>/app/<usecase>.go` 中实现用例逻辑并通过接口注册
-- [ ] T029 [US2] 在 `frontend/apps/web/app/routes/<route>.tsx` 中创建 Remix 路由/loader/action，与 React Router V7 data APIs 对齐
-- [ ] T030 [US2] 在 `frontend/packages/ui/components/<component>.tsx` 中扩展 shadcn 组件或主题 token
-- [ ] T031 [US2] 在 `deploy/compose/docker-compose.local.yml` 中为该故事依赖的外部服务添加配置并更新 `.env`
-- [ ] T032 [US2] （如需）与用户故事 1 的热插拔模块集成，同时保持可独立启停
-- [ ] T033 [US2] 在 `docs/vitepress/<context>/<story>.md` 中补充 API、UI、数据库驱动及 `make docs-*`、`.github/workflows/docs.yml` 的验证结果
+- [ ] T021 [P] [US2] 在 `go/internal/<context>/` 中扩展用例逻辑/接口，保持与 US1 可独立启停
+- [ ] T022 [US2] 在 `go/pkg/providers/<provider>/` 中追加新 API/参数支持或路由策略
+- [ ] T023 [US2] 在 `go/internal/runtime/` 或 `cmd/agno/` 暴露相关端点/CLI 选项，并对接新契约
+- [ ] T024 [US2] 更新 `specs/<feature>/contracts/fixtures/`、`deviations.md` 与 `quickstart.md`，同步 `Makefile`/脚本变更
 
 **检查点**：故事 1 与 2 均可独立运行
 
@@ -142,16 +132,15 @@ description: "功能实施任务模板"
 
 ### 用户故事 3 的测试（可选）⚠️
 
-- [ ] T034 [P] [US3] 在 `backend/tests/contract/<context>_contract_test.go` 中编写契约测试，并在 `backend/internal/<context>/domain/<aggregate>_test.go`/`infra/<adapter>_test.go` 中补充单元测试
-- [ ] T035 [P] [US3] 在 `frontend/apps/web/tests/<journey>.spec.ts` 与 `frontend/packages/ui/components/__tests__/<component>.spec.tsx` 中编写集成 + UI 单元测试
+- [ ] T025 [P] [US3] 在 `go/tests/contract/<context>_contract_test.go` 中编写契约/golden 测试，覆盖边界/异常
+- [ ] T026 [P] [US3] 在 `go/tests/providers/<provider>_integration_test.go` 中编写集成测试，验证异常映射/超时/重试
 
 ### 用户故事 3 的实现
 
-- [ ] T036 [P] [US3] 在 `backend/internal/<context>/domain/<aggregate>.go` 中建模实体
-- [ ] T037 [US3] 在 `backend/internal/<context>/app/<workflow>.go` 中实现服务，并在 `backend/cmd/api/handlers/` 或 gRPC/事件层暴露
-- [ ] T038 [US3] 在 `frontend/apps/web/app/routes/<route>.tsx` 中实现页面/loader/action，并在 `frontend/packages/ui/` 中扩展组件
-- [ ] T039 [US3] 更新 `db/migrations/`、`Makefile`、`deploy/compose/` 中的增量配置，确保该模块可单独启停
-- [ ] T040 [US3] 在 `docs/vitepress/<context>/<story>.md` 中更新发布说明、数据库切换指南及 GitHub Workflow 验证结果
+- [ ] T027 [P] [US3] 在 `go/internal/<context>/` 中建模实体/状态机或并发策略
+- [ ] T028 [US3] 在 `go/internal/runtime/` 或 `cmd/agno/` 中实现服务入口/协议层（HTTP/gRPC/CLI），保持可独立启停
+- [ ] T029 [US3] 在 `go/pkg/providers/<provider>/` 或 `go/pkg/memory/` 中实现依赖适配器
+- [ ] T030 [US3] 更新 `Makefile`、`scripts/` 与 `specs/<feature>/contracts/fixtures/`、`artifacts/`，确保该模块可单独验证
 
 **检查点**：所有用户故事可独立运行
 
@@ -165,7 +154,7 @@ description: "功能实施任务模板"
 
 **目的**：影响多个用户故事的改进
 
-- [ ] TXXX [P] 更新 docs/ 文档
+- [ ] TXXX [P] 更新 specs/ 文档或外部文档（如 quickstart）
 - [ ] TXXX 代码清理与重构
 - [ ] TXXX 全局性能优化
 - [ ] TXXX [P] 如需新增的单元测试（tests/unit/）
@@ -176,8 +165,8 @@ description: "功能实施任务模板"
 
 ## 覆盖率 Gate（所有故事完成后执行）
 
-- [ ] T041 运行 `make test`, `make ui-test`, `make docs-test`, `make data-matrix`, `make coverage`，确保综合覆盖率 ≥85%，并上传覆盖率报告/构建工件
-- [ ] T042 在 `docs/vitepress/status/coverage.md`、README badge 或 CI 注释中更新覆盖率、测试结果及 `make coverage` 命令输出链接
+- [ ] T041 运行 `make test`, `make providers-test`, `make coverage`, 如需性能验证再运行 `make bench`，确保综合覆盖率 ≥85%，并上传覆盖率/基准报告
+- [ ] T042 在 `specs/<feature>/artifacts/coverage.txt`（或 CI 构建工件）中更新覆盖率、供应商测试与基准结果链接
 
 ---
 
@@ -218,12 +207,12 @@ description: "功能实施任务模板"
 
 ```bash
 # 若需要测试，可同时启动：
-Task: "在 backend/tests/contract/<context>_contract_test.go 编写契约测试"
-Task: "在 backend/tests/integration/<journey>_integration_test.go 或 frontend/apps/web/tests/<journey>.spec.ts 编写集成测试"
+Task: "在 go/tests/contract/<context>_contract_test.go 编写契约/golden 测试"
+Task: "在 go/tests/providers/<provider>_integration_test.go 编写供应商集成测试"
 
 # 可同时创建的模型：
-Task: "在 backend/internal/<context>/domain/<aggregate>.go 定义聚合"
-Task: "在 backend/internal/<context>/infra/<adapter>.go 实现 GORM 仓储"
+Task: "在 go/internal/<context>/domain/<aggregate>.go 定义实体/状态"
+Task: "在 go/pkg/providers/<provider>/client.go 实现 HTTP 客户端与错误映射"
 ```
 
 ---

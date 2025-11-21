@@ -1,0 +1,39 @@
+server:
+  host: 0.0.0.0
+  port: 8080
+  # transport: http (SSE/chunked streaming per specs/001-go-agno-rewrite/contracts/openapi.yaml)
+
+logging:
+  level: info
+
+providers:
+  # Each provider is toggled based on env keys; missing keys should mark provider as not-configured.
+  # Add provider-specific defaults here once adapters are implemented.
+  openai:
+    endpoint: ${OPENAI_ENDPOINT}
+  gemini:
+    endpoint: ${GEMINI_ENDPOINT}
+  glm4:
+    endpoint: ${GLM4_ENDPOINT}
+  openrouter:
+    endpoint: ${OPENROUTER_ENDPOINT}
+  siliconflow:
+    endpoint: ${SILICONFLOW_ENDPOINT}
+  cerebras:
+    endpoint: ${CEREBRAS_ENDPOINT}
+  modelscope:
+    endpoint: ${MODELSCOPE_ENDPOINT}
+  groq:
+    endpoint: ${GROQ_ENDPOINT}
+  ollama:
+    endpoint: ${OLLAMA_ENDPOINT}
+
+memory:
+  storeType: memory # memory | bolt | badger
+  tokenWindow: 256
+  # data directory默认 ./data/{bolt|badger}/<namespace>，可通过 env AGNO_DATA_DIR 覆盖
+
+bench:
+  concurrency: 100
+  input_tokens: 128
+  duration: 10m

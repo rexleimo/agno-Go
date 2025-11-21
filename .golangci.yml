@@ -1,0 +1,25 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - govet
+    - staticcheck
+    - revive
+    - gofumpt
+    - errcheck
+    - ineffassign
+
+linters-settings:
+  gofumpt:
+    module-path: github.com/rexleimo/agno-go
+  revive:
+    ignore-generated-header: true
+    severity: warning
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-use-default: false

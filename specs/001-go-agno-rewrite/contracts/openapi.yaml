@@ -1,0 +1,440 @@
+openapi: 3.1.0
+info:
+  title: Go Agno AgentOS API
+  version: "0.1.0"
+  description: >
+    Pure-Go AgentOS runtime aligned with the Python AgentOS interface. Supports agent creation,
+    session management, streaming chat, tool invocation, and contract fixture access without any
+    Python runtime dependency.
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+paths:
+  /agents:
+    post:
+      summary: Create or register an Agent
+      operationId: createAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentCreateRequest"
+      responses:
+        "201":
+          description: Agent created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agentId:
+                    type: string
+                    format: uuid
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /agents/{agentId}:
+    get:
+      summary: Fetch Agent configuration
+      operationId: getAgent
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Agent configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /agents/{agentId}/sessions:
+    post:
+      summary: Create a Session for an Agent
+      operationId: createSession
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionCreateRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /agents/{agentId}/sessions/{sessionId}/messages:
+    post:
+      summary: Send a message and receive assistant output (streaming or non-streaming)
+      operationId: postMessage
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/SessionId"
+        - in: query
+          name: stream
+          schema:
+            type: boolean
+            default: false
+          description: When true, returns SSE/chunked streaming events.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageRequest"
+      responses:
+        "200":
+          description: Non-streaming response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "207":
+          description: Streaming response (text/event-stream)
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-sent events with tokens/tool-calls/final message and an end event.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Session state does not allow new messages
+  /agents/{agentId}/tools/{toolName}:
+    patch:
+      summary: Enable or disable a tool for an Agent
+      operationId: toggleTool
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - in: path
+          name: toolName
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+              required:
+                - enabled
+      responses:
+        "200":
+          description: Tool updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  toolName:
+                    type: string
+                  enabled:
+                    type: boolean
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /contracts/fixtures/{fixtureId}:
+    get:
+      summary: Fetch a contract fixture metadata for parity tests
+      operationId: getFixture
+      parameters:
+        - in: path
+          name: fixtureId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Fixture metadata and payload references
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fixture"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /health:
+    get:
+      summary: Liveness/readiness check
+      operationId: health
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  version:
+                    type: string
+                  providers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProviderStatus"
+
+components:
+  parameters:
+    AgentId:
+      in: path
+      name: agentId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionId:
+      in: path
+      name: sessionId
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    AgentCreateRequest:
+      type: object
+      required:
+        - name
+        - model
+      properties:
+        name:
+          type: string
+        model:
+          $ref: "#/components/schemas/ModelConfig"
+        tools:
+          $ref: "#/components/schemas/ToolConfig"
+        memory:
+          $ref: "#/components/schemas/MemoryConfig"
+    Agent:
+      allOf:
+        - $ref: "#/components/schemas/AgentCreateRequest"
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+    ModelConfig:
+      type: object
+      required:
+        - provider
+        - modelId
+      properties:
+        provider:
+          type: string
+          enum: [ollama, gemini, openai, glm4, openrouter, siliconflow, cerebras, modelscope, groq]
+        modelId:
+          type: string
+        stream:
+          type: boolean
+          default: true
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        maxTokens:
+          type: integer
+          minimum: 1
+          nullable: true
+        timeoutMs:
+          type: integer
+          minimum: 100
+          default: 30000
+    ToolConfig:
+      type: object
+      properties:
+        registered:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: array
+          items:
+            type: string
+        mcpEndpoints:
+          type: array
+          items:
+            type: string
+            format: uri
+        toolTimeoutMs:
+          type: integer
+          minimum: 100
+    MemoryConfig:
+      type: object
+      properties:
+        storeType:
+          type: string
+          enum: [memory, bolt, badger]
+          default: memory
+        namespace:
+          type: string
+        retention:
+          type: string
+          description: Duration string (e.g., 24h)
+        tokenWindow:
+          type: integer
+          minimum: 1
+    SessionCreateRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    Session:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum: [idle, streaming, completed, errored, cancelled]
+        createdAt:
+          type: string
+          format: date-time
+    MessageRequest:
+      type: object
+      required:
+        - messages
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolInvocation"
+        metadata:
+          type: object
+          additionalProperties: true
+    Message:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: [user, assistant, system, tool]
+        content:
+          type: string
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolInvocation"
+    MessageResponse:
+      type: object
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        content:
+          type: string
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolInvocation"
+        usage:
+          $ref: "#/components/schemas/Usage"
+        state:
+          type: string
+    ToolInvocation:
+      type: object
+      properties:
+        toolCallId:
+          type: string
+        name:
+          type: string
+        args:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [pending, success, error, timeout, disabled]
+        output:
+          type: string
+    Fixture:
+      type: object
+      properties:
+        fixtureId:
+          type: string
+        provider:
+          type: string
+        type:
+          type: string
+          enum: [chat, embedding]
+        tolerance:
+          type: object
+          properties:
+            tokenTolerance:
+              type: integer
+              default: 2
+            embeddingCosine:
+              type: number
+              default: 0.98
+        sourceCommit:
+          type: string
+        path:
+          type: string
+          description: Absolute path to the fixture payload on disk.
+    ProviderStatus:
+      type: object
+      properties:
+        provider:
+          type: string
+        status:
+          type: string
+          enum: [available, not-configured, disabled]
+        capabilities:
+          type: array
+          items:
+            type: string
+        missingEnv:
+          type: array
+          items:
+            type: string
+    Usage:
+      type: object
+      properties:
+        promptTokens:
+          type: integer
+        completionTokens:
+          type: integer
+        latencyMs:
+          type: integer
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

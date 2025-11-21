@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.1"
+          cache: true
+
+      - name: Install lint/bench tooling
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+          go install golang.org/x/perf/cmd/benchstat@latest
+
+      - name: Format
+        run: make fmt
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
+      - name: Provider tests (env gated)
+        run: make providers-test
+
+      - name: Coverage
+        run: make coverage
+
+      - name: Benchmarks
+        run: make bench
+
+      - name: Constitution check
+        run: make constitution-check
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-artifacts
+          path: specs/001-go-agno-rewrite/artifacts/coverage/**
+          if-no-files-found: ignore
+
+      - name: Upload bench artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-artifacts
+          path: specs/001-go-agno-rewrite/artifacts/bench/**
+          if-no-files-found: ignore
