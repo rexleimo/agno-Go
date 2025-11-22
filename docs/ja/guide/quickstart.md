@@ -1,69 +1,108 @@
-# クイックスタート：10 分で体験する Agno-Go
+# クイックスタート：Go から Agno-Go プロバイダを呼び出す
 
-このガイドでは、Agno-Go を使った最小限のエンドツーエンドフローを 10 分程度で体験します。
+このガイドでは、本リポジトリに含まれる **Go プロバイダクライアント（`go/pkg/providers/*`）** を使って、
+最小限のチャット呼び出しを行う方法を紹介します。現在のバージョンでは：
 
-1. AgentOS ランタイムを起動する  
-2. 最小限のエージェントを作成する  
-3. セッションを作成する  
-4. メッセージを送信してレスポンスを確認する  
+1. プロバイダ（例：OpenAI）を設定する  
+2. `go/pkg/providers/openai` を使って Go コードから呼び出す  
+3. 返ってきたメッセージを確認する  
 
-> すべてのパスはプロジェクトルート（例：`<your-project-root>/go/cmd/agno`、`<your-project-root>/config/default.yaml`）からの相対パスとして記載されています。ご自身の環境に合わせて置き換えてください。
+> 注意：AgentOS の HTTP ランタイム（`/agents`、`/sessions`、`/messages` など）はまだ安定していません。
+> このクイックスタートは **HTTP サーバや curl に依存せず**、テストで実際に使われている Go クライアントだけにフォーカスします。
 
-プロジェクトルートでサービスを起動します：
+## 前提条件
+
+1. Go 1.25.1 がインストールされていること
+2. プロジェクトルートで環境変数ファイルを準備します：
 
 ```bash
 cd <your-project-root>
-go run ./go/cmd/agno --config ./config/default.yaml
+cp .env.example .env
 ```
 
-サービスのヘルスチェック：
+`.env` に OpenAI のキーを設定します：
 
 ```bash
-curl http://localhost:8080/health
+OPENAI_API_KEY=あなたの-openai-key
 ```
 
-最小限のエージェントを作成します：
+## 最小例：OpenAI Chat を呼び出す
+
+以下のコードは、リポジトリ内のテストと同じ形で、
+
+- `internal/agent`  
+- `internal/model`  
+- `go/pkg/providers/openai`  
+
+をそのまま利用しています。
+
+```go
+package main
+
+import (
+  "context"
+  "fmt"
+  "log"
+  "os"
+  "time"
+
+  "github.com/rexleimo/agno-go/internal/agent"
+  "github.com/rexleimo/agno-go/internal/model"
+  "github.com/rexleimo/agno-go/pkg/providers/openai"
+)
+
+func main() {
+  ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+  defer cancel()
+
+  apiKey := os.Getenv("OPENAI_API_KEY")
+  if apiKey == "" {
+    log.Fatal("OPENAI_API_KEY not set")
+  }
+
+  // デフォルトの OpenAI エンドポイントを使用（プロキシを使う場合は .env で OPENAI_ENDPOINT を上書き）
+  client := openai.New("", apiKey, nil)
+
+  resp, err := client.Chat(ctx, model.ChatRequest{
+    Model: agent.ModelConfig{
+      Provider: agent.ProviderOpenAI,
+      ModelID:  "gpt-4o-mini",
+      Stream:   false,
+    },
+    Messages: []agent.Message{
+      {Role: agent.RoleUser, Content: "Agno-Go を短く紹介してください。"},
+    },
+  })
+  if err != nil {
+    log.Fatalf("chat error: %v", err)
+  }
+
+  fmt.Println("assistant:", resp.Message.Content)
+}
+```
+
+上記を次のように保存します：
 
 ```bash
-curl -X POST http://localhost:8080/agents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "quickstart-agent",
-    "description": "A minimal agent created from the docs quickstart.",
-    "model": "openai:gpt-4o-mini",
-    "tools": [],
-    "config": {}
-  }'
+<your-project-root>/examples/openai_quickstart/main.go
 ```
 
-エージェントのセッションを作成します：
+プロジェクトルートで実行します：
 
 ```bash
-curl -X POST http://localhost:8080/agents/<agent-id>/sessions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "quickstart-user",
-    "metadata": {
-      "source": "docs-quickstart"
-    }
-  }'
+cd <your-project-root>
+go run ./examples/openai_quickstart
 ```
 
-セッション内でメッセージを送信します：
+モデルによって内容は変わりますが、次のような出力が得られるはずです。
 
-```bash
-curl -X POST "http://localhost:8080/agents/<agent-id>/sessions/<session-id>/messages" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "role": "user",
-    "content": "Agno-Go を簡単に紹介してください。"
-  }'
+```text
+assistant: Agno-Go は Go で実装された AgentOS であり、...
 ```
-
-`messageId`、`content`、`usage`、`state` フィールドを含む JSON レスポンスが返ってくることを確認してください。
 
 ## 次のステップ
 
-- [設定とセキュリティ](./config-and-security) を読み、プロバイダのキーやエンドポイント、ランタイム設定を安全に扱う方法を確認してください。  
-- [Core Features & API](./core-features-and-api) や [プロバイダマトリクス](./providers/matrix) に進み、利用可能な機能を体系的に把握します。  
-- 基本フローに慣れてきたら、[高度なガイド](./advanced/multi-provider-routing) のケースを試して、より複雑なワークフローを構築できます。  
+- [設定とセキュリティ](./config-and-security) を読み、各プロバイダのキーやエンドポイント、ランタイム設定をどのように管理するか確認してください  
+- [プロバイダマトリクス](./providers/matrix) で、各プロバイダがサポートする Chat / Embedding / Streaming の能力と必要な環境変数を確認してください  
+- AgentOS の HTTP ランタイム（agents / sessions / messages）はまだ仕様を調整中です。安定したら別途ドキュメント化しますが、それまでは `go/pkg/providers/*` をメインの公開エントリポイントと考えてください  
+

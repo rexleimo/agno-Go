@@ -1,148 +1,148 @@
 
-# 고급 가이드: 메모리 강화 챗봇
+# 고급 가이드: 메모리 기반 채팅 (Go 기반)
 
-이 가이드는 여러 턴과 세션에 걸쳐 메모리를 활용하는 챗 경험을 구축하는 방법을 설명합니다. 특정 스토리지 제품에 의존하지 않고, 기존 HTTP API와 메타데이터 필드를 어떻게 활용할 수 있는지를 중심으로 다룹니다.
+이 가이드는 기존 프로바이더 클라이언트와 사용자 정의 스토리지를 사용하여,
+**자신의 Go 애플리케이션 내부에서** 여러 턴/세션에 걸쳐 메모리를 활용하는 채팅 경험을
+구현하는 방법을 설명합니다. 모든 예제는 Go 코드에 기반하며 HTTP 런타임에는 의존하지 않습니다.
 
-## 1. 메모리 유형
+## 1. 메모리의 세 가지 층
 
-메모리는 크게 세 가지 계층으로 생각할 수 있습니다.
+메모리를 크게 세 단계로 나누어 생각하면 설계가 쉬워집니다.
 
-- **대화 히스토리**: 현재 세션 내 최근 메시지들  
-- **사용자 프로필**: 사용자에 대한 장기 정보(선호도, 프로필 필드 등)  
-- **지식 레코드**: 도메인 특화 사실(과거 상호작용, 중요한 이벤트 등)  
+- **대화 히스토리** – 현재 대화 세션에서의 최근 메시지들  
+- **사용자 프로필** – 장기적인 선호/설정(학습 스타일, 언어, 플랜 등)  
+- **도메인 지식 레코드** – 지원 티켓, 구매 기록, 중요한 이벤트 등의 사실 데이터  
 
-Agno-Go는 Session과 Message를 통해 첫 번째 계층(대화 히스토리)을 기본 제공하며, 나머지 계층은 설정과 자체 서비스로 연결할 수 있습니다.
+Agno-Go 는 주로 1단계(대화 히스토리)를 위한 원시 타입을 제공하며,
+2·3 단계는 애플리케이션과 백엔드 시스템이 관리합니다.
 
-## 2. 메모리 지원 에이전트 생성
+## 2. Go 에서 대화 히스토리 표현하기
 
-Go 애플리케이션에서는 보통 HTTP를 통해 AgentOS 런타임과 통신합니다. Quickstart와
-동일한 흐름을 Go 코드로 구현하면 다음과 같습니다.
+Go 에서는 `[]agent.Message` 로 대화 히스토리를 간단히 표현할 수 있습니다.
 
 ```go
-package main
+var history []agent.Message
 
-import (
-  "bytes"
-  "encoding/json"
-  "log"
-  "net/http"
-  "time"
+history = append(history,
+  agent.Message{Role: agent.RoleUser, Content: "저는 짧은 학습 세션을 선호해요."},
 )
 
-type Agent struct {
-  Name        string                 `json:"name"`
-  Description string                 `json:"description"`
-  Model       map[string]any         `json:"model"`
-  Tools       []map[string]any       `json:"tools"`
-  Config      map[string]any         `json:"config"`
+// 모델의 응답도 히스토리에 추가
+history = append(history,
+  agent.Message{Role: agent.RoleAssistant, Content: "알겠습니다. 한 번에 30분 이내로 유지할게요."},
+)
+```
+
+모델을 호출할 때는 이 히스토리 일부 또는 전부를 `ChatRequest.Messages` 에 넣어주면 됩니다.
+
+```go
+resp, err := client.Chat(ctx, model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+  },
+  Messages: history,
+})
+```
+
+얼마나 많은 히스토리를 유지할지, 언제 요약할지, 어떤 스토리지에 보관할지는
+애플리케이션이 결정해야 합니다.
+
+## 3. 장기 메모리 추가하기
+
+장기 메모리는 보통 외부 스토리지에 저장한 후, 필요할 때 프롬프트에 주입합니다.
+
+```go
+type UserProfile struct {
+  ID          string
+  Preferences string // 자연어 요약 형태
 }
 
-func main() {
-  client := &http.Client{Timeout: 10 * time.Second}
-
-  agent := Agent{
-    Name:        "memory-chat-agent",
-    Description: "A chat agent that uses session history and external memory.",
-    Model: map[string]any{
-      "provider": "openai",
-      "modelId":  "gpt-4o-mini",
-      "stream":   true,
-    },
-    Tools:  nil,
-    Config: map[string]any{},
+func buildPrompt(profile UserProfile, recent []agent.Message) string {
+  var buf strings.Builder
+  buf.WriteString("당신은 친절한 어시스턴트입니다.\n\n")
+  buf.WriteString("【사용자 프로필】\n")
+  buf.WriteString(profile.Preferences)
+  buf.WriteString("\n\n【최근 대화】\n")
+  for _, m := range recent {
+    buf.WriteString(string(m.Role))
+    buf.WriteString(": ")
+    buf.WriteString(m.Content)
+    buf.WriteString("\n")
   }
-
-  body, err := json.Marshal(agent)
-  if err != nil {
-    log.Fatalf("marshal agent: %v", err)
-  }
-
-  resp, err := client.Post("http://localhost:8080/agents", "application/json", bytes.NewReader(body))
-  if err != nil {
-    log.Fatalf("create agent: %v", err)
-  }
-  defer resp.Body.Close()
-
-  if resp.StatusCode != http.StatusCreated {
-    log.Fatalf("unexpected status: %s", resp.Status)
-  }
-
-  // 실제 애플리케이션에서는 여기서 응답을 decode 해서 agentId 를 얻은 뒤,
-  // 이후 섹션에서 설명하는 것처럼 세션 생성 및 메시지 전송을 수행합니다.
+  buf.WriteString("\n위 정보를 바탕으로 사용자의 질문에 답변해 주세요.\n")
+  return buf.String()
 }
 ```
 
-터미널이나 API 클라이언트에서 HTTP 엔드포인트를 빠르게 시험해 보고 싶다면,
-아래와 같이 동등한 `curl` 명령을 사용할 수 있습니다.
+생성한 프롬프트를 하나의 `user` 메시지로 전송합니다.
 
-```bash
-curl -X POST http://localhost:8080/agents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "memory-chat-agent",
-    "description": "A chat agent that uses session history and external memory.",
-    "model": {
-      "provider": "openai",
-      "modelId": "gpt-4o-mini",
-      "stream": true
-    },
-    "tools": [],
-    "config": {}
-  }'
+```go
+prompt := buildPrompt(profile, recentHistory)
+
+resp, err := client.Chat(ctx, model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: prompt},
+  },
+})
 ```
 
-메모리 지원 에이전트인지 여부를 가르는 핵심은, 이후에 설명하는 것처럼 세션을
-어떻게 구성하고 어떤 메타데이터를 전달하느냐에 있습니다.
+애플리케이션은 다음을 책임져야 합니다.
 
-## 3. 세션과 메타데이터 활용
+- DB 에서 `UserProfile` 을 읽고/업데이트하기  
+- 언제 요약하고 언제 전체 히스토리를 보존할지 결정하기  
+- 민감한 데이터가 보안/컴플라이언스 요구 사항에 맞게 처리되는지 확인하기  
 
-세션을 생성할 때 사용자 식별자와 메타데이터를 함께 보낼 수 있습니다.
+## 4. 스트리밍과 결합하기
 
-```bash
-curl -X POST http://localhost:8080/agents/<agent-id>/sessions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "user-1234",
-    "metadata": {
-      "source": "advanced-memory-chat",
-      "segment": "beta-testers"
-    }
-  }'
+메모리 기반 채팅은 스트리밍 출력과도 잘 어울립니다.
+
+```go
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   true,
+  },
+  Messages: history,
+}
+
+err := client.Stream(ctx, req, func(ev model.ChatStreamEvent) error {
+  if ev.Type == "token" {
+    fmt.Print(ev.Delta)
+  }
+  if ev.Done {
+    fmt.Println()
+  }
+  return nil
+})
+if err != nil {
+  log.Fatalf("stream error: %v", err)
+}
 ```
 
-애플리케이션은 `userId`와 `metadata`를 사용해 자체 스토리지에서 사용자 프로필을 조회하거나 갱신하고, 이 정보를 후속 메시지에 반영할 수 있습니다.
+대화가 끝난 후 최종 어시스턴트 메시지를 `history` 에 추가하면,
+다음 요청에서 최신 히스토리를 그대로 사용할 수 있습니다.
 
-## 4. 프롬프트에 메모리 통합
+## 5. 스토리지 및 구성
 
-메시지를 보낼 때 이미 알고 있는 사실과 컨텍스트를 `content`에 합쳐 보낼 수 있습니다.
+메모리를 많이 사용하는 시나리오에서는 다음을 권장합니다.
 
-```bash
-curl -X POST "http://localhost:8080/agents/<agent-id>/sessions/<session-id>/messages" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "role": "user",
-    "content": "이전에 저를 위해 독서 계획을 추천해 줬죠. 그때의 제안 내용과 제가 짧은 독서 세션을 선호한다는 점을 반영해 이번 주 계획을 제안해 주세요."
-  }'
-```
+- 사용자 프로필과 대화 조각을 영속화하기 위해 DB/캐시(Postgres, Redis, 키-값 스토어 등)를 사용  
+- [구성 및 보안](../config-and-security) 문서를 참고하여 어떤 프로바이더를 활성화하고
+  API 키를 어떻게 관리할지 결정  
+- 가능한 한 많은 생 로그를 그대로 프롬프트에 넣지 말고, 선별/요약된 핵심 정보만 전달  
 
-백엔드에서는 다음과 같은 작업을 할 수 있습니다.
+Agno-Go 는 특정 스토리지를 강제하지 않으며, 메시지와 요청 구조만 정의합니다.
 
-- 메모리 스토어에서 과거 상호작용이나 노트를 불러오기  
-- 요약이나 핵심 사실을 프롬프트에 포함하기  
-- 표준 메시지 엔드포인트를 통해 런타임에 전달하기  
+## 6. 다른 문서와의 관계
 
-## 5. 구성과 스토리지
+- [퀵스타트](../quickstart) 는 가장 단순한 “무상태” 호출 플로우를 보여줍니다.  
+- 이 가이드는 그 위에 애플리케이션 레벨의 메모리 및 스토리지를 추가한 것입니다.  
+- 스펙에 정의된 HTTP 런타임도 세션과 메모리 개념을 다루지만, 구현이 안정될 때까지는
+  내부 설계로 간주하고 “바로 복사해서 동작하는 기능” 으로 보지 않는 것을 권장합니다.  
 
-메모리에 크게 의존하는 시나리오에서는:
-
-- 어느 메모리 백엔드를 사용할지(인메모리 vs 로컬 영구 스토리지 등)를 “Configuration & Security Practices” 문서를 참고해 결정합니다.  
-- 추가 인프라(데이터베이스, 캐시, 큐 등)는 내부 운영 문서에 기록하고, AgentOS 런타임은 HTTP 동작과 계약에 집중하도록 유지합니다.  
-- `.env`와 `config/default.yaml` 설정이 공식 문서의 가이드(특히 보존 기간과 데이터 위치)에 맞는지 확인합니다.  
-
-## 6. 테스트와 개선
-
-메모리 강화 챗봇을 검증할 때는:
-
-- 단기/장기 메모리 동작을 모두 포함하는 테스트 케이스를 설계합니다.  
-- 메모리 사용량이 증가해도 `/health`와 Quickstart 플로우로 런타임의 안정성을 확인합니다.  
-- 레이턴시와 리소스 사용량을 모니터링하면서 요약 빈도나 재생 길이 등 메모리 전략을 실제 지표에 따라 조정합니다.  

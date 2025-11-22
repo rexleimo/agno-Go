@@ -1,78 +1,138 @@
 
-# 高级案例：结合知识库的助手
+# 高级指南：基于知识库的助手（Go 优先）
 
-本指南展示如何在保持 Quickstart 风格 HTTP 接口的前提下，构建一个可以使用你自己的知识源回答问题的助手。
+本指南说明如何基于 **你自己的文档与检索系统** 构建问答助手，使用的只是
+Agno-Go 的 Go provider 客户端和数据模型，不依赖尚未完成的 HTTP 运行时。
 
-目标是：
+## 1. 场景概览
 
-- 对客户端而言，仍然只需使用少量 HTTP 接口；  
-- 在模型调用之前或同时引入检索步骤（例如向量检索）；  
-- 明确哪些属于“知识配置/检索”，哪些属于 AgentOS 运行时的职责。  
+你希望助手能回答关于以下内容的问题：
 
-## 1. 场景描述
+- 产品文档  
+- 内部规范或政策  
+- 知识库文章  
 
-假设你希望构建一个能够回答产品文档或内部规范问题的助手。大致流程：
+常见模式是：
 
-1. 离线阶段，将文档嵌入为向量并写入向量库（本指南不展开具体实现）；  
-2. 查询阶段，根据用户问题从向量库检索最相关的片段；  
-3. 将检索到的上下文作为消息内容的一部分传入 Agent。  
+1. 离线对文档做 embedding，将向量和元信息存入向量库/数据库  
+2. 查询时，根据用户问题检索若干相关片段  
+3. 将这些片段作为上下文写入 `agent.Message.Content` 中，请求模型生成回答  
 
-运行时仍然负责管理 Agent、Session 与 Message。
+Agno-Go **不会** 自带向量库，你需要自备存储，只需用 provider 客户端完成
+embedding 和 chat 调用即可。
 
-## 2. Agent 与会话
+## 2. 使用 provider 做文档 embedding
 
-可以沿用 Quickstart 的模式创建 Agent 与会话：
+任何实现了 `model.EmbeddingProvider` 的客户端都可以用于 embedding。具体模型 ID
+和支持情况请参考 Provider Matrix 和 `.env.example`。
 
-```bash
-curl -X POST http://localhost:8080/agents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "kb-assistant",
-    "description": "Answers questions using knowledge base context.",
-    "model": "openai:gpt-4o-mini",
-    "tools": [],
-    "config": {}
-  }'
+```go
+package main
+
+import (
+  "context"
+  "fmt"
+  "log"
+  "os"
+  "time"
+
+  "github.com/rexleimo/agno-go/internal/agent"
+  "github.com/rexleimo/agno-go/internal/model"
+  "github.com/rexleimo/agno-go/pkg/providers/openai"
+)
+
+func embedDoc(ctx context.Context, text string) ([]float64, error) {
+  apiKey := os.Getenv("OPENAI_API_KEY")
+  if apiKey == "" {
+    return nil, fmt.Errorf("OPENAI_API_KEY not set")
+  }
+
+  client := openai.New("", apiKey, nil)
+
+  resp, err := client.Embed(ctx, model.EmbeddingRequest{
+    Model: agent.ModelConfig{
+      Provider: agent.ProviderOpenAI,
+      ModelID:  "text-embedding-3-small", // 选择合适的 embedding 模型
+    },
+    Input: []string{text},
+  })
+  if err != nil {
+    return nil, err
+  }
+  if len(resp.Vectors) == 0 {
+    return nil, fmt.Errorf("empty embedding response")
+  }
+  return resp.Vectors[0], nil
+}
 ```
 
-```bash
-curl -X POST http://localhost:8080/agents/<agent-id>/sessions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "kb-user",
-    "metadata": {
-      "source": "advanced-knowledge-base-assistant"
-    }
-  }'
+向量如何存储（Postgres、ClickHouse、专用向量库等）完全由你自行决定，Agno-Go
+不会做约束。
+
+## 3. 带上下文回答问题
+
+当你已经能根据问题检索出若干片段（例如 `[]string`），可以按如下方式构造提示词：
+
+```go
+func answerWithContext(
+  ctx context.Context,
+  client model.ChatProvider,
+  provider agent.Provider,
+  modelID string,
+  question string,
+  passages []string,
+) (string, error) {
+  var contextText string
+  for _, p := range passages {
+    contextText += "- " + p + "\n"
+  }
+
+  prompt := fmt.Sprintf(
+    "你是一名乐于助人的助手。\n\n上下文：\n%s\n问题：%s\n\n请只根据上述上下文回答；如果上下文中没有答案，请明确说明“我不知道”。",
+    contextText,
+    question,
+  )
+
+  resp, err := client.Chat(ctx, model.ChatRequest{
+    Model: agent.ModelConfig{
+      Provider: provider,
+      ModelID:  modelID,
+    },
+    Messages: []agent.Message{
+      {Role: agent.RoleUser, Content: prompt},
+    },
+  })
+  if err != nil {
+    return "", err
+  }
+  return resp.Message.Content, nil
+}
 ```
 
-## 3. 传入检索上下文
+这里的 `client` 可以是任意实现了 `ChatProvider` 的客户端（OpenAI、Gemini、Groq 等），
+只要你在 `.env` 中配置了对应的 Key。
 
-当应用从知识库中检索到相关片段后，可以直接加入消息内容：
+## 4. 组合完整知识库助手
 
-```bash
-curl -X POST "http://localhost:8080/agents/<agent-id>/sessions/<session-id>/messages" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "role": "user",
-    "content": "请使用以下上下文回答问题。\\n\\n[CONTEXT]\\n...检索到的片段...\\n\\n问题：我们的退款策略是怎样的？"
-  }'
-```
+一个完整的知识库助手通常包含三部分：
 
-也可以在创建会话时或在你自己的应用层状态中通过 `metadata` 传入检索元信息。运行时本身不强制特定的检索方案。
+- **索引器** – 读取文档，调用 `Embed` 得到向量，并把向量+元信息写入存储  
+- **检索器** – 根据问题从存储中取回若干相关片段  
+- **回答器** – 使用上述模式，将片段拼成上下文，调用 `Chat` 生成回答  
 
-## 4. 配置与供应商选择
+在这个故事里，Agno-Go 的职责很小：
 
-在构建知识库助手时：
+- 提供统一的 `ChatRequest` / `EmbeddingRequest` 形状  
+- 提供实现了统一接口的 provider 客户端  
+- 统一部分错误处理与 provider 状态表示  
 
-- 根据“模型供应商矩阵”选择具备较好长上下文能力的供应商与模型；  
-- 在 `.env` 中配置必要的环境变量（如 `OPENAI_API_KEY`、`GEMINI_API_KEY`），并在“配置与安全实践”中说明；  
-- 把知识索引与检索基础设施（向量库、数据库、存储等）视为运行时之外的独立组件，只需将检索结果注入消息内容即可。  
+存储、索引、排序等都属于你的应用层逻辑。
 
-## 5. 测试与优化
+## 5. 与其它文档的关系
 
-验证这一模式时：
+- 使用 [模型供应商矩阵](../providers/matrix) 选择适合长上下文的 Provider 和模型  
+- 使用 [配置与安全实践](../config-and-security) 配置必要的环境变量
+  （例如 `OPENAI_API_KEY`、`GEMINI_API_KEY`）  
+- 规范中的 HTTP 运行时设计与这里的思路一致（“检索 + 对话”），在实现稳定之前，
+  请将其视为数据形状参考，而不是已经上线的现成接口  
 
-- 从一小批精心挑选的文档与测试问题开始；  
-- 检查在给定检索上下文时，助手能否准确回答问题；  
-- 对不完整或错误的回答进行记录，并用来迭代检索策略与提示设计。  

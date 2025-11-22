@@ -1,125 +1,190 @@
+# コア機能と Go API 概要
 
-# Core Features & API 概要
+このページでは、現在 Agno-Go に実装されている **Go レベルの API** を概観します。
+現時点で安定している公開インターフェイスは主に次の 2 つです。
 
-このページでは、Agno-Go における主要な概念と、それらがランタイムの HTTP API とどのように対応しているかを高いレベルで説明します。Go の実装を読まずに「何ができるか」と「どのエンドポイントを叩けばよいか」を理解したい開発者を対象としています。
+- `go/pkg/providers/*` 以下の各プロバイダクライアント  
+- `internal/agent` と `internal/model` に定義された共通データモデル  
 
-## コアコンセプト
+仕様に登場する HTTP ランタイム（`/agents`、`/sessions`、`/messages` など）は
+まだ開発中であり、**安定した公開 API とはみなさないでください**。
 
-### Agent（エージェント）
+## 1. 共有データ型
 
-**Agent** は、あるタスクやプロダクト面に対して「どのように振る舞うか」を定義する構成です。具体的には：
+モデルを呼び出す際によく使う型は次のとおりです。
 
-- 名前と説明  
-- デフォルトで使用するモデル（OpenAI、Gemini、Groq などのプロバイダ）  
-- 利用を許可されたツールの一覧  
-- 温度やルーティングポリシーなどのオプション設定  
+- `agent.ModelConfig` – 利用するプロバイダ／モデルと基本オプション  
+  （`Provider` 列挙、`ModelID`、`Stream`、`MaxTokens`、`Temperature` など）。  
+- `agent.Message` – 1 つのメッセージ。`Role`（`user` / `assistant` / `system`）と
+  `Content`（現在はプレーンテキスト）を持ちます。  
+- `model.ChatRequest` – チャットリクエスト：
 
-Agent の作成・取得は `/agents` 系のエンドポイントで行います。
+  ```go
+  type ChatRequest struct {
+    Model    agent.ModelConfig `json:"model"`
+    Messages []agent.Message   `json:"messages"`
+    Tools    []agent.ToolCall  `json:"tools,omitempty"`
+    Metadata map[string]any    `json:"metadata,omitempty"`
+    Stream   bool              `json:"stream,omitempty"`
+  }
+  ```
 
-### Session（セッション）
+- `model.ChatResponse` – 1 回分のアシスタント応答と使用量：
 
-**Session** は、ユーザー（またはシステム）と Agent の間の継続的な対話を表します：
+  ```go
+  type ChatResponse struct {
+    Message      agent.Message `json:"message"`
+    Usage        agent.Usage   `json:"usage,omitempty"`
+    FinishReason string        `json:"finishReason,omitempty"`
+  }
+  ```
 
-- 常に 1 つの Agent に属する  
-- `userId` と任意の `metadata`（チャネル、実験グループなど）を持つ  
-- 一連のメッセージに対して安定したコンテキストを提供する  
+- `model.ChatStreamEvent` / `model.StreamHandler` – トークン単位のストリーミング用。  
+- `model.EmbeddingRequest` / `model.EmbeddingResponse` – embedding 呼び出し用。  
+- `model.ChatProvider` / `model.EmbeddingProvider` – 各 provider クライアントが
+  実装するインターフェイス。  
 
-セッションは `/agents/{agentId}/sessions` で作成します。
+## 2. プロバイダクライアント（`go/pkg/providers/*`）
 
-### Message（メッセージ）
+各プロバイダパッケージ（OpenAI、Gemini、Groq など）は `internal/model` の
+インターフェイスを実装しています。たとえば OpenAI クライアントは：
 
-**Message** は、セッション内の単一ターンの対話です：
+- `go/pkg/providers/openai` に配置  
+- `New(endpoint, apiKey string, missingEnv []string) *Client` を公開  
+- `model.ChatProvider` と `model.EmbeddingProvider` を実装  
 
-- 役割（`user` や `assistant` など）を持つ  
-- テキストコンテンツと、必要に応じてツール呼び出し情報を含む  
-- `stream` クエリパラメータに応じて、単一の JSON かイベントストリームとして返される  
+最小限の非ストリーミングチャット呼び出しは次のようになります。
 
-メッセージ送信には `/agents/{agentId}/sessions/{sessionId}/messages` を使用します。
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
 
-### Tool（ツール）
+client := openai.New("", os.Getenv("OPENAI_API_KEY"), nil)
 
-ツールは、Agent が外部システム（HTTP API、データベース、検索など）を呼び出すためのインターフェースです。ランタイムは以下を提供します：
+resp, err := client.Chat(ctx, model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   false,
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "Agno-Go を簡単に紹介してください。"},
+  },
+})
+if err != nil {
+  log.Fatalf("chat error: %v", err)
+}
 
-- Agent に対してツールを登録する手段  
-- 特定のツールを有効化/無効化する手段  
+fmt.Println("assistant:", resp.Message.Content)
+```
 
-ツールの ON/OFF は `/agents/{agentId}/tools/{toolName}` で切り替えます。
+ストリーミング出力が必要な場合は、同じクライアントの `Stream` メソッドと
+`model.ChatStreamEvent` を利用します。
 
-### Memory（メモリ）と状態
+```go
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   true,
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "短いトークンで挨拶してください。"},
+  },
+}
 
-メモリは、セッションや対話をまたいで状態をどのように保持するかを表します。Agno-Go では：
+err := client.Stream(ctx, req, func(ev model.ChatStreamEvent) error {
+  if ev.Type == "token" {
+    fmt.Print(ev.Delta)
+  }
+  if ev.Done {
+    fmt.Println()
+  }
+  return nil
+})
+if err != nil {
+  log.Fatalf("stream error: %v", err)
+}
+```
 
-- 短期的な会話状態は Session と Message に保持される  
-- ユーザープロファイルやナレッジベースなどの長期的な状態は、設定されたストレージバックエンドに保存される  
+Embedding 呼び出しも同様で、`EmbeddingRequest` / `EmbeddingResponse` を使用します。
+詳細な例は `go/tests/contract` や `go/tests/providers` を参照してください。
 
-実際に使用されるストレージ技術（インメモリ、Bolt、Badger など）は、環境変数と `config/default.yaml` によって決まり、その詳細は「Configuration & Security Practices」ページで説明されます。
+## 3. Router：複数プロバイダの合成
 
-### Provider（プロバイダ）
+`internal/model.Router` は複数のプロバイダクライアントを 1 つのディスパッチャに
+まとめるための仕組みです。
 
-**Provider** は、OpenAI、Gemini、GLM4、OpenRouter、SiliconFlow、Cerebras、ModelScope、Groq、Ollama などのモデルバックエンドです。各プロバイダは：
+```go
+router := model.NewRouter(
+  model.WithMaxConcurrency(16),
+  model.WithTimeout(30*time.Second),
+)
 
-- Go で共通の chat/embedding インターフェースを実装する  
-- 認証およびエンドポイント設定のための特定の環境変数を必要とする  
-- 非ストリーミングおよびストリーミングレスポンスをサポートする場合がある  
+openAI := openai.New("", os.Getenv("OPENAI_API_KEY"), nil)
+router.RegisterChatProvider(openAI)
 
-プロバイダごとの能力と設定項目は「プロバイダマトリクス」ページで確認できます。
+// Gemini や Groq など、他のプロバイダも同様に登録できます。
 
-## HTTP API サーフェス（ランタイム）
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "Hello from router."},
+  },
+}
 
-ランタイムは、上記の概念に対応する少数の HTTP エンドポイントを公開します。`contracts` ディレクトリ内の OpenAPI ドキュメントは完全な定義を提供しており、ここでは代表的なものだけを紹介します。
+resp, err := router.Chat(ctx, req)
+if err != nil {
+  log.Fatalf("router chat error: %v", err)
+}
 
-### Health Check
+fmt.Println("assistant:", resp.Message.Content)
+```
 
-- **エンドポイント**：`GET /health`  
-- **目的**：ランタイムが稼働しているかを確認し、バージョンやプロバイダステータスなどのメタ情報を取得する。  
-- **用途**：ヘルスチェック、モニタリング、デプロイ後の手動確認など。  
+Router はさらに：
 
-### Agents
+- `router.Stream(ctx, req, handler)` – ストリーミングチャット  
+- `router.Embed(ctx, embeddingReq)` – embedding 呼び出し  
+- `router.Statuses()` – 各プロバイダのステータス一覧（ヘルスチェック用）  
 
-- **Agent 作成**  
-  - **エンドポイント**：`POST /agents`  
-  - **リクエストボディ**：Agent 定義（名前、説明、モデル、ツール、設定）。  
-  - **レスポンス**：`agentId` を含む JSON オブジェクト。  
-- **Agent 取得**  
-  - **エンドポイント**：`GET /agents/{agentId}`  
-  - **用途**：既存 Agent の設定を確認し、デバッグや監査に利用する。  
+としても利用できます。内部実装でもこの Router を使っており、自分のサービスの中で
+そのまま再利用することもできます。
 
-### Sessions
+## 4. HTTP ランタイム（設計メモ・まだ安定していない）
 
-- **セッション作成**  
-  - **エンドポイント**：`POST /agents/{agentId}/sessions`  
-  - **リクエストボディ**：任意の `userId` と `metadata`。  
-  - **レスポンス**：セッション ID を含むオブジェクト。  
-- **関係**：1 つのセッションは 1 つの Agent に属し、1 つの Agent は複数のセッションを持つことができます。  
+`specs/001-vitepress-docs/contracts/docs-site-openapi.yaml` には、次のような
+HTTP ランタイムの設計が記載されています。
 
-### Messages
+- `GET /health` – ヘルスチェックとプロバイダステータス  
+- `POST /agents` – エージェント定義の作成  
+- `POST /agents/{agentId}/sessions` – セッション作成  
+- `POST /agents/{agentId}/sessions/{sessionId}/messages` – メッセージ送信  
 
-- **非ストリーミングメッセージ送信**  
-  - **エンドポイント**：`POST /agents/{agentId}/sessions/{sessionId}/messages`  
-  - **クエリ**：`stream` なし、または `stream=false`。  
-  - **リクエストボディ**：`role` と `content` を含むメッセージ。  
-  - **レスポンス**：`messageId`、`content`、`toolCalls`、`usage`、`state` などを含む JSON。  
-- **ストリーミングメッセージ送信**  
-  - **エンドポイント**：`POST /agents/{agentId}/sessions/{sessionId}/messages?stream=true`  
-  - **レスポンス**：Server-Sent Events（SSE）による逐次的な出力。  
+ただし、この HTTP インターフェイスは現時点ではまだ設計・実装の途中です。
 
-Quickstart ページでは、これらのエンドポイントを用いた最小限の呼び出しシーケンスを紹介しています。
+- Go ランタイム実装が完全には安定していない  
+- 一部のフローは、まだ外部公開されていない `go/cmd/agno` の挙動に依存している  
 
-### Tools
+そのため、今は次のような使い方を推奨します。
 
-- **ツールの有効化/無効化**  
-  - **エンドポイント**：`PATCH /agents/{agentId}/tools/{toolName}`  
-  - **リクエストボディ**：`{ "enabled": true | false }`  
-  - **レスポンス**：ツール名、現在の状態、全ツールリストを含むオブジェクト。  
+- `go/pkg/providers/*` 経由で各プロバイダを直接呼び出す  
+- 複数プロバイダを組み合わせたい場合は、自分のサービス内で
+  `internal/model.Router` を利用する  
 
-ツールを用いたワークフローや、動的なツールオン/オフを紹介する高度なガイドで特に重要です。
+HTTP ランタイムと契約が安定した時点で、別途エンドツーエンドの例をドキュメントに
+追記する予定です。
 
-## 設定の概要
+## 5. リポジトリ内の参照場所
 
-本ページでは具体的なデプロイ構成には踏み込みませんが、以下を前提とします：
+- `go/pkg/providers/*` – 各プロバイダクライアント（OpenAI / Gemini / Groq など）  
+- `go/internal/agent` – エージェント・モデル設定型、使用量集計など  
+- `go/internal/model` – リクエスト/レスポンス型、Router、Provider インターフェイス  
+- `go/tests/providers` – プロバイダクライアントの具体的な利用例  
+- `go/tests/contract` – HTTP 形状のデータモデルを検証する契約テスト  
 
-- ランタイムの設定は `config/default.yaml` などのファイルに保持される。  
-- プロバイダの認証情報とエンドポイントは `.env` に定義された環境変数から注入される。  
-- `.env.example` にはサポートされるすべてのプロバイダ用変数が記載され、必須/任意がコメントで区別されている。  
+自分の Go アプリケーションに例を適用する際は、これらのファイルを最終的な
+ソース・オブ・トゥルースとして参照してください。
 
-設定内容と環境変数、安全な取り扱い方法を一箇所で確認したい場合は **Configuration & Security Practices** ページを参照してください。プロバイダごとの能力差や設定フィールドを比較したい場合は **プロバイダマトリクス** ページを参照してください。

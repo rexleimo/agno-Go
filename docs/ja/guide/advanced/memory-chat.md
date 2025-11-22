@@ -1,148 +1,152 @@
 
-# 高度なガイド：メモリ拡張チャット
+# 高度なガイド：メモリ拡張チャット（Go ベース）
 
-このガイドでは、対話の複数ターンやセッションをまたいでメモリを活用するチャット体験を構築する方法を説明します。特定のストレージ製品に依存することなく、既存の HTTP API とメタデータフィールドをどのように使えばよいかに焦点を当てます。
+このガイドでは、既存のプロバイダクライアントと独自のストレージを使って、
+**自分の Go アプリケーション内で** 複数ターン・複数セッションにまたがる
+「メモリを持ったチャット」を構築する方法を説明します。例はすべて Go コードであり、
+HTTP ランタイムに依存しません。
 
-## 1. メモリの種類
+## 1. メモリの 3 層
 
-メモリは大きく 3 つの層として考えることができます：
+メモリは大きく 3 層に分けて考えると整理しやすくなります。
 
-- **会話履歴**：現在のセッション内の最近のメッセージ  
-- **ユーザープロファイル**：ユーザーに関する長期的な情報（嗜好、属性など）  
-- **ナレッジレコード**：ドメイン固有の事実（過去のやり取りや重要イベントなど）  
+- **会話履歴** – 現在の会話セッション内の直近のやり取り  
+- **ユーザープロファイル** – 長期的な嗜好・設定（学習スタイル、言語、プランなど）  
+- **ドメイン知識レコード** – サポートチケット、購入履歴、重要なイベントなどの事実  
 
-Agno-Go は Session + Message によって第一層（会話履歴）をネイティブにサポートし、残りの層は設定と自前のサービスによって接続します。
+Agno-Go が直接扱うのは 1 層目（会話履歴）で、2・3 層目はアプリケーションや
+バックエンドシステム側で管理します。
 
-## 2. メモリ対応エージェントの作成
+## 2. Go で会話履歴を表現する
 
-Go からは、通常 HTTP 経由で AgentOS ランタイムにアクセスします。Quickstart と
-同じ流れを Go コードで表現すると、次のようになります。
+Go では、会話履歴を単純に `[]agent.Message` で表現できます。
 
 ```go
-package main
+var history []agent.Message
 
-import (
-  "bytes"
-  "encoding/json"
-  "log"
-  "net/http"
-  "time"
+history = append(history,
+  agent.Message{Role: agent.RoleUser, Content: "短い学習セッションが好きです。"},
 )
 
-type Agent struct {
-  Name        string                 `json:"name"`
-  Description string                 `json:"description"`
-  Model       map[string]any         `json:"model"`
-  Tools       []map[string]any       `json:"tools"`
-  Config      map[string]any         `json:"config"`
+// モデルからの応答も履歴に追加
+history = append(history,
+  agent.Message{Role: agent.RoleAssistant, Content: "わかりました。1 回あたり 30 分以内を目安にします。"},
+)
+```
+
+モデルを呼び出す際は、この履歴の一部または全部を `ChatRequest.Messages` に渡します。
+
+```go
+resp, err := client.Chat(ctx, model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+  },
+  Messages: history,
+})
+```
+
+どの程度の履歴を保持するか、いつ要約するか、どこに保存するかなどはアプリケーション側の判断になります。
+
+## 3. 長期メモリを組み込む
+
+長期メモリは通常、外部ストレージに保存し、必要なときだけプロンプトに注入します。
+
+```go
+type UserProfile struct {
+  ID          string
+  Preferences string // 自然言語での短いサマリ
 }
 
-func main() {
-  client := &http.Client{Timeout: 10 * time.Second}
-
-  agent := Agent{
-    Name:        "memory-chat-agent",
-    Description: "A chat agent that uses session history and external memory.",
-    Model: map[string]any{
-      "provider": "openai",
-      "modelId":  "gpt-4o-mini",
-      "stream":   true,
-    },
-    Tools:  nil,
-    Config: map[string]any{},
+func buildPrompt(profile UserProfile, recent []agent.Message) string {
+  var buf strings.Builder
+  buf.WriteString("あなたは親切なアシスタントです。\n\n")
+  buf.WriteString("【ユーザープロファイル】\n")
+  buf.WriteString(profile.Preferences)
+  buf.WriteString("\n\n【最近の会話】\n")
+  for _, m := range recent {
+    buf.WriteString(string(m.Role))
+    buf.WriteString(": ")
+    buf.WriteString(m.Content)
+    buf.WriteString("\n")
   }
-
-  body, err := json.Marshal(agent)
-  if err != nil {
-    log.Fatalf("marshal agent: %v", err)
-  }
-
-  resp, err := client.Post("http://localhost:8080/agents", "application/json", bytes.NewReader(body))
-  if err != nil {
-    log.Fatalf("create agent: %v", err)
-  }
-  defer resp.Body.Close()
-
-  if resp.StatusCode != http.StatusCreated {
-    log.Fatalf("unexpected status: %s", resp.Status)
-  }
-
-  // 実際のアプリケーションでは、ここでレスポンスを decode して agentId を取得し、
-  // その後のセクションのように Session 作成やメッセージ送信を行います。
+  buf.WriteString("\n上記の情報に基づいてユーザーの質問に答えてください。\n")
+  return buf.String()
 }
 ```
 
-ターミナルや API クライアントで生の HTTP を試したい場合は、同等の `curl`
-コマンドも利用できます。
+生成したプロンプトを 1 つの `user` メッセージとして送信します。
 
-```bash
-curl -X POST http://localhost:8080/agents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "memory-chat-agent",
-    "description": "A chat agent that uses session history and external memory.",
-    "model": {
-      "provider": "openai",
-      "modelId": "gpt-4o-mini",
-      "stream": true
-    },
-    "tools": [],
-    "config": {}
-  }'
+```go
+prompt := buildPrompt(profile, recentHistory)
+
+resp, err := client.Chat(ctx, model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: prompt},
+  },
+})
 ```
 
-メモリ対応エージェントかどうかを分けるポイントは、後続で説明するように
-セッション構造とメタデータの渡し方にあります。
+アプリケーション側では：
 
-## 3. セッションとメタデータの活用
+- データベースから `UserProfile` を読み書きする  
+- いつ要約し、いつ完全な履歴を保持するかを決める  
+- 敏感な情報が安全かつコンプライアンスに沿って扱われているかを確認する  
 
-セッション作成時にユーザー固有の識別子やメタデータを付与できます。
+必要があります。
 
-```bash
-curl -X POST http://localhost:8080/agents/<agent-id>/sessions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "user-1234",
-    "metadata": {
-      "source": "advanced-memory-chat",
-      "segment": "beta-testers"
-    }
-  }'
+## 4. ストリーミングとの組み合わせ
+
+メモリ拡張チャットはストリーミング出力とも相性が良いです。
+
+```go
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   true,
+  },
+  Messages: history,
+}
+
+err := client.Stream(ctx, req, func(ev model.ChatStreamEvent) error {
+  if ev.Type == "token" {
+    fmt.Print(ev.Delta)
+  }
+  if ev.Done {
+    fmt.Println()
+  }
+  return nil
+})
+if err != nil {
+  log.Fatalf("stream error: %v", err)
+}
 ```
 
-アプリケーション側では、`userId` や `metadata` を用いて自前ストレージからユーザープロファイルを参照・更新し、その情報を後続メッセージに反映させることができます。
+最終的なアシスタント返信を `history` に追加しておけば、次回のリクエストでは更新された
+履歴を参照できます。
 
-## 4. プロンプトへのメモリ統合
+## 5. ストレージと設定
 
-メッセージ送信時に、既知の事実やコンテキストを `content` に組み込むことができます。
+メモリを多く扱うシナリオでは：
 
-```bash
-curl -X POST "http://localhost:8080/agents/<agent-id>/sessions/<session-id>/messages" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "role": "user",
-    "content": "以前、あなたは私のために読書プランを提案してくれました。その提案内容と、短時間の読書を好むという私の好みを踏まえて、今週のプランを提案してください。"
-  }'
-```
+- ユーザープロファイルや会話の断片を永続化するために、データベースやキャッシュ
+  （Postgres, Redis, キーバリューストアなど）を利用する  
+- [設定とセキュリティ](../config-and-security) を参照し、どのプロバイダを有効化し
+  API キーをどう管理するか決める  
+- 可能な限り大量の生ログをそのままプロンプトに入れず、要約された重要情報だけを渡す  
 
-バックエンド側では：
+といった方針を推奨します。Agno-Go は特定のストレージを強制せず、メッセージとリクエストの
+形だけを定義します。
 
-- メモリストアから過去のやり取りやメモを読み込む  
-- 要約や重要な事実をプロンプトに組み込む  
-- その上で標準的なメッセージエンドポイントを通してランタイムに渡す  
+## 6. 他ドキュメントとの関係
 
-## 5. 設定とストレージ
+- [クイックスタート](../quickstart) は最もシンプルな「ステートレス」な呼び出しフローです。  
+- 本ガイドはその上にアプリケーションレベルのメモリとストレージロジックを追加したものです。  
+- 仕様に記載されている HTTP ランタイムもセッションやメモリの概念を扱いますが、
+  実装が安定するまでは内部設計とみなし、「そのままコピーして動く機能」とは考えないでください。  
 
-メモリに依存する度合いが高いユースケースでは：
-
-- 「Configuration & Security Practices」ドキュメントを参考に、どのメモリバックエンドを有効化するか（インメモリ vs ローカル永続化など）を決める。  
-- 追加のインフラ（データベース、キャッシュ、キューなど）は内部運用ドキュメントに記録し、AgentOS ランタイムは HTTP 動作と契約に専念させる。  
-- `.env` と `config/default.yaml` の設定が公式ドキュメントのガイダンス（特に保持期間やデータ所在）と整合していることを確認する。  
-
-## 6. テストと進化
-
-メモリ拡張チャットを検証する際には：
-
-- 「短期」および「長期」メモリの両方の挙動をカバーするテストプランを設計する。  
-- メモリ使用量が増えても `/health` と Quickstart フローでランタイムが健康であることを確認する。  
-- レイテンシやリソース使用量を監視し、要約頻度やリプレイ長といったメモリ戦略を実測結果に基づき調整する。  

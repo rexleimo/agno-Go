@@ -1,148 +1,161 @@
 
-# Advanced Guide: Memory-Augmented Chat
+# Advanced Guide: Memory-Augmented Chat (Go-first)
 
-This guide illustrates how to build a chat experience that can take advantage of memory across turns and sessions. The goal is not to prescribe a specific storage backend, but to show how to use the existing HTTP API and metadata fields to make memory useful.
+This guide illustrates how to build a chat experience that takes advantage of
+memory across turns and sessions **inside your own Go application**, using the
+existing provider clients and your own storage. It does not depend on an HTTP
+runtime being available.
 
 ## 1. Types of memory
 
-At a high level, you can think of memory in three layers:
+You can think about “memory” in three layers:
 
-- **Conversation history**: recent messages in the current session.  
-- **User profile**: long-lived information about a user (preferences, profile fields).  
-- **Knowledge records**: domain-specific facts (for example past interactions or important events).  
+- **Conversation history** – recent turns in the current conversation.  
+- **User profile** – long-lived information about a user (preferences, profile
+  fields, plan, etc.).  
+- **Knowledge records** – domain-specific facts (support tickets, purchases,
+  important events).  
 
-Agno-Go provides primitives for the first layer out of the box（Session + Message），and allows you to connect the other two via configuration and your own services.
+Agno-Go focuses on the first layer via `ChatRequest`/`ChatResponse` and leaves
+the other layers to your own systems.
 
-## 2. Creating a memory-capable agent
+## 2. Representing conversation state
 
-In Go, you will typically talk to the AgentOS runtime over HTTP. A minimal example
-that mirrors the Quickstart flow looks like this:
+At the Go API level, the conversation history is just a slice of
+`agent.Message` values:
 
 ```go
-package main
+var history []agent.Message
 
-import (
-  "bytes"
-  "encoding/json"
-  "log"
-  "net/http"
-  "time"
+history = append(history,
+  agent.Message{Role: agent.RoleUser, Content: "Hi, I like short study sessions."},
 )
 
-type Agent struct {
-  Name        string                 `json:"name"`
-  Description string                 `json:"description"`
-  Model       map[string]any         `json:"model"`
-  Tools       []map[string]any       `json:"tools"`
-  Config      map[string]any         `json:"config"`
+// later…
+history = append(history,
+  agent.Message{Role: agent.RoleAssistant, Content: "Great, I will keep sessions under 30 minutes."},
+)
+```
+
+When you call a provider, you pass the relevant part of this history into
+`model.ChatRequest.Messages`:
+
+```go
+resp, err := client.Chat(ctx, model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+  },
+  Messages: history,
+})
+```
+
+Your application decides:
+
+- How many past turns to keep.  
+- Whether to periodically summarize older messages.  
+- How to persist history between requests (database, cache, …).  
+
+## 3. Adding long-term memory
+
+Long-term memory is typically stored outside the model and injected into the
+prompt when needed. For example:
+
+```go
+type UserProfile struct {
+  ID          string
+  Preferences string // a short natural-language summary
 }
 
-func main() {
-  client := &http.Client{Timeout: 10 * time.Second}
-
-  agent := Agent{
-    Name:        "memory-chat-agent",
-    Description: "A chat agent that uses session history and external memory.",
-    Model: map[string]any{
-      "provider": "openai",
-      "modelId":  "gpt-4o-mini",
-      "stream":   true,
-    },
-    Tools:  nil,
-    Config: map[string]any{},
+func buildPrompt(profile UserProfile, recent []agent.Message) string {
+  var buf strings.Builder
+  buf.WriteString("You are a helpful assistant.\n\n")
+  buf.WriteString("USER PROFILE:\n")
+  buf.WriteString(profile.Preferences)
+  buf.WriteString("\n\nRECENT CONVERSATION:\n")
+  for _, m := range recent {
+    buf.WriteString(string(m.Role))
+    buf.WriteString(": ")
+    buf.WriteString(m.Content)
+    buf.WriteString("\n")
   }
-
-  body, err := json.Marshal(agent)
-  if err != nil {
-    log.Fatalf("marshal agent: %v", err)
-  }
-
-  resp, err := client.Post("http://localhost:8080/agents", "application/json", bytes.NewReader(body))
-  if err != nil {
-    log.Fatalf("create agent: %v", err)
-  }
-  defer resp.Body.Close()
-
-  if resp.StatusCode != http.StatusCreated {
-    log.Fatalf("unexpected status: %s", resp.Status)
-  }
-
-  // In a real app you would decode the response to get agentId
-  // and then create sessions / send messages as shown later.
+  buf.WriteString("\nBased on the profile and recent conversation, answer the user.\n")
+  return buf.String()
 }
 ```
 
-If you prefer to experiment with the raw HTTP surface (for example in a terminal
-or API client), the equivalent `curl` command is:
+You can then pass this prompt as a single `user` message:
 
-```bash
-curl -X POST http://localhost:8080/agents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "memory-chat-agent",
-    "description": "A chat agent that uses session history and external memory.",
-    "model": {
-      "provider": "openai",
-      "modelId": "gpt-4o-mini",
-      "stream": true
-    },
-    "tools": [],
-    "config": {}
-  }'
+```go
+prompt := buildPrompt(profile, recentHistory)
+
+resp, err := client.Chat(ctx, model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: prompt},
+  },
+})
 ```
 
-The key differences for a memory-capable agent will be how you structure sessions
-and what metadata you pass along, which we cover next.
+Your own service is responsible for:
 
-## 3. Using sessions and metadata
+- Loading / updating `UserProfile` records from your database.  
+- Deciding when to summarize or prune history.  
+- Ensuring sensitive data is handled according to your policies.  
 
-When creating a session, you can attach user-specific identifiers and metadata:
+## 4. Streaming with memory
 
-```bash
-curl -X POST http://localhost:8080/agents/<agent-id>/sessions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "user-1234",
-    "metadata": {
-      "source": "advanced-memory-chat",
-      "segment": "beta-testers"
-    }
-  }'
+Memory-augmented chat works equally well with streaming:
+
+```go
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   true,
+  },
+  Messages: history,
+}
+
+err := client.Stream(ctx, req, func(ev model.ChatStreamEvent) error {
+  if ev.Type == "token" {
+    fmt.Print(ev.Delta)
+  }
+  if ev.Done {
+    fmt.Println()
+  }
+  return nil
+})
+if err != nil {
+  log.Fatalf("stream error: %v", err)
+}
 ```
 
-Your application can use `userId` and `metadata` to look up or update user profile records in your own storage, then include relevant information in future messages.
+You can append the final assistant message back into `history` so that future
+requests see the updated conversation.
 
-## 4. Incorporating memory into prompts
-
-When sending messages, you can pass prior facts and context into the `content` field:
-
-```bash
-curl -X POST "http://localhost:8080/agents/<agent-id>/sessions/<session-id>/messages" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "role": "user",
-    "content": "You previously suggested a reading plan for me. Based on that and my preference for short sessions, suggest a plan for this week."
-  }'
-```
-
-Your backend can:
-
-- Load past interactions or notes from your memory store.  
-- Add a brief summary or key facts to the prompt content.  
-- Let the runtime handle the rest via the standard message endpoint.  
-
-## 5. Configuration and storage
+## 5. Storage and configuration
 
 For memory-heavy scenarios:
 
-- Use Configuration & Security docs to decide which memory backend to enable（for example an on-disk store vs purely in-memory）.  
-- Document any additional infrastructure（databases, caches, queues）in your own operational docs; the runtime itself stays focused on HTTP behavior and contracts.  
-- Make sure your `.env` and `config/default.yaml` settings are consistent with the guidance in the official docs, especially around retention and data locality.  
+- Use your own database or cache (for example Postgres, Redis, key-value store)
+  to persist user profiles and conversation snippets.  
+- Use [Configuration & Security](../config-and-security) to decide which
+  providers to enable and how to manage API keys.  
+- Keep sensitive or long-lived data out of prompt text where possible; prefer
+  short summaries over raw logs.  
 
-## 6. Testing and evolution
+Agno-Go does not impose a specific storage backend; it only defines the shapes
+for messages and requests.
 
-To validate memory-augmented chat:
+## 6. Relation to other docs
 
-- Design a small test plan that exercises both “short-term” and “long-term” memory behaviors.  
-- Use the same `/health` and Quickstart flows to ensure the runtime remains healthy while memory usage grows.  
-- Monitor latency and resource usage; adjust your memory strategy（for example summarization frequency）based on empirical results.  
+- The [Quickstart](../quickstart) shows the simplest “stateless” call flow.  
+- This guide adds application-level memory on top of the same provider clients.  
+- The HTTP runtime design in the specs uses the same concepts (sessions,
+  messages, metadata), but until it stabilizes, treat it as an internal design,
+  not a ready-made feature.  
+

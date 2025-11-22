@@ -1,78 +1,147 @@
 
-# Advanced Guide: Knowledge Base Assistant
+# Advanced Guide: Knowledge Base Assistant (Go-first)
 
-This guide shows how to design an assistant that can answer questions based on your own knowledge sources, while keeping the HTTP interaction surface the same as in the Quickstart.
+This guide outlines how to build an assistant that answers questions based on
+your own documents, using **Go provider clients** and your own retrieval stack.
+It focuses on how to structure requests to the existing Go API surface, and
+intentionally avoids relying on the unfinished HTTP runtime.
 
-The goals of this example are:
+## 1. High-level scenario
 
-- Keep the client integration to a small set of HTTP endpoints.  
-- Introduce a retrieval step (for example a vector store lookup) before or alongside the model call.  
-- Make it clear which parts belong to “knowledge configuration” and which parts belong to the runtime API.  
+You want an assistant that can answer questions about:
 
-## 1. Scenario
+- Product documentation  
+- Internal guidelines or policies  
+- Knowledge base articles  
 
-Imagine you want an assistant that can answer questions about your product documentation or internal guidelines. High-level flow:
+At a high level:
 
-1. Offline, you embed your documents into a vector store (not covered in detail here).  
-2. At query time, you retrieve the most relevant passages for the user’s question.  
-3. You pass the retrieved context into the agent as part of the message content or metadata.  
+1. Offline, you embed your documents into a vector store (any database or service
+   you prefer).  
+2. At query time, you retrieve the most relevant passages based on the user’s
+   question.  
+3. You pass those passages into the model via `agent.Message.Content`.  
 
-The runtime remains responsible for managing agents, sessions and messages.
+Agno-Go does **not** ship a built-in vector store; you bring your own storage
+and just use the provider clients to run embeddings and chat.
 
-## 2. Agent and session
+## 2. Embedding documents with a provider client
 
-You can reuse the same Quickstart pattern to create an agent and session:
+You can use any provider that implements `model.EmbeddingProvider`. The exact
+model IDs and capabilities are listed in the Provider Matrix and `.env.example`.
 
-```bash
-curl -X POST http://localhost:8080/agents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "kb-assistant",
-    "description": "Answers questions using knowledge base context.",
-    "model": "openai:gpt-4o-mini",
-    "tools": [],
-    "config": {}
-  }'
+```go
+package main
+
+import (
+  "context"
+  "log"
+  "os"
+  "time"
+
+  "github.com/rexleimo/agno-go/internal/agent"
+  "github.com/rexleimo/agno-go/internal/model"
+  "github.com/rexleimo/agno-go/pkg/providers/openai"
+)
+
+func embedDoc(ctx context.Context, text string) ([]float64, error) {
+  apiKey := os.Getenv("OPENAI_API_KEY")
+  if apiKey == "" {
+    return nil, fmt.Errorf("OPENAI_API_KEY not set")
+  }
+
+  client := openai.New("", apiKey, nil)
+
+  resp, err := client.Embed(ctx, model.EmbeddingRequest{
+    Model: agent.ModelConfig{
+      Provider: agent.ProviderOpenAI,
+      ModelID:  "text-embedding-3-small", // choose a suitable embedding model
+    },
+    Input: []string{text},
+  })
+  if err != nil {
+    return nil, err
+  }
+  if len(resp.Vectors) == 0 {
+    return nil, fmt.Errorf("empty embedding response")
+  }
+  return resp.Vectors[0], nil
+}
 ```
 
-```bash
-curl -X POST http://localhost:8080/agents/<agent-id>/sessions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "kb-user",
-    "metadata": {
-      "source": "advanced-knowledge-base-assistant"
-    }
-  }'
+How you store these vectors (Postgres, ClickHouse, dedicated vector DB, etc.) is
+up to you and outside the scope of Agno-Go.
+
+## 3. Answering questions with retrieved context
+
+Once you have a way to retrieve relevant passages (for example, `[]string`
+containing the top-k chunks), you can pass them into a chat request:
+
+```go
+func answerWithContext(
+  ctx context.Context,
+  client model.ChatProvider,
+  provider agent.Provider,
+  modelID string,
+  question string,
+  passages []string,
+) (string, error) {
+  var contextText string
+  for _, p := range passages {
+    contextText += "- " + p + "\n"
+  }
+
+  prompt := fmt.Sprintf(
+    "You are a helpful assistant.\n\nCONTEXT:\n%s\nQUESTION: %s\n\nAnswer in a concise way and say “I don't know” if the answer is not in the context.",
+    contextText,
+    question,
+  )
+
+  resp, err := client.Chat(ctx, model.ChatRequest{
+    Model: agent.ModelConfig{
+      Provider: provider,
+      ModelID:  modelID,
+    },
+    Messages: []agent.Message{
+      {Role: agent.RoleUser, Content: prompt},
+    },
+  })
+  if err != nil {
+    return "", err
+  }
+  return resp.Message.Content, nil
+}
 ```
 
-## 3. Passing retrieved context
+You can plug in any `ChatProvider` here (OpenAI, Gemini, Groq, …) as long as
+you have configured the corresponding env vars.
 
-Once your application has retrieved relevant passages from a knowledge store, you can include them directly in the message content:
+## 4. Putting it together
 
-```bash
-curl -X POST "http://localhost:8080/agents/<agent-id>/sessions/<session-id>/messages" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "role": "user",
-    "content": "Using the following context, answer the question.\\n\\n[CONTEXT]\\n...retrieved passages here...\\n\\nQuestion: How does our refund policy work?"
-  }'
-```
+A complete knowledge base assistant in Go typically has three pieces:
 
-Alternatively, you can pass retrieval metadata in the `metadata` field when creating the session or as part of your own application-level state. The runtime API itself does not enforce a specific retrieval pattern.
+- **Indexer** – reads documents, calls `Embed` on a provider client, stores
+  vectors + metadata in your own store.  
+- **Retriever** – given a question, finds relevant passages and returns text
+  chunks.  
+- **Answerer** – calls `Chat` with a prompt that includes the retrieved
+  context, using the pattern above.  
 
-## 4. Configuration and providers
+Agno-Go’s responsibilities in this story are deliberately small:
 
-When building a knowledge base assistant:
+- Provide consistent `ChatRequest` / `EmbeddingRequest` shapes.  
+- Provide provider clients that implement the same interfaces.  
+- Normalize basic error handling and provider status.  
 
-- Choose a provider and model with good long-context support, as summarized in the Provider Matrix.  
-- Configure the necessary env vars in `.env` (for example `OPENAI_API_KEY`, `GEMINI_API_KEY`), and ensure they are documented on the Configuration & Security page.  
-- Keep knowledge indexing and retrieval infrastructure (vector store, database, storage) outside of the runtime; treat it as a separate concern that feeds into message content.  
+Everything else (storage, indexing, ranking) is up to your application.
 
-## 5. Testing and validation
+## 5. Relation to other docs
 
-To validate this pattern:
+- Use the [Provider Matrix](../providers/matrix) to pick a provider and model
+  with good long-context support.  
+- Use [Configuration & Security](../config-and-security) to configure the
+  necessary env vars (for example `OPENAI_API_KEY`, `GEMINI_API_KEY`).  
+- The HTTP runtime design in the specs mirrors the same ideas (context + chat),
+  but until it stabilizes, treat it as a contract reference rather than a
+  ready-to-copy implementation.  
 
-- Start with a small set of carefully curated documents and test questions.  
-- Verify that the assistant can answer questions accurately when given the retrieved context.  
-- Log or record cases where the answer is incomplete or incorrect, and use them to refine your retrieval strategy and prompt templates.  

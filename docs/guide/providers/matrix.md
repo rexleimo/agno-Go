@@ -42,3 +42,57 @@ For more detail on how providers are routed and how errors are normalized, see t
   the environment variables listed here and recommended practices for managing keys.  
 - Return to [Quickstart](../quickstart) if you want to extend the basic example with a
   different provider configuration.  
+
+## Go examples: calling providers directly
+
+If you prefer to call providers directly from Go (without going through the AgentOS
+HTTP runtime), you can use the clients in `go/pkg/providers`. For example, to call
+OpenAI chat:
+
+```go
+package main
+
+import (
+  "context"
+  "fmt"
+  "log"
+  "os"
+  "time"
+
+  "github.com/rexleimo/agno-go/internal/agent"
+  "github.com/rexleimo/agno-go/internal/model"
+  "github.com/rexleimo/agno-go/pkg/providers/openai"
+)
+
+func main() {
+  apiKey := os.Getenv("OPENAI_API_KEY")
+  if apiKey == "" {
+    log.Fatal("OPENAI_API_KEY not set")
+  }
+
+  client := openai.New("", apiKey, nil) // uses default endpoint
+
+  ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+  defer cancel()
+
+  resp, err := client.Chat(ctx, model.ChatRequest{
+    Model: agent.ModelConfig{
+      Provider: agent.ProviderOpenAI,
+      ModelID:  "gpt-4o-mini",
+    },
+    Messages: []agent.Message{
+      {Role: agent.RoleUser, Content: "Hello from Agno-Go client."},
+    },
+  })
+  if err != nil {
+    log.Fatalf("chat error: %v", err)
+  }
+
+  fmt.Println("assistant:", resp.Message.Content)
+}
+```
+
+The other providers under `go/pkg/providers/*` follow the same pattern: each has a
+`New` constructor and implements `model.ChatProvider` / `EmbeddingProvider`. The
+AgentOS runtime uses these clients under the hood when routing requests based on
+`agent.ModelConfig`.

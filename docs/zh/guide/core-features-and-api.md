@@ -1,125 +1,185 @@
+# 核心能力与 Go API 概览
 
-# 核心功能与 API 概览
+本页介绍目前 **已经存在且可用的 Go 级 API 面**。在当前阶段，对外稳定的入口主要是：
 
-本页从概念和接口两个角度介绍 Agno-Go 的核心能力，帮助你在不阅读 Go 源码的前提下理解“有哪些东西可以用”和“应该调用哪些 HTTP 接口”。
+- `go/pkg/providers/*` 下的各个模型供应商客户端  
+- `internal/agent` 和 `internal/model` 中共享的数据模型  
 
-## 核心概念
+规范里提到的 HTTP 运行时（`/agents`、`/sessions`、`/messages` 等）仍在演进中，暂时
+**不建议** 作为对外稳定 API 使用，本页只做设计级别的说明。
 
-### Agent（代理）
+## 1. 核心数据类型
 
-**Agent** 表示针对某类任务或产品场景的“智能体配置”，通常包括：
+调用模型时，你会频繁接触到以下类型：
 
-- 名称与描述（用于区分用途）  
-- 默认使用的模型（例如 OpenAI、Gemini、Groq 等供应商的具体模型）  
-- 可以调用的工具列表  
-- 可选的行为配置（如温度、路由策略等）  
+- `agent.ModelConfig`：描述要使用的 Provider / Model 以及一些基础选项  
+  （`Provider` 枚举、`ModelID`、`Stream`、`MaxTokens`、`Temperature` 等）。  
+- `agent.Message`：一条消息，包含 `Role`（`user` / `assistant` / `system`）和
+  `Content`（当前实现为纯文本）。  
+- `model.ChatRequest`：一次对话请求：
 
-Agent 通过 `/agents` 系列接口创建与读取。
+  ```go
+  type ChatRequest struct {
+    Model    agent.ModelConfig `json:"model"`
+    Messages []agent.Message   `json:"messages"`
+    Tools    []agent.ToolCall  `json:"tools,omitempty"`
+    Metadata map[string]any    `json:"metadata,omitempty"`
+    Stream   bool              `json:"stream,omitempty"`
+  }
+  ```
 
-### Session（会话）
+- `model.ChatResponse`：一次助手回复以及用量信息：
 
-**会话** 表示用户（或系统）与某个 Agent 之间的一段持续交互，它：
+  ```go
+  type ChatResponse struct {
+    Message      agent.Message `json:"message"`
+    Usage        agent.Usage   `json:"usage,omitempty"`
+    FinishReason string        `json:"finishReason,omitempty"`
+  }
+  ```
 
-- 始终隶属某一个 Agent；  
-- 携带 `userId` 与可选的 `metadata`（例如渠道、实验分组）；  
-- 为一系列消息提供稳定的上下文。  
+- `model.ChatStreamEvent` / `model.StreamHandler`：用于流式输出（`token` /
+  `tool_call` / `end` 事件）。  
+- `model.EmbeddingRequest` / `model.EmbeddingResponse`：用于 embedding 调用。  
+- `model.ChatProvider` / `model.EmbeddingProvider`：各个 provider 客户端实现的接口。  
 
-会话通过 `/agents/{agentId}/sessions` 创建。
+## 2. Provider 客户端（`go/pkg/providers/*`）
 
-### Message（消息）
+每个 provider 包（OpenAI、Gemini、Groq 等）都会实现 `internal/model` 中的接口。
+例如 OpenAI 客户端：
 
-**消息** 是会话中的单轮对话，包含：
+- 位于 `go/pkg/providers/openai`  
+- 暴露 `New(endpoint, apiKey string, missingEnv []string) *Client`  
+- 实现 `model.ChatProvider` 和 `model.EmbeddingProvider`  
 
-- 角色（例如 `user`、`assistant`）；  
-- 文本内容，以及在需要时包含的工具调用信息；  
-- 可根据 `stream` 查询参数选择一次性 JSON 响应或事件流。  
+一个最小的非流式对话调用如下：
 
-消息通过 `/agents/{agentId}/sessions/{sessionId}/messages` 发送。
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
 
-### Tool（工具）
+client := openai.New("", os.Getenv("OPENAI_API_KEY"), nil)
 
-工具让 Agent 能够调用外部系统（例如 HTTP API、数据库或搜索）。运行时提供：
+resp, err := client.Chat(ctx, model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   false,
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "请简单介绍一下 Agno-Go。"},
+  },
+})
+if err != nil {
+  log.Fatalf("chat error: %v", err)
+}
 
-- 为 Agent 注册工具的方法；  
-- 启用/禁用某个工具的能力。  
+fmt.Println("assistant:", resp.Message.Content)
+```
 
-工具状态可通过 `/agents/{agentId}/tools/{toolName}` 切换。
+如果需要流式输出，可以使用同一个客户端的 `Stream` 方法和
+`model.ChatStreamEvent`：
 
-### Memory（记忆）与状态
+```go
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   true,
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "请分几次输出一句问候。"},
+  },
+}
 
-记忆描述了跨会话持久化状态的方式。在 Agno-Go 中：
+err := client.Stream(ctx, req, func(ev model.ChatStreamEvent) error {
+  if ev.Type == "token" {
+    fmt.Print(ev.Delta)
+  }
+  if ev.Done {
+    fmt.Println()
+  }
+  return nil
+})
+if err != nil {
+  log.Fatalf("stream error: %v", err)
+}
+```
 
-- 短期对话状态保存在 Session 与 Message 中；  
-- 长期状态（如用户画像或知识库）通过配置的存储后端持久化。  
+Embedding 的调用方式与此类似，使用 `EmbeddingRequest` / `EmbeddingResponse`。
+更完整的示例可以参考 `go/tests/contract` 与 `go/tests/providers`。
 
-具体采用的存储技术（内存、Bolt、Badger 等）由环境变量与 `config/default.yaml` 决定，并在“配置与安全实践”页面中统一说明。
+## 3. Router：在 Go 内部组合多个 Provider
 
-### Provider（模型供应商）
+`internal/model.Router` 提供了一个简单的路由器，可以在同一个进程内注册多个
+provider 客户端：
 
-**供应商** 是提供模型能力的后端（例如 OpenAI、Gemini、GLM4、OpenRouter、SiliconFlow、Cerebras、ModelScope、Groq、Ollama）。每个供应商：
+```go
+router := model.NewRouter(
+  model.WithMaxConcurrency(16),
+  model.WithTimeout(30*time.Second),
+)
 
-- 在 Go 中实现统一的 chat/embedding 接口；  
-- 需要特定的环境变量完成鉴权与 endpoint 配置；  
-- 可能支持非流式与流式输出。  
+openAI := openai.New("", os.Getenv("OPENAI_API_KEY"), nil)
+router.RegisterChatProvider(openAI)
 
-具体能力与配置项可在“模型供应商矩阵”页面中查看。
+// 其它 provider（Gemini、Groq 等）可以以同样方式注册
 
-## HTTP API 概览（运行时）
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "Hello from router."},
+  },
+}
 
-运行时暴露的 HTTP 接口与上述概念一一对应。`contracts` 目录中的 OpenAPI 文档给出了完整细节，这里仅列出最常用的几个。
+resp, err := router.Chat(ctx, req)
+if err != nil {
+  log.Fatalf("router chat error: %v", err)
+}
 
-### Health Check（健康检查）
+fmt.Println("assistant:", resp.Message.Content)
+```
 
-- **接口**：`GET /health`  
-- **用途**：确认运行时是否就绪，并查看版本与供应商状态等元信息。  
-- **典型场景**：活性/就绪探针、监控、手动验证部署是否成功。  
+Router 还提供：
 
-### Agents（代理）
+- `router.Stream(ctx, req, handler)`：流式对话  
+- `router.Embed(ctx, embeddingReq)`：embedding 调用  
+- `router.Statuses()`：当前各 provider 的状态列表（可用于健康检查）  
 
-- **创建 Agent**  
-  - **接口**：`POST /agents`  
-  - **请求体**：Agent 定义（名称、描述、模型、工具、配置）。  
-  - **响应**：包含 `agentId` 的 JSON 对象。  
-- **获取 Agent**  
-  - **接口**：`GET /agents/{agentId}`  
-  - **用途**：查看已创建 Agent 的配置，便于调试与审计。  
+这也是内部实现多 provider 组合的主要原语，你也可以在自己的服务里直接复用。
 
-### Sessions（会话）
+## 4. HTTP 运行时（设计说明，暂不稳定）
 
-- **创建会话**  
-  - **接口**：`POST /agents/{agentId}/sessions`  
-  - **请求体**：可选 `userId` 与 `metadata` 字段。  
-  - **响应**：包含会话 ID 的会话对象。  
-- **关系**：一个会话只属于一个 Agent；一个 Agent 可以拥有多个会话。  
+`specs/001-vitepress-docs/contracts/docs-site-openapi.yaml` 中描述了一个 HTTP 运行时，
+包含如下端点：
 
-### Messages（消息）
+- `GET /health` – 健康检查与 provider 状态  
+- `POST /agents` – 创建 Agent 定义  
+- `POST /agents/{agentId}/sessions` – 创建会话  
+- `POST /agents/{agentId}/sessions/{sessionId}/messages` – 发送消息  
 
-- **发送非流式消息**  
-  - **接口**：`POST /agents/{agentId}/sessions/{sessionId}/messages`  
-  - **查询参数**：无 `stream` 或 `stream=false`。  
-  - **请求体**：包含 `role` 与 `content` 的消息对象。  
-  - **响应**：包含 `messageId`、`content`、`toolCalls`、`usage`、`state` 等字段的 JSON 对象。  
-- **发送流式消息**  
-  - **接口**：`POST /agents/{agentId}/sessions/{sessionId}/messages?stream=true`  
-  - **响应**：以 Server-Sent Events（SSE）形式返回逐步输出。  
+目前这套 HTTP 接口仍处于设计/实现迭代阶段：
 
-Quickstart 页面展示了使用这些接口完成最小闭环调用的示例。
+- Go 运行时实现尚未完全稳定  
+- 文档中的部分流程依赖 `go/cmd/agno` 尚未实现/对外公开的行为  
 
-### Tools（工具）
+在当前阶段，用于生产代码时 **优先选择**：
 
-- **切换工具状态**  
-  - **接口**：`PATCH /agents/{agentId}/tools/{toolName}`  
-  - **请求体**：`{ "enabled": true | false }`  
-  - **响应**：返回工具名称、当前状态以及完整工具列表。  
+- 直接通过 `go/pkg/providers/*` 调用各个模型供应商  
+- 如需多 provider 组合，在你自己的服务中使用 `internal/model.Router`  
 
-在需要演示工具工作流或动态开关工具的高级案例中，这个接口尤为重要。
+等 HTTP 运行面和契约完全稳定之后，文档会再单独给出完整的端到端示例。
 
-## 配置概览
+## 5. 代码参考位置
 
-本页不限定具体的部署拓扑，而是假定：
+- `go/pkg/providers/*` – 各供应商客户端（OpenAI、Gemini、Groq 等）  
+- `go/internal/agent` – Agent / 模型配置类型、用量统计等  
+- `go/internal/model` – 请求/响应类型、Router、Provider 接口  
+- `go/tests/providers` – Provider 客户端的实际使用示例  
+- `go/tests/contract` – 覆盖 HTTP 形状的数据模型的契约测试  
 
-- 运行时配置保存在 `config/default.yaml` 等文件中；  
-- 模型供应商的凭据与 endpoint 通过 `.env` 中的环境变量注入；  
-- `.env.example` 列出了所有支持的供应商变量，并以注释区分必填与可选。  
+在调整自己的 Go 代码和示例时，请以以上文件为最终事实来源。
 
-如果你想集中了解配置、环境变量与安全实践，请参考 **Configuration & Security Practices** 页面；若希望了解各供应商的能力差异与配置字段，请参考 **模型供应商矩阵** 页面。

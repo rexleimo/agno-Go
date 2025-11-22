@@ -1,92 +1,158 @@
 
-# 高级案例：多模型回退与路由
+# 高级指南：多模型供应商路由（Go 优先）
 
-本指南展示如何在保持统一 HTTP 接口的前提下，在多个模型供应商之间进行路由与回退。
-
-目标是：
-
-- 只暴露一套 AgentOS 运行时与 HTTP 接口给调用方；  
-- 在服务端根据简单规则（如任务类型、模型名称）在不同供应商之间路由；  
-- 当主供应商不可用时自动回退到备用模型，而无需修改客户端代码。  
+本指南介绍如何在 **你自己的 Go 服务内部** 使用现有的 provider 客户端和
+`internal/model.Router` 在多个模型供应商之间进行路由。示例全部基于 Go 代码，
+**不依赖** 尚未完成的 HTTP 运行时。
 
 ## 1. 适用场景
 
-常见需求包括：
+典型场景包括：
 
-- 通用对话使用一个供应商，成本敏感或低延迟场景使用另一个供应商；  
-- 主供应商不可用时希望自动切换到备用供应商；  
-- 希望在稳定的客户端集成之上做模型实验或 A/B 测试。  
+- 通用对话使用一个 Provider，低延迟/低成本场景使用另一个 Provider  
+- 主 Provider 故障或限流时自动切换到备用 Provider  
+- 在保持应用集成面稳定的前提下，对新模型做 A/B 或灰度实验  
 
-## 2. 高层设计
+核心思路是：**在一个进程里组合多个 `ChatProvider` 实现**，对上层代码只暴露统一的
+请求形状。
 
-路由逻辑应尽量放在 Agent 配置与服务端运行时，而不是客户端：
+## 2. 核心构件
 
-1. 定义一个或多个 Agent，通过 `model` 字段表达“首选模型/供应商”；  
-2. 运行时根据 `model` 字段与配置，将请求路由到具体供应商；  
-3. 客户端始终调用相同的 HTTP 接口（`/agents`、`/sessions`、`/messages`）。  
+- `go/pkg/providers/*` – 各个模型供应商的 Go 客户端，实现
+  `model.ChatProvider` / `model.EmbeddingProvider`  
+- `internal/model.Router` – 负责把 `ChatRequest` / `EmbeddingRequest` 路由到
+  已注册的 provider  
+- `agent.ModelConfig` – 决定当前请求要走哪个 Provider / Model  
 
-示例模型命名约定：
+## 3. 示例：同时接入 OpenAI 与 Gemini
 
-- `openai:gpt-4o-mini`  
-- `gemini:flash-1.5`  
-- `groq:llama3-70b`  
+下面是一个只存在于 Go 进程里的路由器示例，它可以同时调用 OpenAI 和 Gemini。
 
-具体映射由服务端配置负责。
+```go
+package main
 
-## 3. 示例流程
+import (
+  "context"
+  "fmt"
+  "log"
+  "os"
+  "time"
 
-1. **创建支持路由的 Agent**
+  "github.com/rexleimo/agno-go/internal/agent"
+  "github.com/rexleimo/agno-go/internal/model"
+  "github.com/rexleimo/agno-go/pkg/providers/gemini"
+  "github.com/rexleimo/agno-go/pkg/providers/openai"
+)
 
-   ```bash
-   curl -X POST http://localhost:8080/agents \
-     -H "Content-Type: application/json" \
-     -d '{
-       "name": "routing-agent",
-       "description": "An agent that routes across providers based on task type.",
-       "model": "openai:gpt-4o-mini",
-       "tools": [],
-       "config": {
-         "fallbackModel": "gemini:flash-1.5"
-       }
-     }'
-   ```
+func main() {
+  ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+  defer cancel()
 
-2. **创建会话**
+  openaiKey := os.Getenv("OPENAI_API_KEY")
+  geminiKey := os.Getenv("GEMINI_API_KEY")
+  if openaiKey == "" && geminiKey == "" {
+    log.Fatal("at least one of OPENAI_API_KEY or GEMINI_API_KEY must be set")
+  }
 
-   ```bash
-   curl -X POST http://localhost:8080/agents/<agent-id>/sessions \
-     -H "Content-Type: application/json" \
-     -d '{
-       "userId": "routing-user",
-       "metadata": {
-         "source": "advanced-multi-provider-routing"
-       }
-     }'
-   ```
+  router := model.NewRouter(
+    model.WithMaxConcurrency(16),
+    model.WithTimeout(30*time.Second),
+  )
 
-3. **发送消息**
+  if openaiKey != "" {
+    router.RegisterChatProvider(openai.New("", openaiKey, nil))
+  }
+  if geminiKey != "" {
+    router.RegisterChatProvider(gemini.New("", geminiKey, nil))
+  }
 
-   ```bash
-   curl -X POST "http://localhost:8080/agents/<agent-id>/sessions/<session-id>/messages" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "role": "user",
-       "content": "对于一个内部小工具，你会推荐使用哪个供应商/模型？请说明原因。"
-     }'
-   ```
+  // 优先尝试 OpenAI，不可用时回退到 Gemini。
+  providers := []agent.Provider{agent.ProviderOpenAI, agent.ProviderGemini}
 
-如果主供应商出现不可用，运行时可以根据配置回退到 `fallbackModel`，而客户端调用方式保持不变。
+  var lastErr error
+  for _, prov := range providers {
+    req := model.ChatRequest{
+      Model: agent.ModelConfig{
+        Provider: prov,
+        ModelID:  "gpt-4o-mini", // 当 prov 为 Gemini 时换成合适的 Gemini 模型 ID
+        Stream:   false,
+      },
+      Messages: []agent.Message{
+        {Role: agent.RoleUser, Content: "针对一个内部小工具，推荐性价比高的模型并说明理由。"},
+      },
+    }
 
-## 4. 配置要点
+    resp, err := router.Chat(ctx, req)
+    if err != nil {
+      lastErr = err
+      log.Printf("provider %s failed: %v", prov, err)
+      continue
+    }
 
-- 在 `.env` 与 `config/default.yaml` 中统一管理各供应商的 key、endpoint 与超时等配置；  
-- 结合“模型供应商矩阵”页面选择合适的供应商与能力组合；  
-- 避免在客户端硬编码供应商特有逻辑，将 Agno-Go 运行时视为唯一集成面。  
+    fmt.Printf("provider=%s reply=%s\n", prov, resp.Message.Content)
+    return
+  }
 
-## 5. 测试与验证
+  log.Fatalf("all providers failed, last error: %v", lastErr)
+}
+```
 
-上线前建议：
+这样，provider 具体的模型 ID、Key、端点都留在配置和环境变量里，上层业务只需要关心
+“先试哪个 Provider、再试哪个 Provider”。
 
-- 按 Quickstart 流程对路由 Agent 做一次完整调用；  
-- 临时移除某个供应商的 key，观察是否按预期回退到备用模型；  
-- 记录与不同供应商相关的已知限制（如 token 计数、延迟差异），在内部 runbook 中说明。  
+## 4. 流式变体
+
+同一个 Router 也可以用于流式输出：
+
+```go
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   true,
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "请以流式方式输出一句简短问候。"},
+  },
+}
+
+err := router.Stream(ctx, req, func(ev model.ChatStreamEvent) error {
+  if ev.Type == "token" {
+    fmt.Print(ev.Delta)
+  }
+  if ev.Done {
+    fmt.Println()
+  }
+  return nil
+})
+if err != nil {
+  log.Fatalf("stream error: %v", err)
+}
+```
+
+需要回退时，可以像非流式示例那样，对不同 Provider 构造不同的 `ChatRequest` 并逐个尝试。
+
+## 5. 配置建议
+
+在 Go 侧做多 Provider 路由时建议：
+
+- 把 Key 和端点放在 `.env` / `config/default.yaml` 中，而不是硬编码在应用代码里  
+- 使用 [模型供应商矩阵](../providers/matrix) 选择要启用的 Provider 及模型  
+- 让 Router 成为唯一知道具体 Provider 细节的地方，其它代码只依赖
+  `agent.ModelConfig` 和 `model.ChatRequest`  
+
+## 6. 与 HTTP 运行时的关系
+
+规范中的 HTTP 运行时设计（agents / sessions / messages）沿用了相同的概念
+（模型配置、多 Provider 路由），但实现尚未稳定。
+
+在此之前，你可以：
+
+- 按本文所示，直接在 Go 服务中使用 `go/pkg/providers/*` 与
+  `internal/model.Router` 组合出自己的路由逻辑  
+- 把 `specs/001-go-agno-rewrite/contracts` 中的 HTTP 契约当作数据形状参考，
+  而不是“已经上线的外部 API”  
+
+当 HTTP 层稳定之后，这些路由模式会自然映射到运行时公开的 `agents/sessions/messages`
+接口上。
+

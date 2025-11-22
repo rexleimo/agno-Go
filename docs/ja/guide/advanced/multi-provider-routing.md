@@ -1,90 +1,162 @@
 
-# 高度なガイド：マルチプロバイダルーティング
+# 高度なガイド：マルチプロバイダルーティング（Go ベース）
 
-このガイドでは、単一の HTTP インターフェースを維持しながら、複数のモデルプロバイダ間でリクエストをルーティングおよびフォールバックする方法を紹介します。
+このガイドでは、既存のプロバイダクライアントと `internal/model.Router` を使って
+**自分の Go サービスの中で** 複数のモデルプロバイダ間でルーティングする方法を説明します。
+ここでの例はすべて Go コードであり、未完成の HTTP ランタイムには依存しません。
 
-目的は次のとおりです。
+## 1. どんなときに使うか
 
-- クライアント側には 1 つの AgentOS ランタイムと HTTP サーフェスだけを見せる  
-- サーバー側でタスク種別やモデル名に基づいてプロバイダを切り替える  
-- メインプロバイダが利用できないときにフォールバックモデルに自動的に切り替え、クライアントコードは変更しない  
+代表的なユースケース：
 
-## 1. 典型的なユースケース
+- 一般的なチャットにはあるプロバイダを、低レイテンシ/低コスト用途には別のプロバイダを使う  
+- メインプロバイダがダウンしたりレートリミットされたときに別プロバイダへフェイルオーバーする  
+- アプリケーション側のインターフェイスを変えずに、新しいモデルを A/B テストする  
 
-- 汎用対話にはあるプロバイダ、コストやレイテンシに敏感なワークロードには別のプロバイダを使いたい場合  
-- メインプロバイダの障害時に自動的に予備プロバイダへ切り替えたい場合  
-- 安定したクライアント統合の上で、新しいモデルを用いた実験や A/B テストを行いたい場合  
+本質的なアイデアは、**複数の `ChatProvider` 実装を 1 つの API の裏側に隠す** ことです。
 
-## 2. 高レベルな設計
+## 2. コアコンポーネント
 
-ルーティングロジックはクライアントではなく、Agent の設定とサーバーサイドランタイムに置くことを推奨します：
+- `go/pkg/providers/*` – 各モデルプロバイダの Go クライアント。
+  `model.ChatProvider` / `model.EmbeddingProvider` を実装します。  
+- `internal/model.Router` – `ChatRequest` / `EmbeddingRequest` を登録済みプロバイダに
+  ルーティングするディスパッチャ。  
+- `agent.ModelConfig` – どのプロバイダ／モデルを使うかを表す設定。  
 
-1. `model` フィールドで「優先モデル/プロバイダ」を表現した Agent を定義する  
-2. ランタイムは `model` と構成に基づいて、リクエストを具体的なプロバイダクライアントにルーティングする  
-3. クライアントは常に同じ HTTP エンドポイント（`/agents`、`/sessions`、`/messages`）を呼び出す  
+## 3. 例：OpenAI と Gemini の両方を扱う Router
 
-モデル名の例：
+次の例は HTTP サーバを立てずに、Go プロセス内だけで OpenAI と Gemini を扱う
+ルーティングロジックを示します。
 
-- `openai:gpt-4o-mini`  
-- `gemini:flash-1.5`  
-- `groq:llama3-70b`  
+```go
+package main
 
-具体的なマッピングはサーバー側の設定に委ねます。
+import (
+  "context"
+  "fmt"
+  "log"
+  "os"
+  "time"
 
-## 3. サンプルフロー
+  "github.com/rexleimo/agno-go/internal/agent"
+  "github.com/rexleimo/agno-go/internal/model"
+  "github.com/rexleimo/agno-go/pkg/providers/gemini"
+  "github.com/rexleimo/agno-go/pkg/providers/openai"
+)
 
-1. **ルーティング対応 Agent の作成**
+func main() {
+  ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+  defer cancel()
 
-   ```bash
-   curl -X POST http://localhost:8080/agents \
-     -H "Content-Type: application/json" \
-     -d '{
-       "name": "routing-agent",
-       "description": "An agent that routes across providers based on task type.",
-       "model": "openai:gpt-4o-mini",
-       "tools": [],
-       "config": {
-         "fallbackModel": "gemini:flash-1.5"
-       }
-     }'
-   ```
+  openaiKey := os.Getenv("OPENAI_API_KEY")
+  geminiKey := os.Getenv("GEMINI_API_KEY")
+  if openaiKey == "" && geminiKey == "" {
+    log.Fatal("at least one of OPENAI_API_KEY or GEMINI_API_KEY must be set")
+  }
 
-2. **セッションの作成**
+  router := model.NewRouter(
+    model.WithMaxConcurrency(16),
+    model.WithTimeout(30*time.Second),
+  )
 
-   ```bash
-   curl -X POST http://localhost:8080/agents/<agent-id>/sessions \
-     -H "Content-Type: application/json" \
-     -d '{
-       "userId": "routing-user",
-       "metadata": {
-         "source": "advanced-multi-provider-routing"
-       }
-     }'
-   ```
+  if openaiKey != "" {
+    router.RegisterChatProvider(openai.New("", openaiKey, nil))
+  }
+  if geminiKey != "" {
+    router.RegisterChatProvider(gemini.New("", geminiKey, nil))
+  }
 
-3. **メッセージの送信**
+  // まず OpenAI を試し、ダメなら Gemini にフォールバックする
+  providers := []agent.Provider{agent.ProviderOpenAI, agent.ProviderGemini}
 
-   ```bash
-   curl -X POST "http://localhost:8080/agents/<agent-id>/sessions/<session-id>/messages" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "role": "user",
-       "content": "小規模な社内ツールの場合、どのプロバイダ/モデルを推奨しますか？理由も教えてください。"
-     }'
-   ```
+  var lastErr error
+  for _, prov := range providers {
+    req := model.ChatRequest{
+      Model: agent.ModelConfig{
+        Provider: prov,
+        ModelID:  "gpt-4o-mini", // prov==Gemini のときは適切な Gemini モデル ID に置き換える
+        Stream:   false,
+      },
+      Messages: []agent.Message{
+        {Role: agent.RoleUser, Content: "小さな社内ツール向けに、安くて速いモデルを推薦し理由を説明してください。"},
+      },
+    }
 
-メインプロバイダが利用できない場合、ランタイムは設定された `fallbackModel` にフォールバックできます。クライアント側の呼び出しパターンは変わりません。
+    resp, err := router.Chat(ctx, req)
+    if err != nil {
+      lastErr = err
+      log.Printf("provider %s failed: %v", prov, err)
+      continue
+    }
 
-## 4. 設定上のポイント
+    fmt.Printf("provider=%s reply=%s\n", prov, resp.Message.Content)
+    return
+  }
 
-- 各プロバイダのキーやエンドポイント、タイムアウトなどは `.env` と `config/default.yaml` で一元管理する。  
-- 「プロバイダマトリクス」ページを参考に、利用するプロバイダと機能の組み合わせを決める。  
-- クライアント側でプロバイダ固有のロジックをハードコードするのではなく、Agno-Go ランタイムを「唯一の統合面」として扱う。  
+  log.Fatalf("all providers failed, last error: %v", lastErr)
+}
+```
 
-## 5. テストと検証
+プロバイダ固有のモデル ID やキー、エンドポイントなどは設定ファイルや環境変数に閉じ込め、
+アプリケーションロジック側は「どのプロバイダを優先するか」だけに集中できます。
 
-本パターンを本番で使用する前に：
+## 4. ストリーミング版
 
-- Quickstart と同様の呼び出しフローでルーティング Agent の基本動作を確認する。  
-- 一時的にあるプロバイダのキーを外し、フォールバックが期待通り動作するかを確認する。  
-- プロバイダごとの既知の制約（トークン数、レイテンシなど）を記録し、運用ドキュメントに明示する。  
+同じ Router はストリーミングにも使えます。
+
+```go
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   true,
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "短い挨拶をストリーミングで出力してください。"},
+  },
+}
+
+err := router.Stream(ctx, req, func(ev model.ChatStreamEvent) error {
+  if ev.Type == "token" {
+    fmt.Print(ev.Delta)
+  }
+  if ev.Done {
+    fmt.Println()
+  }
+  return nil
+})
+if err != nil {
+  log.Fatalf("stream error: %v", err)
+}
+```
+
+フォールバックが必要な場合は、非ストリーミングの例と同様に Provider ごとに
+`ChatRequest` を作り直して順番に試すだけです。
+
+## 5. 設定上の注意点
+
+Go 側でマルチプロバイダルーティングを構成する際は：
+
+- API キーやエンドポイントは `.env` や `config/default.yaml` に置き、
+  アプリケーションコードにはハードコードしない  
+- [プロバイダマトリクス](../providers/matrix) を参照して、有効化する
+  プロバイダとモデルを選ぶ  
+- Router を「プロバイダの具体的な事情を知っている唯一の場所」とし、それ以外のコードは
+  `agent.ModelConfig` と `model.ChatRequest` のみに依存させる  
+
+## 6. HTTP ランタイムとの関係
+
+仕様に記載されている HTTP ランタイム（agents / sessions / messages）は、
+ここで紹介した概念（モデル設定やマルチプロバイダルーティング）を反映した設計ですが、
+実装はまだ安定していません。
+
+そのため現時点では：
+
+- 本ガイドのように、`go/pkg/providers/*` と `internal/model.Router` を用いて
+  自前のサービス内でルーティングを実装する  
+- `specs/001-go-agno-rewrite/contracts` にある HTTP 契約は、データ形状の参考としてのみ
+  使用し、すでに稼働中の外部 API とはみなさない  
+
+といった扱いを推奨します。HTTP 層が安定したあと、このルーティングパターンは自然と
+公開される `agents/sessions/messages` エンドポイントに対応する形になります。
+

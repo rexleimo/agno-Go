@@ -1,125 +1,193 @@
 
 # Core Features & API Overview
 
-This page gives a high-level overview of the main concepts in Agno-Go and how they map to the HTTP API that the runtime exposes. It is intended for developers who want to understand *what* the system does and *which endpoints* they should call, without needing to read the Go implementation.
+This page gives a high-level overview of the **Go-level API surface that exists
+today** in Agno-Go. For this first iteration, the stable public entry point is:
 
-## Core Concepts
+- The provider clients under `go/pkg/providers/*`  
+- The shared types in `internal/agent` and `internal/model`  
 
-### Agent
+The HTTP runtime (agents / sessions / messages) described in the specs is still
+under active development and shouldn’t be treated as a stable public API yet.
 
-An **agent** defines how the system should behave for a given task or product surface. It encapsulates:
+## 1. Shared Go types
 
-- A name and description.
-- The default model to use (for example an OpenAI, Gemini, Groq, or other provider model).
-- Which tools the agent is allowed to call.
-- Optional configuration such as temperature or routing policies.
+The main types you will interact with when calling models from Go are:
 
-Agents are created and retrieved via the `/agents` endpoints.
+- `agent.ModelConfig` – describes which provider/model to use and basic options
+  (provider enum, `ModelID`, `Stream`, `MaxTokens`, `Temperature`, …).  
+- `agent.Message` – a single message with `Role` (`user`, `assistant`, `system`)
+  and `Content` (plain text in the current implementation).  
+- `model.ChatRequest` – a chat completion request:
 
-### Session
+  ```go
+  type ChatRequest struct {
+    Model    agent.ModelConfig `json:"model"`
+    Messages []agent.Message   `json:"messages"`
+    Tools    []agent.ToolCall  `json:"tools,omitempty"`
+    Metadata map[string]any    `json:"metadata,omitempty"`
+    Stream   bool              `json:"stream,omitempty"`
+  }
+  ```
 
-A **session** represents an ongoing interaction between a user (or system) and an agent. It:
+- `model.ChatResponse` – a single assistant turn and usage data:
 
-- Is always tied to a single agent.
-- Carries a `userId` and optional metadata (for example channel, experiment group).
-- Provides a stable context for a sequence of messages.
+  ```go
+  type ChatResponse struct {
+    Message      agent.Message `json:"message"`
+    Usage        agent.Usage   `json:"usage,omitempty"`
+    FinishReason string        `json:"finishReason,omitempty"`
+  }
+  ```
 
-Sessions are created via `/agents/{agentId}/sessions`.
+- `model.ChatStreamEvent` / `model.StreamHandler` – used when you want token-level
+  streaming (`token` / `tool_call` / `end` events).  
+- `model.EmbeddingRequest` / `model.EmbeddingResponse` – used for embeddings.  
+- `model.ChatProvider` / `model.EmbeddingProvider` – interfaces implemented by
+  the provider clients in `go/pkg/providers/*`.  
 
-### Message
+## 2. Provider clients (`go/pkg/providers/*`)
 
-A **message** is a single turn in a conversation within a session. It:
+Each provider package (OpenAI, Gemini, Groq, etc.) implements the shared
+interfaces from `internal/model`. For example, the OpenAI client:
 
-- Has a role (for example `user`, `assistant`).
-- Contains textual content and, when applicable, tool call information.
-- Can be returned as a single JSON payload or as a stream of events, depending on the `stream` query parameter.
+- Lives in `go/pkg/providers/openai`  
+- Exposes `New(endpoint, apiKey string, missingEnv []string) *Client`  
+- Implements `model.ChatProvider` and `model.EmbeddingProvider`  
 
-Messages are sent via `/agents/{agentId}/sessions/{sessionId}/messages`.
+A minimal non-streaming chat call looks like this:
 
-### Tool
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
 
-Tools allow agents to call out to external systems (for example HTTP APIs, databases or search). The runtime exposes:
+client := openai.New("", os.Getenv("OPENAI_API_KEY"), nil)
 
-- A way to register tools against an agent.
-- A way to enable or disable tools for a given agent.
+resp, err := client.Chat(ctx, model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   false,
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "Introduce Agno-Go briefly."},
+  },
+})
+if err != nil {
+  log.Fatalf("chat error: %v", err)
+}
 
-Tools can be toggled via `/agents/{agentId}/tools/{toolName}`.
+fmt.Println("assistant:", resp.Message.Content)
+```
 
-### Memory and State
+For streaming output, the same client exposes `Stream` and uses
+`model.ChatStreamEvent`:
 
-Memory describes how state is persisted across sessions and interactions. In Agno-Go:
+```go
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+    Stream:   true,
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "Say hello in a few short tokens."},
+  },
+}
 
-- Short-term conversation state is held in sessions and messages.
-- Long-term state (for example user profiles or knowledge bases) can be stored via the configured memory backends.
+err := client.Stream(ctx, req, func(ev model.ChatStreamEvent) error {
+  if ev.Type == "token" {
+    fmt.Print(ev.Delta)
+  }
+  if ev.Done {
+    fmt.Println()
+  }
+  return nil
+})
+if err != nil {
+  log.Fatalf("stream error: %v", err)
+}
+```
 
-The exact storage technology (in-memory, Bolt, Badger, etc.) is configured via environment variables and `config/default.yaml` and is documented on the Configuration & Security page.
+Embeddings follow the same pattern via `EmbeddingRequest`/`EmbeddingResponse`.
+See the contract tests under `go/tests/contract` for concrete examples.
 
-### Providers
+## 3. Router: composing multiple providers
 
-Providers are model backends (for example OpenAI, Gemini, GLM4, OpenRouter, SiliconFlow, Cerebras, ModelScope, Groq, Ollama). Each provider:
+The `internal/model.Router` type lets you plug multiple provider clients into a
+single dispatcher:
 
-- Implements a common chat/embedding interface in Go.
-- Requires specific environment variables for authentication and endpoints.
-- May support non-streaming and streaming responses.
+```go
+router := model.NewRouter(
+  model.WithMaxConcurrency(16),
+  model.WithTimeout(30*time.Second),
+)
 
-The Provider Matrix page lists the supported capabilities and required environment variables for each provider.
+openAI := openai.New("", os.Getenv("OPENAI_API_KEY"), nil)
+router.RegisterChatProvider(openAI)
 
-## HTTP API Surface (Runtime)
+// You can register additional providers (Gemini, Groq, …) the same way.
 
-The runtime exposes a small set of HTTP endpoints that correspond to the concepts above. The OpenAPI document in the `contracts` directory describes them in detail; this section only covers the most common ones.
+req := model.ChatRequest{
+  Model: agent.ModelConfig{
+    Provider: agent.ProviderOpenAI,
+    ModelID:  "gpt-4o-mini",
+  },
+  Messages: []agent.Message{
+    {Role: agent.RoleUser, Content: "Hello from router."},
+  },
+}
 
-### Health Check
+resp, err := router.Chat(ctx, req)
+if err != nil {
+  log.Fatalf("router chat error: %v", err)
+}
 
-- **Endpoint**: `GET /health`  
-- **Purpose**: Confirm that the runtime is up and to inspect basic metadata such as version and provider status.  
-- **Typical use**: Liveness/readiness checks, monitoring, and quick manual verification after deployment.
+fmt.Println("assistant:", resp.Message.Content)
+```
 
-### Agents
+The router also exposes:
 
-- **Create agent**  
-  - **Endpoint**: `POST /agents`  
-  - **Payload**: Agent definition (name, description, model, tools, config).  
-  - **Response**: A JSON object containing `agentId`.  
-- **Get agent**  
-  - **Endpoint**: `GET /agents/{agentId}`  
-  - **Purpose**: Retrieve the stored agent definition, for inspection or debugging.
+- `router.Stream(ctx, req, handler)` – streaming chat  
+- `router.Embed(ctx, embeddingReq)` – embeddings  
+- `router.Statuses()` – provider status list for health checks  
 
-### Sessions
+This is the main composition primitive used internally; you can also embed it in
+your own services for multi-provider routing.
 
-- **Create session**  
-  - **Endpoint**: `POST /agents/{agentId}/sessions`  
-  - **Payload**: Optional `userId` and `metadata` object.  
-  - **Response**: Session object including its unique ID.  
-- **Relationship**: Each session is attached to exactly one agent; a single agent can have many sessions.
+## 4. HTTP runtime (design notes, not stable)
 
-### Messages
+The specs and OpenAPI document under
+`specs/001-vitepress-docs/contracts/docs-site-openapi.yaml` describe an HTTP
+runtime with endpoints such as:
 
-- **Send message (non-streaming)**  
-  - **Endpoint**: `POST /agents/{agentId}/sessions/{sessionId}/messages`  
-  - **Query**: no `stream` parameter, or `stream=false`.  
-  - **Payload**: Message request with `role` and `content`.  
-  - **Response**: A single JSON object containing `messageId`, `content`, `toolCalls`, `usage`, and `state`.  
-- **Send message (streaming)**  
-  - **Endpoint**: `POST /agents/{agentId}/sessions/{sessionId}/messages?stream=true`  
-  - **Response**: Server-Sent Events (SSE) stream of partial outputs.  
+- `GET /health` – health and provider status  
+- `POST /agents` – create an agent definition  
+- `POST /agents/{agentId}/sessions` – create a session  
+- `POST /agents/{agentId}/sessions/{sessionId}/messages` – send a message  
 
-The Quickstart page demonstrates a minimal call sequence using these endpoints.
+At the moment, this HTTP surface is **not** considered a stable public API:
 
-### Tools
+- The Go runtime implementation is still evolving.  
+- Some flows in the design docs reference behavior that has not yet been fully
+  implemented in `go/cmd/agno`.  
 
-- **Toggle tool**  
-  - **Endpoint**: `PATCH /agents/{agentId}/tools/{toolName}`  
-  - **Payload**: `{ "enabled": true | false }`  
-  - **Response**: Confirmation of the new tool state and the resulting tool list.  
+For production code today, prefer:
 
-This endpoint is especially relevant for advanced guides that demonstrate tool-based workflows or dynamic tool enabling/disabling.
+- Calling providers directly via `go/pkg/providers/*`  
+- Optionally composing them with `internal/model.Router` in your own service  
 
-## Configuration Overview
+The documentation will be updated to treat the HTTP runtime as a first-class
+surface once the implementation and contracts have stabilized.
 
-This page deliberately avoids prescribing a specific deployment topology. Instead, it assumes:
+## 5. Where to look in the repo
 
-- The runtime configuration is stored in files such as `config/default.yaml`.  
-- Provider credentials and endpoints are injected via environment variables defined in `.env`.  
-- The `.env.example` file lists all supported provider variables, with comments explaining required vs optional values.
+- `go/pkg/providers/*` – provider clients (OpenAI, Gemini, Groq, …)  
+- `go/internal/agent` – shared agent/model configuration types, usage tracking  
+- `go/internal/model` – request/response types, router, provider interfaces  
+- `go/tests/providers` – concrete usage examples for provider clients  
+- `go/tests/contract` – contract tests that exercise the HTTP-shaped data model  
 
-For a consolidated view of configuration, environment variables and security practices, refer to the **Configuration & Security Practices** page. For provider-specific details and capability differences, refer to the **Provider Matrix** page.
+Use these files as the ground truth when adapting the examples above to your
+own Go applications.
+
