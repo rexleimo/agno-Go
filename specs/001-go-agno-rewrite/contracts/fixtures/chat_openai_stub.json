@@ -1,0 +1,23 @@
+{
+  "fixtureId": "chat-openai-stub",
+  "provider": "openai",
+  "type": "chat",
+  "input": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "hello from stub"
+      }
+    ]
+  },
+  "expected": {
+    "contains": "echo",
+    "minTokens": 1
+  },
+  "tolerance": {
+    "tokenTolerance": 2,
+    "embeddingCosine": 0.98
+  },
+  "sourceCommit": "stub#0000",
+  "notes": "Placeholder fixture; replace with Python reference output when available."
+}

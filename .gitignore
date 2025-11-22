@@ -4,4 +4,50 @@
 .codex/version.json
 .codex/history.jsonl
 .codex/log/
+
+# Python reference snapshot (read-only)
 agno/
+# Python artifacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Go build/test artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.cover
+*.coverprofile
+*.prof
+
+# Build outputs
+bin/
+build/
+dist/
+coverage/
+.cache/
+tmp/
+*.tmp
+*.log
+
+# Dependencies
+vendor/
+
+# Local env/config
+.env
+.env.local
+.envrc
+
+# Editor/OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

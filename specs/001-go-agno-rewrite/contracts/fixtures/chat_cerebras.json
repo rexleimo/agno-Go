@@ -1,0 +1,24 @@
+{
+  "fixtureId": "chat-cerebras-placeholder",
+  "provider": "cerebras",
+  "type": "chat",
+  "input": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello from cerebras placeholder."
+      }
+    ],
+    "modelId": "llama-3.3-70b"
+  },
+  "expected": {
+    "contains": "",
+    "minTokens": 0
+  },
+  "tolerance": {
+    "tokenTolerance": 2,
+    "embeddingCosine": 0.98
+  },
+  "sourceCommit": "pending-python-baseline",
+  "notes": "Placeholder fixture; replace with Python reference output when available."
+}

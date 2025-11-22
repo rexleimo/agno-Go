@@ -1,0 +1,20 @@
+{
+  "fixtureId": "embedding-modelscope-placeholder",
+  "provider": "modelscope",
+  "type": "embedding",
+  "input": {
+    "text": [
+      "Embedding placeholder for modelscope"
+    ],
+    "modelId": "text-embedding-3-small"
+  },
+  "expected": {
+    "vectors": []
+  },
+  "tolerance": {
+    "tokenTolerance": 2,
+    "embeddingCosine": 0.98
+  },
+  "sourceCommit": "pending-python-baseline",
+  "notes": "Placeholder embedding; replace with Python reference vectors."
+}
