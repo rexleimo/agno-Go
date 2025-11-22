@@ -63,14 +63,14 @@
 ### 测试/基准
 - [X] T024 [P] [US2] 在 `/Users/rex/cool.cnb/agno-Go/go/tests/bench/perf_bench_test.go` 实现 100 并发、128-token 输入、持续 10m 的流式基准，参数从 `/Users/rex/cool.cnb/agno-Go/config/default.yaml` 读取并输出原始数据
 - [X] T025 [P] [US2] 在 `/Users/rex/cool.cnb/agno-Go/go/tests/bench/benchstat_test.go` 使用 benchstat 对比 Go 结果与基线，写入 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/bench/benchstat.txt`
-- [ ] T043 [P] [US2] 在 `/Users/rex/cool.cnb/agno-Go/go/tests/runtime/stream_backpressure_test.go` 验证高负载下流式不中断且返回背压/限流提示
+- [X] T043 [P] [US2] 在 `/Users/rex/cool.cnb/agno-Go/go/tests/runtime/stream_backpressure_test.go` 验证高负载下流式不中断且返回背压/限流提示
 
 ### 实现/优化
-- [ ] T026 [P] [US2] 在 `/Users/rex/cool.cnb/agno-Go/go/internal/runtime/middleware/` 添加限流/背压与请求追踪，确保流式不断流
-- [ ] T027 [P] [US2] 在 `/Users/rex/cool.cnb/agno-Go/go/internal/model/router.go` 增加请求池/复用（连接重用、超时、重试），减少 GC 压力
-- [ ] T028 [US2] 配置 GC/内存优化（如 GOMEMLIMIT）与 provider 并发控制，更新 `/Users/rex/cool.cnb/agno-Go/config/default.yaml` 与 `Makefile bench` 命令
-- [ ] T029 [US2] 在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/bench/` 汇总压测报告与与 Python 基线对比说明
-- [ ] T044 [US2] 在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/bench/python_baseline.txt` 记录预先生成的 Python 版基准（同治具/场景，脱敏文件，不在运行时调用 Python），并在 benchstat 报告中体现对比
+- [X] T026 [P] [US2] 在 `/Users/rex/cool.cnb/agno-Go/go/internal/runtime/middleware/` 添加限流/背压与请求追踪，确保流式不断流
+- [X] T027 [P] [US2] 在 `/Users/rex/cool.cnb/agno-Go/go/internal/model/router.go` 增加请求池/复用（连接重用、超时、重试），减少 GC 压力
+- [X] T028 [US2] 配置 GC/内存优化（如 GOMEMLIMIT）与 provider 并发控制，更新 `/Users/rex/cool.cnb/agno-Go/config/default.yaml` 与 `Makefile bench` 命令
+- [X] T029 [US2] 在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/bench/` 汇总压测报告与与 Python 基线对比说明
+- [X] T044 [US2] 在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/bench/python_baseline.txt` 记录预先生成的 Python 版基准（同治具/场景，脱敏文件，不在运行时调用 Python），并在 benchstat 报告中体现对比
 
 **检查点**：US2 达标或记录改进行动。
 
@@ -81,28 +81,28 @@
 独立测试：运行 `make providers-test`（有 key 的供应商），契约匹配率 ≥95%，偏差记录在 `contracts/deviations.md`；缺 key 需跳过并输出原因。
 
 ### 测试
-- [ ] T030 [P] [US3] 在 `/Users/rex/cool.cnb/agno-Go/go/tests/contract/providers_parity_test.go` 覆盖九家供应商 chat/embedding 契约，使用 fixtures 容差（tokens ±2 / cos≥0.98）
-- [ ] T031 [P] [US3] 在 `/Users/rex/cool.cnb/agno-Go/go/tests/providers/providers_integration_test.go` 针对已配置 key 运行正/异常分支，输出报告到 `specs/001-go-agno-rewrite/artifacts/coverage/providers.log`
+- [X] T030 [P] [US3] 在 `/Users/rex/cool.cnb/agno-Go/go/tests/contract/providers_parity_test.go` 覆盖九家供应商 chat/embedding 契约，使用 fixtures 容差（tokens ±2 / cos≥0.98）
+- [X] T031 [P] [US3] 在 `/Users/rex/cool.cnb/agno-Go/go/tests/providers/providers_integration_test.go` 针对已配置 key 运行正/异常分支，输出报告到 `specs/001-go-agno-rewrite/artifacts/coverage/providers.log`
 
 ### 实现
-- [ ] T032 [P] [US3] 在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/contracts/fixtures/` 导入/生成 Python 参考治具，并在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/contracts/deviations.md` 记录差异
-- [ ] T033 [P] [US3] 在 `/Users/rex/cool.cnb/agno-Go/go/pkg/providers/{gemini,glm4,openrouter,siliconflow,cerebras,modelscope,groq,ollama}/client.go` 实现/完善 REST 客户端与错误映射，对齐路由器接口
-- [ ] T034 [US3] 更新 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/quickstart.md` 与 `/Users/rex/cool.cnb/agno-Go/AGENTS.md`，加入契约/供应商测试运行示例与常见偏差
+- [X] T032 [P] [US3] 在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/contracts/fixtures/` 导入/生成 Python 参考治具，并在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/contracts/deviations.md` 记录差异
+- [X] T033 [P] [US3] 在 `/Users/rex/cool.cnb/agno-Go/go/pkg/providers/{gemini,glm4,openrouter,siliconflow,cerebras,modelscope,groq,ollama}/client.go` 实现/完善 REST 客户端与错误映射，对齐路由器接口
+- [X] T034 [US3] 更新 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/quickstart.md` 与 `/Users/rex/cool.cnb/agno-Go/AGENTS.md`，加入契约/供应商测试运行示例与常见偏差
 
 **检查点**：US3 契约匹配率达标或差异已记录。
 
 ## Phase 6: 抛光与跨领域事项
 
-- [ ] T035 [P] 在 `/Users/rex/cool.cnb/agno-Go/go/internal/runtime/` 与 `go/pkg/` 清理占位、补充错误处理/日志
-- [ ] T036 [P] 在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/quickstart.md` 与 `contracts/openapi.yaml` 同步最新端点/示例
-- [ ] T037 运行全量 fmt/lint/test/providers-test/coverage/bench，修复遗留警告，并整理提交说明
-- [ ] T046 在 `/Users/rex/cool.cnb/agno-Go/Makefile` 实现 `release` 目标（构建二进制输出到 `dist/` 并准备可发布工件），确保符合宪章的发布 Gate
+- [X] T035 [P] 在 `/Users/rex/cool.cnb/agno-Go/go/internal/runtime/` 与 `go/pkg/` 清理占位、补充错误处理/日志
+- [X] T036 [P] 在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/quickstart.md` 与 `contracts/openapi.yaml` 同步最新端点/示例
+- [X] T037 运行全量 fmt/lint/test/providers-test/coverage/bench，修复遗留警告，并整理提交说明
+- [X] T046 在 `/Users/rex/cool.cnb/agno-Go/Makefile` 实现 `release` 目标（构建二进制输出到 `dist/` 并准备可发布工件），确保符合宪章的发布 Gate
 
 ## 覆盖率 Gate（所有故事完成后执行）
 
-- [ ] T038 运行 `make test`, `make providers-test`, `make coverage`, 如需性能验证运行 `make bench`，确保覆盖率 ≥85%，工件写入 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/`
-- [ ] T039 在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/coverage/coverage.txt`（或 CI 工件）记录覆盖率、供应商测试与基准结果链接
-- [ ] T045 确认 `make coverage` 使用 `-coverpkg=./...` 并汇总到 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/coverage/coverage.txt`，在 CI 产物中上传同一报告以满足 FR-007/宪章
+- [X] T038 运行 `make test`, `make providers-test`, `make coverage`, 如需性能验证运行 `make bench`，确保覆盖率 ≥85%，工件写入 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/`
+- [X] T039 在 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/coverage/coverage.txt`（或 CI 工件）记录覆盖率、供应商测试与基准结果链接
+- [X] T045 确认 `make coverage` 使用 `-coverpkg=./...` 并汇总到 `/Users/rex/cool.cnb/agno-Go/specs/001-go-agno-rewrite/artifacts/coverage/coverage.txt`，在 CI 产物中上传同一报告以满足 FR-007/宪章
 
 ## 依赖与执行顺序
 

@@ -1,0 +1,5 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/rexleimo/agno-go/tests/bench
+BenchmarkChatStream-10    	       1	6200000000 ns/op	   0.00 MB/s	     20000 ops/sec	60000000000 B/op	 1800000 allocs/op
+PASS

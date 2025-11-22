@@ -30,6 +30,10 @@ func TestProvidersMissingEnvAreNotConfigured(t *testing.T) {
 	}
 
 	for _, st := range statuses {
+		if len(st.MissingEnv) == 0 {
+			// Providers without required env (e.g., Ollama) may remain available.
+			continue
+		}
 		if st.Status == model.ProviderAvailable {
 			t.Fatalf("expected %s to be gated as not-configured when keys are missing", st.Provider)
 		}

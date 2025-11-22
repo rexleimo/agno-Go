@@ -122,7 +122,7 @@ func NewOpenAICompat(provider agent.Provider, cfg Config) *OpenAICompatClient {
 	}
 	httpClient := cfg.HTTPClient
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: timeout}
+		httpClient = DefaultHTTPClient(timeout)
 	}
 	chatPath := cfg.ChatPath
 	if chatPath == "" {
@@ -181,7 +181,7 @@ func (c *OpenAICompatClient) Chat(ctx context.Context, req model.ChatRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var out oaCompatChatResp
 	if resp.StatusCode >= 400 {
 		return nil, c.errorForStatus(resp, &out)
@@ -233,7 +233,7 @@ func (c *OpenAICompatClient) Stream(ctx context.Context, req model.ChatRequest, 
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		return c.errorForStatus(resp, nil)
 	}
@@ -295,7 +295,7 @@ func (c *OpenAICompatClient) Embed(ctx context.Context, req model.EmbeddingReque
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var out oaCompatEmbedResp
 	if resp.StatusCode >= 400 {
 		return nil, c.errorForStatus(resp, &out)
@@ -373,7 +373,7 @@ func (c *OpenAICompatClient) applyHeaders(req *http.Request) {
 }
 
 func (c *OpenAICompatClient) errorForStatus(resp *http.Response, fallback any) error {
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var body map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&body); err == nil {
 		if c.errorParser != nil {

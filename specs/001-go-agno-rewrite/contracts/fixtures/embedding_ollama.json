@@ -1,0 +1,20 @@
+{
+  "fixtureId": "embedding-ollama-placeholder",
+  "provider": "ollama",
+  "type": "embedding",
+  "input": {
+    "text": [
+      "Embedding placeholder for ollama"
+    ],
+    "modelId": "nomic-embed-text"
+  },
+  "expected": {
+    "vectors": []
+  },
+  "tolerance": {
+    "tokenTolerance": 2,
+    "embeddingCosine": 0.98
+  },
+  "sourceCommit": "pending-python-baseline",
+  "notes": "Placeholder embedding; replace with Python reference vectors."
+}

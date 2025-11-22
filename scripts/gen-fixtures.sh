@@ -11,7 +11,7 @@ echo "==> fixtures: ${SOURCE} -> ${DEST}"
 cd "${ROOT}"
 
 if [[ "${VERIFY_ONLY:-false}" == "true" ]]; then
-  go run ./go/scripts/gen_fixtures.go --source="${SOURCE}" --dest="${DEST}" --verify-only
+  go run ./go/scripts/gen_fixtures --source="${SOURCE}" --dest="${DEST}" --verify-only
 else
-  go run ./go/scripts/gen_fixtures.go --source="${SOURCE}" --dest="${DEST}"
+  go run ./go/scripts/gen_fixtures --source="${SOURCE}" --dest="${DEST}"
 fi

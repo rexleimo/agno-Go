@@ -31,11 +31,15 @@ func TestOpenAIStreamingAndErrorBranches(t *testing.T) {
 				},
 			}
 			payload, _ := json.Marshal(chunk)
-			fmt.Fprintf(w, "data: %s\n\n", string(payload))
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", string(payload)); err != nil {
+				panic(err)
+			}
 		}
 		writeChunk("hi")
 		writeChunk(" there")
-		fmt.Fprint(w, "data: [DONE]\n\n")
+		if _, err := fmt.Fprint(w, "data: [DONE]\n\n"); err != nil {
+			panic(err)
+		}
 	}))
 	defer streamSrv.Close()
 

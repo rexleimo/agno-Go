@@ -18,12 +18,14 @@ import (
 	"github.com/rexleimo/agno-go/pkg/providers/groq"
 	"github.com/rexleimo/agno-go/pkg/providers/modelscope"
 	"github.com/rexleimo/agno-go/pkg/providers/ollama"
+	"github.com/rexleimo/agno-go/pkg/providers/openai"
 	"github.com/rexleimo/agno-go/pkg/providers/openrouter"
 	"github.com/rexleimo/agno-go/pkg/providers/siliconflow"
 )
 
 // User-provided preferred model IDs.
 var providerModels = map[agent.Provider]string{
+	agent.ProviderOpenAI:      "gpt-4.1-mini",
 	agent.ProviderOpenRouter:  "tngtech/deepseek-r1t2-chimera:free",
 	agent.ProviderGroq:        "openai/gpt-oss-120b",
 	agent.ProviderGemini:      "gemini-2.5-flash",
@@ -118,6 +120,8 @@ func newProviderClient(prov agent.Provider, st model.ProviderStatus, endpoint, a
 		return gemini.New(endpoint, apiKey, st.MissingEnv), nil
 	case agent.ProviderGLM4:
 		return glm4.New(st, endpoint, apiKey), nil
+	case agent.ProviderOpenAI:
+		return openai.New(endpoint, apiKey, st.MissingEnv), nil
 	case agent.ProviderSiliconFlow:
 		return siliconflow.New(st, endpoint, apiKey), nil
 	case agent.ProviderModelScope:

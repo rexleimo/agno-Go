@@ -6,12 +6,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/rexleimo/agno-go/internal/agent"
 	"github.com/rexleimo/agno-go/internal/model"
+	"github.com/rexleimo/agno-go/pkg/providers/shared"
 )
 
 const defaultEndpoint = "https://generativelanguage.googleapis.com/v1beta"
@@ -73,7 +75,7 @@ func New(endpoint, apiKey string, missingEnv []string) *Client {
 	return &Client{
 		endpoint: strings.TrimSuffix(ep, "/"),
 		apiKey:   apiKey,
-		http:     &http.Client{Timeout: 60 * time.Second},
+		http:     shared.DefaultHTTPClient(60 * time.Second),
 		status:   status,
 	}
 }
@@ -98,9 +100,9 @@ func (c *Client) Chat(ctx context.Context, req model.ChatRequest) (*model.ChatRe
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("gemini error: %s", resp.Status)
+		return nil, parseGeminiError(resp)
 	}
 	var out chatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
@@ -135,9 +137,9 @@ func (c *Client) Stream(ctx context.Context, req model.ChatRequest, fn model.Str
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("gemini error: %s", resp.Status)
+		return parseGeminiError(resp)
 	}
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
@@ -189,9 +191,9 @@ func (c *Client) Embed(ctx context.Context, req model.EmbeddingRequest) (*model.
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("gemini error: %s", resp.Status)
+		return nil, parseGeminiError(resp)
 	}
 	var out embedResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
@@ -211,4 +213,24 @@ func toContents(msgs []agent.Message) []oaContent {
 		})
 	}
 	return out
+}
+
+func parseGeminiError(resp *http.Response) error {
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+	if len(body) > 0 {
+		var parsed struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(body, &parsed); err == nil {
+			if msg := strings.TrimSpace(parsed.Error.Message); msg != "" {
+				return fmt.Errorf("gemini error: %s (%s)", resp.Status, msg)
+			}
+		}
+		if msg := strings.TrimSpace(string(body)); msg != "" {
+			return fmt.Errorf("gemini error: %s (%s)", resp.Status, msg)
+		}
+	}
+	return fmt.Errorf("gemini error: %s", resp.Status)
 }

@@ -51,7 +51,7 @@ func TestBoltStoreTokenWindow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new bolt: %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	agentID := uuid.New()
 	sessionID := uuid.New()
@@ -85,7 +85,7 @@ func TestBadgerStoreCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new badger: %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	agentID := uuid.New()
 	sessionID := uuid.New()
@@ -121,7 +121,7 @@ func TestBadgerStoreTTLExpires(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new badger: %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	agentID := uuid.New()
 	sessionID := uuid.New()

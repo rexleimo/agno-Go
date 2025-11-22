@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ type Config struct {
 	Providers ProvidersConfig    `yaml:"providers"`
 	Memory    agent.MemoryConfig `yaml:"memory"`
 	Bench     BenchConfig        `yaml:"bench"`
+	Runtime   RuntimeConfig      `yaml:"runtime"`
 }
 
 type ServerConfig struct {
@@ -35,6 +37,22 @@ type BenchConfig struct {
 	Concurrency int           `yaml:"concurrency"`
 	InputTokens int           `yaml:"input_tokens"`
 	Duration    time.Duration `yaml:"duration"`
+}
+
+type RuntimeConfig struct {
+	MaxConcurrentRequests int           `yaml:"maxConcurrentRequests"`
+	RequestQueue          int           `yaml:"requestQueue"`
+	RequestTimeout        time.Duration `yaml:"requestTimeout"`
+	Router                RouterConfig  `yaml:"router"`
+	GOMEMLIMIT            string        `yaml:"gomemlimit"`
+	GOGC                  int           `yaml:"gogc"`
+}
+
+type RouterConfig struct {
+	MaxProviderConcurrency int           `yaml:"maxProviderConcurrency"`
+	ProviderTimeout        time.Duration `yaml:"providerTimeout"`
+	ProviderRetries        int           `yaml:"providerRetries"`
+	ProviderBackoff        time.Duration `yaml:"providerBackoff"`
 }
 
 type ProviderConfig struct {
@@ -79,6 +97,7 @@ func LoadWithEnv(configPath, envPath string) (*Config, error) {
 	}
 
 	cfg.applyProviderEnv()
+	cfg.applyRuntimeEnv()
 	return &cfg, nil
 }
 
@@ -90,7 +109,7 @@ func (c *Config) ProviderStatuses() []model.ProviderStatus {
 		statuses = append(statuses, model.ProviderStatus{
 			Provider:     provider,
 			Status:       cfg.Status,
-			Capabilities: []model.Capability{model.CapabilityChat, model.CapabilityEmbedding},
+			Capabilities: providerCapabilities(provider),
 			MissingEnv:   cfg.MissingEnv,
 		})
 	}
@@ -169,6 +188,15 @@ func firstNonEmpty(values []string) string {
 	return ""
 }
 
+func (c *Config) applyRuntimeEnv() {
+	if limit := strings.TrimSpace(c.Runtime.GOMEMLIMIT); limit != "" {
+		_ = os.Setenv("GOMEMLIMIT", limit)
+	}
+	if c.Runtime.GOGC > 0 {
+		_ = os.Setenv("GOGC", strconv.Itoa(c.Runtime.GOGC))
+	}
+}
+
 // loadEnvFile sets env vars from a .env file without overriding existing values.
 func loadEnvFile(envPath string) error {
 	abs := envPath
@@ -214,5 +242,15 @@ func (p *ProvidersConfig) asMap() map[agent.Provider]*ProviderConfig {
 		agent.ProviderModelScope:  &p.ModelScope,
 		agent.ProviderGroq:        &p.Groq,
 		agent.ProviderOllama:      &p.Ollama,
+	}
+}
+
+func providerCapabilities(p agent.Provider) []model.Capability {
+	// All providers expose chat + embedding + streaming surfaces; specific
+	// adapters will gate unavailable capabilities at call time.
+	return []model.Capability{
+		model.CapabilityChat,
+		model.CapabilityEmbedding,
+		model.CapabilityStreaming,
 	}
 }

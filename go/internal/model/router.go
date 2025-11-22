@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/rexleimo/agno-go/internal/agent"
 )
@@ -95,6 +96,11 @@ type EmbeddingProvider interface {
 type Router struct {
 	chatProviders      map[agent.Provider]ChatProvider
 	embeddingProviders map[agent.Provider]EmbeddingProvider
+
+	limiter chan struct{}
+	timeout time.Duration
+	retries int
+	backoff time.Duration
 }
 
 // Errors returned by the router when routing fails.
@@ -105,10 +111,50 @@ var (
 )
 
 // NewRouter constructs an empty provider router.
-func NewRouter() *Router {
-	return &Router{
+func NewRouter(opts ...RouterOption) *Router {
+	router := &Router{
 		chatProviders:      make(map[agent.Provider]ChatProvider),
 		embeddingProviders: make(map[agent.Provider]EmbeddingProvider),
+		timeout:            60 * time.Second,
+		retries:            1,
+		backoff:            50 * time.Millisecond,
+	}
+	for _, opt := range opts {
+		opt(router)
+	}
+	return router
+}
+
+// RouterOption customizes router behavior.
+type RouterOption func(*Router)
+
+// WithMaxConcurrency limits in-flight provider calls; zero disables limiting.
+func WithMaxConcurrency(n int) RouterOption {
+	return func(r *Router) {
+		if n > 0 {
+			r.limiter = make(chan struct{}, n)
+		}
+	}
+}
+
+// WithTimeout sets a per-request timeout applied to provider calls.
+func WithTimeout(d time.Duration) RouterOption {
+	return func(r *Router) {
+		if d > 0 {
+			r.timeout = d
+		}
+	}
+}
+
+// WithRetries enables retry attempts for transient failures.
+func WithRetries(count int, backoff time.Duration) RouterOption {
+	return func(r *Router) {
+		if count >= 0 {
+			r.retries = count
+		}
+		if backoff > 0 {
+			r.backoff = backoff
+		}
 	}
 }
 
@@ -135,7 +181,13 @@ func (r *Router) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 	if req.Stream {
 		return nil, errors.New("stream requested without stream handler")
 	}
-	return p.Chat(ctx, req)
+	var resp *ChatResponse
+	err := r.execute(ctx, func(callCtx context.Context) error {
+		var err error
+		resp, err = p.Chat(callCtx, req)
+		return err
+	})
+	return resp, err
 }
 
 // Stream routes a streaming completion request.
@@ -148,7 +200,9 @@ func (r *Router) Stream(ctx context.Context, req ChatRequest, fn StreamHandler) 
 	if status.Status != ProviderAvailable {
 		return fmt.Errorf("%w: %s", ErrProviderUnavailable, status.Status)
 	}
-	return p.Stream(ctx, req, fn)
+	return r.execute(ctx, func(callCtx context.Context) error {
+		return p.Stream(callCtx, req, fn)
+	})
 }
 
 // Embed routes an embedding request.
@@ -161,7 +215,13 @@ func (r *Router) Embed(ctx context.Context, req EmbeddingRequest) (*EmbeddingRes
 	if status.Status != ProviderAvailable {
 		return nil, fmt.Errorf("%w: %s", ErrProviderUnavailable, status.Status)
 	}
-	return p.Embed(ctx, req)
+	var resp *EmbeddingResponse
+	err := r.execute(ctx, func(callCtx context.Context) error {
+		var err error
+		resp, err = p.Embed(callCtx, req)
+		return err
+	})
+	return resp, err
 }
 
 // Statuses returns provider statuses for health checks.
@@ -181,4 +241,63 @@ func (r *Router) Statuses() []ProviderStatus {
 		result = append(result, p.Status())
 	}
 	return result
+}
+
+func (r *Router) execute(ctx context.Context, fn func(context.Context) error) error {
+	release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	if release != nil {
+		defer release()
+	}
+
+	attempts := r.retries + 1
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	for i := 0; i < attempts; i++ {
+		callCtx := ctx
+		var cancel context.CancelFunc
+		if r.timeout > 0 {
+			callCtx, cancel = context.WithTimeout(ctx, r.timeout)
+		}
+		err = fn(callCtx)
+		if cancel != nil {
+			cancel()
+		}
+		if err == nil {
+			return nil
+		}
+		if !r.retryable(err) || i == attempts-1 {
+			return err
+		}
+		if r.backoff > 0 {
+			select {
+			case <-time.After(r.backoff):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
+	return err
+}
+
+func (r *Router) acquire(ctx context.Context) (func(), error) {
+	if r.limiter == nil {
+		return nil, nil
+	}
+	select {
+	case r.limiter <- struct{}{}:
+		return func() { <-r.limiter }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return nil, fmt.Errorf("%w: max in-flight reached", ErrProviderUnavailable)
+	}
+}
+
+func (r *Router) retryable(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
 }

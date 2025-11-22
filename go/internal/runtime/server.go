@@ -4,13 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/rexleimo/agno-go/internal/agent"
 	"github.com/rexleimo/agno-go/internal/model"
+	rtmiddleware "github.com/rexleimo/agno-go/internal/runtime/middleware"
 )
 
 // Server exposes HTTP handlers for the AgentOS runtime.
@@ -19,27 +22,85 @@ type Server struct {
 	providerStatuses func() []model.ProviderStatus
 	version          string
 	svc              *Service
+	logger           *log.Logger
+}
+
+type serverOptions struct {
+	middlewares        []func(http.Handler) http.Handler
+	messageMiddlewares []func(http.Handler) http.Handler
+	logger             *log.Logger
+}
+
+// ServerOption configures runtime server behavior.
+type ServerOption func(*serverOptions)
+
+// WithMiddlewares applies router-wide middleware (e.g., request tracing).
+func WithMiddlewares(mw ...func(http.Handler) http.Handler) ServerOption {
+	return func(o *serverOptions) {
+		o.middlewares = append(o.middlewares, mw...)
+	}
+}
+
+// WithMessageMiddleware applies middleware specifically to message endpoints.
+func WithMessageMiddleware(mw ...func(http.Handler) http.Handler) ServerOption {
+	return func(o *serverOptions) {
+		o.messageMiddlewares = append(o.messageMiddlewares, mw...)
+	}
+}
+
+// WithLogger overrides the default server logger. If nil, a stdout logger is used.
+func WithLogger(l *log.Logger) ServerOption {
+	return func(o *serverOptions) {
+		o.logger = l
+	}
+}
+
+// WithConcurrencyLimiter is a convenience option to attach a limiter to message routes.
+func WithConcurrencyLimiter(l *rtmiddleware.ConcurrencyLimiter) ServerOption {
+	if l == nil {
+		return func(o *serverOptions) {}
+	}
+	return WithMessageMiddleware(l.Middleware)
+}
+
+func defaultServerOptions() serverOptions {
+	return serverOptions{
+		middlewares: []func(http.Handler) http.Handler{
+			rtmiddleware.RequestID(),
+		},
+		logger: log.New(os.Stdout, "runtime: ", log.LstdFlags),
+	}
 }
 
 // NewServer builds a chi router with placeholder handlers matching the OpenAPI surface.
 // providerStatuses may be nil; in that case health will omit provider details.
-func NewServer(providerStatuses func() []model.ProviderStatus, version string, svc *Service) *Server {
+func NewServer(providerStatuses func() []model.ProviderStatus, version string, svc *Service, opts ...ServerOption) *Server {
+	config := defaultServerOptions()
+	for _, opt := range opts {
+		opt(&config)
+	}
 	if providerStatuses == nil {
 		providerStatuses = func() []model.ProviderStatus { return nil }
 	}
 	r := chi.NewRouter()
+	for _, mw := range config.middlewares {
+		if mw != nil {
+			r.Use(mw)
+		}
+	}
 	s := &Server{
 		Router:           r,
 		providerStatuses: providerStatuses,
 		version:          version,
 		svc:              svc,
+		logger:           config.logger,
 	}
 
 	r.Get("/health", s.healthHandler)
 	r.Post("/agents", s.createAgent)
 	r.Get("/agents/{agentId}", s.getAgent)
 	r.Post("/agents/{agentId}/sessions", s.createSession)
-	r.Post("/agents/{agentId}/sessions/{sessionId}/messages", s.postMessage)
+	r.With(config.messageMiddlewares...).Post("/agents/{agentId}/sessions/{sessionId}/messages", s.postMessage)
 	r.Patch("/agents/{agentId}/tools/{toolName}", s.toggleTool)
 	r.Get("/contracts/fixtures/{fixtureId}", s.notImplemented)
 
@@ -72,6 +133,7 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := s.svc.CreateAgent(r.Context(), req)
 	if err != nil {
+		s.logf("createAgent error: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -90,6 +152,7 @@ func (s *Server) getAgent(w http.ResponseWriter, r *http.Request) {
 	}
 	a, err := s.svc.GetAgent(r.Context(), agentID)
 	if err != nil {
+		s.logf("getAgent error: %v", err)
 		http.Error(w, err.Error(), statusForError(err))
 		return
 	}
@@ -116,6 +179,7 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 	session, err := s.svc.CreateSession(r.Context(), agentID, body.UserID, body.Metadata)
 	if err != nil {
+		s.logf("createSession error: %v", err)
 		http.Error(w, err.Error(), statusForError(err))
 		return
 	}
@@ -152,6 +216,7 @@ func (s *Server) postMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := s.svc.PostMessage(r.Context(), agentID, sessionID, req)
 	if err != nil {
+		s.logf("postMessage error: %v", err)
 		http.Error(w, err.Error(), statusForError(err))
 		return
 	}
@@ -228,6 +293,7 @@ func (s *Server) handleStream(ctx context.Context, w http.ResponseWriter, agentI
 	}
 
 	if err := s.svc.StreamMessage(ctx, agentID, sessionID, req, encoder); err != nil {
+		s.logf("streamMessage error: %v", err)
 		http.Error(w, err.Error(), statusForError(err))
 		return
 	}
@@ -273,4 +339,11 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func (s *Server) logf(format string, args ...any) {
+	if s.logger == nil {
+		return
+	}
+	s.logger.Printf(format, args...)
 }

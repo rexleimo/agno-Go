@@ -35,4 +35,9 @@
 - 001-go-agno-rewrite：规划纯 Go AgentOS，定义数据模型、OpenAPI 契约、记忆存储策略与性能目标（20% p95、25% 峰值内存），新增 CI（Go 1.25.1 + make fmt/lint/test/providers-test/coverage/bench/constitution-check）与 gofumpt/golangci-lint 配置
 
 <!-- MANUAL ADDITIONS START -->
+- 契约治具：`specs/001-go-agno-rewrite/contracts/fixtures/` 已生成部分基线（Gemini/GLM4/Groq/SiliconFlow），其余 provider 仍为占位（缺 key/鉴权/模型/接口兼容）。未覆盖的项 parity 仅做形状/非空检查。
+- 供应商测试：缺 key 时 `make providers-test` 会跳过并记录 `artifacts/coverage/providers.log`；Ollama 需本地 `OLLAMA_ENDPOINT` 可达，否则标记 unreachable。
+- 契约/供应商回归推荐命令（复用本地缓存）：`GOCACHE=$PWD/.cache/go-build go test ./tests/contract ./tests/providers`，输出/跳过原因会写入 `specs/001-go-agno-rewrite/artifacts/coverage/providers.log`。
+- 替换治具后记得更新 `contracts/deviations.md` 记录与 Python 的差异。
+- 基线治具生成：可运行 `go run ./go/scripts/gen_provider_baseline`（读取 `.env` + `config/default.yaml`）生成/更新 fixtures；已生成 Gemini/GLM4/Groq/SiliconFlow 的 chat 基线，以及 Gemini/SiliconFlow 的 embedding；Groq/GLM4 embedding、Cerebras/ModelScope/Ollama 仍因限额/鉴权/接口兼容性保留占位（详见 `contracts/deviations.md`）。Ollama 本地建议 `OLLAMA_ENDPOINT=http://localhost:11434/api`。
 <!-- MANUAL ADDITIONS END -->

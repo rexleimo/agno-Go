@@ -33,6 +33,18 @@ memory:
   tokenWindow: 256
   # data directory默认 ./data/{bolt|badger}/<namespace>，可通过 env AGNO_DATA_DIR 覆盖
 
+runtime:
+  maxConcurrentRequests: 64
+  requestQueue: 32
+  requestTimeout: 60s
+  router:
+    maxProviderConcurrency: 128
+    providerTimeout: 55s
+    providerRetries: 1
+    providerBackoff: 50ms
+  gomemlimit: 2GiB
+  gogc: 120
+
 bench:
   concurrency: 100
   input_tokens: 128

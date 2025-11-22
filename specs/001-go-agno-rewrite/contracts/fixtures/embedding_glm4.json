@@ -1,0 +1,20 @@
+{
+  "fixtureId": "embedding-glm4-placeholder",
+  "provider": "glm4",
+  "type": "embedding",
+  "input": {
+    "text": [
+      "Embedding placeholder for glm4"
+    ],
+    "modelId": "text-embedding-3-small"
+  },
+  "expected": {
+    "vectors": []
+  },
+  "tolerance": {
+    "tokenTolerance": 2,
+    "embeddingCosine": 0.98
+  },
+  "sourceCommit": "pending-python-baseline",
+  "notes": "Placeholder embedding; replace with Python reference vectors."
+}

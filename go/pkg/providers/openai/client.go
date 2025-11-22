@@ -12,6 +12,7 @@ import (
 
 	"github.com/rexleimo/agno-go/internal/agent"
 	"github.com/rexleimo/agno-go/internal/model"
+	"github.com/rexleimo/agno-go/pkg/providers/shared"
 )
 
 const defaultEndpoint = "https://api.openai.com/v1"
@@ -78,10 +79,11 @@ func New(endpoint, apiKey string, missingEnv []string) *Client {
 	if apiKey == "" {
 		status.Status = model.ProviderNotConfigured
 	}
+	client := shared.DefaultHTTPClient(60 * time.Second)
 	return &Client{
 		endpoint: strings.TrimSuffix(ep, "/"),
 		apiKey:   apiKey,
-		http:     &http.Client{Timeout: 60 * time.Second},
+		http:     client,
 		status:   status,
 	}
 }
@@ -110,7 +112,7 @@ func (c *Client) Chat(ctx context.Context, req model.ChatRequest) (*model.ChatRe
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		return nil, mapHTTPError(resp)
 	}
@@ -155,7 +157,7 @@ func (c *Client) Stream(ctx context.Context, req model.ChatRequest, fn model.Str
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		return mapHTTPError(resp)
 	}
@@ -204,7 +206,7 @@ func (c *Client) Embed(ctx context.Context, req model.EmbeddingRequest) (*model.
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		return nil, mapHTTPError(resp)
 	}

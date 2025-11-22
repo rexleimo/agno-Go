@@ -10,10 +10,16 @@ COVER_PROFILE ?= $(COVER_DIR)/coverage.out
 COVER_FUNC ?= $(COVER_DIR)/coverage.txt
 BENCH_OUTPUT ?= $(BENCH_DIR)/bench.txt
 DIST_DIR ?= $(ROOT)/dist
-BENCH_BASELINE ?=
+RELEASE_PLATFORMS ?= linux/amd64 linux/arm64 darwin/arm64
+BENCH_BASELINE ?= $(BENCH_DIR)/python_baseline.txt
 FIXTURE_SOURCE_DIR ?= $(ROOT)/specs/001-go-agno-rewrite/contracts/fixtures-src
 FIXTURE_DEST_DIR ?= $(ROOT)/specs/001-go-agno-rewrite/contracts/fixtures
 VERIFY_ONLY ?= false
+GOCACHE_DIR ?= $(ROOT)/.cache/go-build
+DEFAULT_GOMEMLIMIT ?= 2GiB
+DEFAULT_GOGC ?= 120
+GO_ENV_BASE := GOCACHE=$(GOCACHE_DIR)
+BENCH_ENV := $(GO_ENV_BASE) GOMEMLIMIT=$${GOMEMLIMIT:-$(DEFAULT_GOMEMLIMIT)} GOGC=$${GOGC:-$(DEFAULT_GOGC)}
 
 .PHONY: help fmt lint test providers-test coverage bench gen-fixtures release constitution-check tidy audit-no-python
 
@@ -21,42 +27,42 @@ help: ## Show available targets
 	@echo "Available targets:"
 	@grep -E '^[a-zA-Z0-9_.-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*##"} {printf "  %-22s %s\n", $$1, $$2}'
 
-fmt: ## Format Go code with gofumpt
+fmt: | $(GOCACHE_DIR) ## Format Go code with gofumpt
 	@echo "==> gofumpt ./..."
-	@cd $(ROOT)/go && $(GO) run mvdan.cc/gofumpt@$(GOFUMPT_VERSION) -w .
+	@cd $(ROOT)/go && $(GO_ENV_BASE) $(GO) run mvdan.cc/gofumpt@$(GOFUMPT_VERSION) -w .
 
-lint: ## Run golangci-lint with configured linters
+lint: | $(GOCACHE_DIR) ## Run golangci-lint with configured linters
 	@echo "==> golangci-lint ./..."
 	@cd $(ROOT)/go && command -v golangci-lint >/dev/null || { echo "golangci-lint not installed; run '$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)'"; exit 1; }
-	@cd $(ROOT)/go && golangci-lint run ./...
+	@cd $(ROOT)/go && $(GO_ENV_BASE) golangci-lint run ./...
 
-test: ## Run unit and package tests
+test: | $(GOCACHE_DIR) ## Run unit and package tests
 	@echo "==> go test ./..."
-	@cd $(ROOT)/go && $(GO) test ./...
+	@cd $(ROOT)/go && $(GO_ENV_BASE) $(GO) test ./...
 
-providers-test: ## Run provider integration tests (env-gated)
+providers-test: | $(GOCACHE_DIR) ## Run provider integration tests (env-gated)
 	@echo "==> providers integration tests (env-gated)"
-	@cd $(ROOT)/go && $(GO) test ./tests/providers
+	@cd $(ROOT)/go && $(GO_ENV_BASE) $(GO) test ./tests/providers
 
-coverage: ## Generate coverage profile and summary
+coverage: | $(GOCACHE_DIR) ## Generate coverage profile and summary
 	@echo "==> coverage profile -> $(COVER_PROFILE)"
 	@mkdir -p $(COVER_DIR)
-	@cd $(ROOT)/go && $(GO) test ./... -coverpkg=./... -coverprofile=$(COVER_PROFILE) -covermode=atomic
-	@cd $(ROOT)/go && $(GO) tool cover -func=$(COVER_PROFILE) > $(COVER_FUNC)
+	@cd $(ROOT)/go && $(GO_ENV_BASE) $(GO) test ./... -coverpkg=./... -coverprofile=$(COVER_PROFILE) -covermode=atomic
+	@cd $(ROOT)/go && $(GO_ENV_BASE) $(GO) tool cover -func=$(COVER_PROFILE) > $(COVER_FUNC)
 
-bench: ## Run benchmarks and summarize with benchstat
+bench: | $(GOCACHE_DIR) ## Run benchmarks and summarize with benchstat
 	@echo "==> benchmark -> $(BENCH_OUTPUT)"
 	@mkdir -p $(BENCH_DIR)
-	@cd $(ROOT)/go && $(GO) test -run=^$$ -bench=. -benchmem ./... | tee $(BENCH_OUTPUT)
+	@cd $(ROOT)/go && $(BENCH_ENV) $(GO) test -run=^$$ -bench=. -benchmem ./... | tee $(BENCH_OUTPUT)
 	@command -v benchstat >/dev/null || { echo "benchstat not installed; run '$(GO) install golang.org/x/perf/cmd/benchstat@latest'"; exit 1; }
-	@if [ -n "$(BENCH_BASELINE)" ]; then benchstat $(BENCH_BASELINE) $(BENCH_OUTPUT) > $(BENCH_DIR)/benchstat.txt; else benchstat $(BENCH_OUTPUT) > $(BENCH_DIR)/benchstat.txt; fi
+	@if [ -n "$(BENCH_BASELINE)" ] && [ -f "$(BENCH_BASELINE)" ]; then benchstat $(BENCH_BASELINE) $(BENCH_OUTPUT) > $(BENCH_DIR)/benchstat.txt; else benchstat $(BENCH_OUTPUT) > $(BENCH_DIR)/benchstat.txt; fi
 
-gen-fixtures: ## Copy sanitized fixtures from precomputed references
+gen-fixtures: | $(GOCACHE_DIR) ## Copy sanitized fixtures from precomputed references
 	@echo "==> fixture generation from precomputed reference (pure Go)"
 	@cd $(ROOT)/go && if [ "$(VERIFY_ONLY)" = "true" ]; then \
-		$(GO) run ./scripts/gen_fixtures.go --source=$(FIXTURE_SOURCE_DIR) --dest=$(FIXTURE_DEST_DIR) --verify-only; \
+		$(GO_ENV_BASE) $(GO) run ./scripts/gen_fixtures --source=$(FIXTURE_SOURCE_DIR) --dest=$(FIXTURE_DEST_DIR) --verify-only; \
 	else \
-		$(GO) run ./scripts/gen_fixtures.go --source=$(FIXTURE_SOURCE_DIR) --dest=$(FIXTURE_DEST_DIR); \
+		$(GO_ENV_BASE) $(GO) run ./scripts/gen_fixtures --source=$(FIXTURE_SOURCE_DIR) --dest=$(FIXTURE_DEST_DIR); \
 	fi
 
 audit-no-python: ## Ensure no cgo or Python subprocess usage is present
@@ -66,12 +72,19 @@ audit-no-python: ## Ensure no cgo or Python subprocess usage is present
 	@cd $(ROOT)/go && if rg -n 'exec\\.Command\\(\"(python|python3)\"' .; then echo "python subprocess detected; remove runtime dependency"; exit 1; else echo "no python subprocess detected"; fi
 	@cd $(ROOT)/go && if rg -n '/agno' .; then echo "python bridge detected; remove runtime dependency"; exit 1; else echo "no runtime python bridges detected"; fi
 
-release: ## Build release binaries into dist/
+release: | $(GOCACHE_DIR) ## Build release binaries into dist/ for common platforms
 	@echo "==> building release binaries"
 	@mkdir -p $(DIST_DIR)
-	@cd $(ROOT)/go && $(GO) build -o $(DIST_DIR)/agno ./cmd/agno
+	@cd $(ROOT)/go; \
+	for plat in $(RELEASE_PLATFORMS); do \
+		OS=$${plat%%/*}; ARCH=$${plat##*/}; \
+		OUT="$(DIST_DIR)/agno-$${OS}-$${ARCH}"; \
+		echo "  -> $$OUT"; \
+		CGO_ENABLED=0 GOOS=$$OS GOARCH=$$ARCH $(GO_ENV_BASE) $(GO) build -o $$OUT ./cmd/agno || exit $$?; \
+	done
+	@cd $(DIST_DIR) && sha256sum agno-* > sha256sums.txt
 	@echo "Artifacts:"
-	@echo "  binary: $(DIST_DIR)/agno"
+	@cd $(DIST_DIR) && ls -1 agno-* sha256sums.txt
 
 constitution-check: | $(LOG_DIR) ## Run the full constitution check suite and log outputs
 	@echo "==> constitution-check (logs -> $(LOG_DIR))"
@@ -85,7 +98,10 @@ constitution-check: | $(LOG_DIR) ## Run the full constitution check suite and lo
 	@echo "==> constitution-check completed (see $(LOG_DIR))"
 
 tidy: ## Tidy Go module dependencies
-	@cd $(ROOT)/go && $(GO) mod tidy
+	@cd $(ROOT)/go && $(GO_ENV_BASE) $(GO) mod tidy
 
 $(LOG_DIR):
 	@mkdir -p $(LOG_DIR) $(COVER_DIR) $(BENCH_DIR)
+
+$(GOCACHE_DIR):
+	@mkdir -p $(GOCACHE_DIR)

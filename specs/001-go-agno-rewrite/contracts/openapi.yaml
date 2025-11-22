@@ -100,7 +100,9 @@ paths:
             text/event-stream:
               schema:
                 type: string
-                description: Server-sent events with tokens/tool-calls/final message and an end event.
+                description: |-
+                  Server-sent events with tokens/tool-calls/final message and an end event.
+                  Status 207 is used to distinguish streaming vs non-streaming.
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
