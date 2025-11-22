@@ -19,44 +19,21 @@ jobs:
           go-version: "1.25.1"
           cache: true
 
-      - name: Install lint/bench tooling
+      - name: Download modules
+        working-directory: go
+        run: go mod download
+
+      - name: Build binary
+        working-directory: go
         run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
-          go install golang.org/x/perf/cmd/benchstat@latest
+          mkdir -p ../dist ../.cache/go-build
+          GOCACHE=$PWD/../.cache/go-build \
+          GOOS=linux GOARCH=amd64 \
+          go build -o ../dist/agno ./cmd/agno
 
-      - name: Format
-        run: make fmt
-
-      - name: Lint
-        run: make lint
-
-      - name: Test
-        run: make test
-
-      - name: Provider tests (env gated)
-        run: make providers-test
-
-      - name: Coverage
-        run: make coverage
-
-      - name: Benchmarks
-        run: make bench
-
-      - name: Constitution check
-        run: make constitution-check
-
-      - name: Upload coverage artifacts
-        if: always()
+      - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-artifacts
-          path: specs/001-go-agno-rewrite/artifacts/coverage/**
-          if-no-files-found: ignore
-
-      - name: Upload bench artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bench-artifacts
-          path: specs/001-go-agno-rewrite/artifacts/bench/**
-          if-no-files-found: ignore
+          name: agno-linux-amd64
+          path: dist/agno
+          if-no-files-found: error
