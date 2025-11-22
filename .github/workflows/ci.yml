@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.1'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: docs/package.json
+
+      - name: Make fmt
+        run: make fmt
+
+      - name: Make lint
+        run: make lint
+
+      - name: Make test
+        run: make test
+
+      - name: Make providers-test
+        run: make providers-test
+
+      - name: Make coverage
+        run: make coverage
+
+      - name: Make bench
+        run: make bench
+
+      - name: Constitution check
+        run: make constitution-check
+
+      - name: Docs check
+        run: make docs-check
+
