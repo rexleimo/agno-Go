@@ -130,3 +130,9 @@ go vet ./pkg/hno/tools/file/... ./pkg/hno/tools/filegen/...
 ```
 
 完整 API 契约、部署建议与架构讲解请见[沙盒化文件 I/O 指南](/zh/guide/sandboxed-file-io)。
+
+## 继续阅读
+
+- [上一篇：一次性代码执行沙盒](/zh/blog/code-execution-sandbox)
+- [下一篇：AI Agent 框架性能基准](/zh/blog/ai-agent-runtime-benchmark)
+- [全部博客文章](/zh/blog/)

@@ -155,3 +155,8 @@ result, err := executor.Run(ctx, run.Spec{
 Build one pinned image with the runtimes your agents need, install podman,
 and `run_code` becomes a tool you can hand to any model. The full design is
 in [Code Execution Sandbox](/guide/code-execution-sandbox).
+
+## Continue reading
+
+- [Next: Agent File Tools Need Root-Bound Sandboxes](/blog/sandboxed-file-io)
+- [All blog articles](/blog/)

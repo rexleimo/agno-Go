@@ -137,3 +137,8 @@ uv run --with psutil --with 'agno==2.8.6' --with 'langgraph==1.2.10' \
 ```
 
 这是一组特定环境下的快照。做生产决策前，请在自己的机器上重新运行。
+
+## 继续阅读
+
+- [上一篇：Agent 文件工具需要根句柄沙盒](/zh/blog/sandboxed-file-io)
+- [全部博客文章](/zh/blog/)

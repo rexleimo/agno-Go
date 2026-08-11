@@ -21,11 +21,22 @@ head:
 Short, evidence-led articles about AI agent systems, Go runtime design, benchmarks,
 and the engineering ideas behind the news cycle.
 
-## Latest article
+## Articles
+
+### Disposable Code Sandboxes: Running LLM-Generated Code Without Fear
+
+[Read the article](/blog/code-execution-sandbox)
+
+How HNO runs agent-generated code in disposable Podman/Docker containers or
+explicit E2B Cloud VMs, with no network, bounded resources, and fail-closed
+provider selection.
+
+- **Category:** Security engineering
+- **Tags:** AI agents, sandbox, code execution, Podman, E2B, Go
 
 ### Agent File Tools Need Root-Bound Sandboxes, Not Path Prefix Checks
 
-[Read the full article](/blog/sandboxed-file-io)
+[Read the article](/blog/sandboxed-file-io)
 
 An engineering note on why a string path allowlist is not an Agent security
 boundary, and how HNO uses explicit read/write capabilities plus Go's
@@ -33,9 +44,8 @@ root-bound filesystem handles to contain file-tool operations.
 
 - **Category:** Security engineering
 - **Tags:** AI agents, Agent security, sandbox, file I/O, Go
-- **Evidence:** Root-relative tool paths, `os.Root` enforcement, escape-regression tests, and documented deployment limits
 
-### Also recent: AI Agent Framework Benchmarks: Why Runtime Overhead Matters More Than Model Latency
+### AI Agent Framework Benchmarks: Why Runtime Overhead Matters More Than Model Latency
 
 [Read the benchmark](/blog/ai-agent-runtime-benchmark)
 

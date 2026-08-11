@@ -107,3 +107,8 @@ result, err := executor.Run(ctx, run.Spec{
 ```
 
 构建一个固定标签、预装 agent 所需 runtime 的镜像,装好 podman,`run_code` 就成了可以放心交给任何模型的能力。完整设计见[代码执行沙盒](/zh/guide/code-execution-sandbox)。
+
+## 继续阅读
+
+- [下一篇：Agent 文件工具需要根句柄沙盒](/zh/blog/sandboxed-file-io)
+- [全部博客文章](/zh/blog/)

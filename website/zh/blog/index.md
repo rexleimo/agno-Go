@@ -21,7 +21,16 @@ head:
 围绕 AI Agent、Go 运行时、框架性能和模型生态写一些有证据的原创文章，
 把热点当作入口，把可复现的工程内容留下来。
 
-## 最新文章
+## 文章列表
+
+### 一次性代码沙盒：无惧运行 LLM 生成的代码
+
+[阅读完整文章](/zh/blog/code-execution-sandbox)
+
+HNO 如何通过一次性 Podman/Docker 容器或显式 E2B Cloud VM 运行 agent 生成的代码，默认断网、资源有界、provider fail-closed。
+
+- **分类：**安全工程
+- **标签：**AI Agent、沙盒、代码执行、Podman、E2B、Go
 
 ### Agent 文件工具不能只靠路径前缀：HNO 如何用根句柄做沙盒
 
@@ -32,9 +41,8 @@ head:
 
 - **分类：**安全工程
 - **标签：**AI Agent、Agent 安全、沙盒、文件 I/O、Go
-- **证据：**根相对工具路径、`os.Root` 强制执行、逃逸回归测试与明确的部署边界
 
-### 同期文章：AI Agent 框架性能怎么测：为什么运行时开销比模型延迟更重要
+### AI Agent 框架性能怎么测：为什么运行时开销比模型延迟更重要
 
 [阅读性能基准](/zh/blog/ai-agent-runtime-benchmark)
 

@@ -146,3 +146,8 @@ uv run --with psutil --with 'agno==2.8.6' --with 'langgraph==1.2.10' \
 
 The benchmark is a snapshot. Re-run it on your own machine before making a
 production decision.
+
+## Continue reading
+
+- [Previous: Agent File Tools Need Root-Bound Sandboxes](/blog/sandboxed-file-io)
+- [All blog articles](/blog/)
