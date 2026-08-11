@@ -73,6 +73,23 @@ func TestCodeExecutionToolkitFailsClosedWithNilExecutor(t *testing.T) {
 	}
 }
 
+func TestCodeExecutionToolkitCapsTimeout(t *testing.T) {
+	executor := &recordingExecutor{result: Result{ExitCode: 0}}
+	toolkit := NewToolkit(executor)
+
+	_, err := toolkit.Execute(context.Background(), "run_code", map[string]interface{}{
+		"runtime":         "python",
+		"code":            "print(1)",
+		"timeout_seconds": 100000.0,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if executor.spec.Timeout != maxToolkitTimeout {
+		t.Fatalf("spec.Timeout = %v, want capped %v", executor.spec.Timeout, maxToolkitTimeout)
+	}
+}
+
 func TestCodeExecutionToolkitRejectsInvalidTimeout(t *testing.T) {
 	toolkit := NewToolkit(&recordingExecutor{})
 	_, err := toolkit.Execute(context.Background(), "run_code", map[string]interface{}{

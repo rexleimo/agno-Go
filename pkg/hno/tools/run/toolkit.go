@@ -8,6 +8,10 @@ import (
 	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
+// maxToolkitTimeout caps timeout_seconds from model-supplied arguments so a
+// hostile or mistaken payload cannot stretch a billable E2B sandbox TTL.
+const maxToolkitTimeout = 5 * time.Minute
+
 // CodeExecutionToolkit exposes a fail-closed run_code tool to agents. It
 // receives an already-configured Executor so provider selection and Cloud
 // billing remain an application-owned decision.
@@ -94,6 +98,9 @@ func (t *CodeExecutionToolkit) runCode(ctx context.Context, args map[string]inte
 			return nil, fmt.Errorf("timeout_seconds must be a positive number")
 		}
 		spec.Timeout = time.Duration(seconds * float64(time.Second))
+		if spec.Timeout > maxToolkitTimeout {
+			spec.Timeout = maxToolkitTimeout
+		}
 	}
 
 	result, err := t.executor.Run(ctx, spec)
