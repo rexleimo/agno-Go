@@ -46,8 +46,9 @@ type Executor interface {
 }
 ```
 
-`NewExecutor` probes for a container runtime and **fails closed** when none
-is found — it never silently falls back to running on the host:
+`NewExecutor` in default `auto` mode probes for a local container runtime and
+**fails closed** when none is found — it never silently falls back to the host
+or a billable Cloud service:
 
 ```
 podman (preferred, rootless-capable) → docker → error
@@ -58,6 +59,29 @@ podman (preferred, rootless-capable) → docker → error
 - **docker** works when the host already runs it.
 - A `local` executor exists for development only and must be constructed
   explicitly via `NewLocalExecutor`; production code should never use it.
+
+### E2B Cloud
+
+E2B is an explicit remote provider for teams that need disposable Linux VMs
+without operating a container runtime. It uses E2B's public REST and Connect
+APIs because E2B currently publishes JavaScript and Python SDKs, not a stable
+Go SDK.
+
+```go
+executor, err := run.NewExecutor(run.Config{
+    Backend: "e2b", // auto never starts a billable Cloud sandbox
+    E2B: &run.E2BConfig{
+        TemplateID: "your-pinned-e2b-template",
+        // APIKey: os.Getenv("E2B_API_KEY"), // optional when env is set
+    },
+})
+```
+
+The provider requires `E2B_API_KEY` (or `E2BConfig.APIKey`) and a template
+ID. It creates a fresh secure sandbox with internet disabled, uploads code as
+a temporary file, executes it, then deletes the sandbox. `Workspace` mounts
+are intentionally rejected in the first version; E2B volumes and file upload
+need an explicit capability design before exposure.
 
 ## Quick start
 
@@ -78,8 +102,9 @@ result, err := executor.Run(ctx, run.Spec{
 })
 ```
 
-The payload always arrives on **stdin**, never in the process argument list,
-so code cannot leak into `ps` output or container metadata.
+The local container provider sends the payload on **stdin**, never in the
+process argument list. E2B uploads it as a temporary sandbox file before
+execution. Neither provider puts code in `ps` output or command metadata.
 
 ## Spec
 
@@ -130,11 +155,12 @@ compiled runtimes and system tools belong there, not in the sandbox core.
 
 ## Deployment prerequisites
 
-- `podman` (preferred) or `docker` on the host.
-- For rootless podman, unprivileged user namespaces must work:
-  `unshare -Ur true` should succeed.
-- A sandbox image with the runtimes you expose, built and pinned to a
-  deterministic tag (never `latest`).
+- Local provider: `podman` (preferred) or `docker` on the host. For rootless
+  podman, `unshare -Ur true` should succeed. Build a sandbox image with pinned
+  runtime versions (never `latest`).
+- E2B provider: an E2B Cloud API key and a pinned template ID. E2B runs the
+  sandbox in its Linux VM infrastructure; no host root or Docker install is
+  required.
 
 ## Security model
 
@@ -148,10 +174,16 @@ compiled runtimes and system tools belong there, not in the sandbox core.
 - **Audit:** results record runtime, duration, exit code, and output size;
   full untrusted output is never logged beyond its cap.
 
+For E2B, the provider additionally requests `secure: true` and
+`allow_internet_access: false`. The template controls VM-level resource
+limits; the process wrapper also applies the requested memory and PID ceilings
+with `ulimit` before executing the runtime.
+
 ## Limits
 
-- Kernel exploits: container isolation shares the host kernel. For untrusted
-  kernel-level workloads, deploy behind a VM or microVM runtime.
+- Kernel exploits: local container isolation shares the host kernel. For
+  untrusted kernel-level workloads, select E2B Cloud's VM-backed provider or
+  deploy behind your own VM/microVM runtime.
 - Compile-and-run workflows (Go/Rust/C) need a file-based template and are not
   in the initial template set.
 - No network-enabled templates yet; data must be pre-staged into the image or

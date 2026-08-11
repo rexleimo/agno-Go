@@ -13,9 +13,8 @@ filesystem access beyond an explicit workspace, and no retained state.
 
 - This is not a file-I/O sandbox. Path confinement inside the workspace is
   provided by the existing `file.Sandbox` / `filegen` components.
-- No microVM orchestration (Firecracker/Kata) in the initial version. If a
-  tenant requires kernel-level isolation, the `Executor` interface permits a
-  later `e2b` provider (Cloud or self-hosted) without agent-facing changes.
+- E2B Cloud is an implemented remote microVM provider. E2B self-hosted,
+  Firecracker, and Kata orchestration remain out of scope for this component.
 - No multi-tenant scheduling platform. Quotas and audit are per-service
   configuration, not a control plane.
 
@@ -79,8 +78,8 @@ type Result struct {
 Probe order at construction, overridable by config:
 
 ```
-podman  → exec.LookPath("podman")   // preferred: rootless-capable, no daemon
-docker  → exec.LookPath("docker")   // fallback, rootful daemon
+auto    → podman → docker → error   // local-only probe; never incurs Cloud cost
+e2b     → explicit E2B Cloud provider, API key and template ID required
 local   → explicit dev-only backend (UNSANDBOXED warning)
 none    → NewExecutor fails; caller must not fall back to bare exec.Command
 ```
@@ -142,13 +141,20 @@ core stays language-agnostic.
 - **Rootless note:** rootless podman confines a container escape to the
   unprivileged user via userns remapping; preferred over rootful docker when
   the host lacks root.
+- **E2B Cloud:** the provider creates a fresh secure E2B sandbox with
+  `allow_internet_access: false`, uploads code as a temporary file, uses a
+  short-lived sandbox access token for the process API, and deletes the
+  sandbox after every run. E2B template configuration owns VM-level limits;
+  the adapter adds per-process `ulimit` memory and PID ceilings.
 
 ## Deployment prerequisites
 
-- `podman` (rootless preferred) or `docker` binary on the host.
-- Rootless userns availability check: `unshare -Ur true` must succeed.
-- Base image built and pushed to a local registry or loaded via
-  `podman build` in CI; image signature/scan policy per enterprise setup.
+- Local provider: `podman` (rootless preferred) or `docker` binary; rootless
+  userns availability check: `unshare -Ur true` must succeed.
+- Local provider: base image built and pinned in CI; image signature/scan
+  policy per enterprise setup.
+- E2B provider: `E2B_API_KEY` (or `E2BConfig.APIKey`) and an E2B template ID.
+  `Backend: "e2b"` is required; `auto` never spends Cloud quota implicitly.
 
 ## Testing strategy
 
@@ -156,11 +162,15 @@ core stays language-agnostic.
 - Integration (skip if no podman): each of the following must fail or be
   bounded — `rm -rf /`, read `/etc/shadow`, `curl evil.example`, fork bomb,
   memory blowup, infinite loop (timeout), output flood (output cap).
+- E2B provider unit tests use an HTTP server to verify secure sandbox
+  creation, offline policy, Connect process framing, payload upload, output
+  decoding, exit status, and unconditional deletion. A real Cloud test must
+  be explicitly enabled by the operator because it consumes quota.
 - `make test` runs unit suite; integration gated behind build tag or env var.
 
 ## Future work
 
-- `e2b` provider (Cloud today, self-hosted later) behind the same interface.
+- E2B self-hosted / BYOC deployment behind the existing E2B provider config.
 - gVisor (`runsc`) as an OCI runtime for stronger syscall isolation.
 - WASM provider for zero-dependency offline execution if a template
   requirement emerges.

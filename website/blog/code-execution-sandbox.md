@@ -72,8 +72,9 @@ The container flags are fixed policy:
 - `--memory` with `--memory-swap` equal — no swap escape;
 - `--read-only` rootfs with a small tmpfs — nothing persists.
 
-Payloads reach the sandbox on **stdin**, never in the argument list, so code
-does not leak into `ps` output or container metadata.
+Local-container payloads reach the sandbox on **stdin**, never in the argument
+list. E2B uploads a temporary sandbox file. Neither path leaks code into `ps`
+output or command metadata.
 
 ## Language-agnostic by template
 
@@ -102,6 +103,19 @@ podman is the preferred backend for three reasons:
 For teams already invested in Docker, the same code path works: the CLI
 surface is compatible.
 
+## When the host cannot run containers: E2B Cloud
+
+Some teams have no root access, cannot install Docker or podman, or want the
+execution plane outside their application server. For them HNO also provides
+an **explicit** E2B Cloud provider. It creates a fresh secure E2B Linux VM,
+requests `allow_internet_access: false`, uploads the payload as a temporary
+file, runs it with memory and PID ceilings, then deletes the VM.
+
+The choice is deliberately explicit: `Backend: "e2b"` plus an API key and a
+pinned template ID. The default `auto` mode will not spend Cloud quota because
+than a stable Go SDK, so the adapter uses E2B's documented REST and Connect
+protocol directly and is covered with an HTTP lifecycle test.
+
 ## What the tests prove
 
 The integration suite (gated behind an environment variable) runs payloads
@@ -117,9 +131,9 @@ capability worth granting.
 
 ## What the sandbox is not
 
-Containers share the host kernel. A kernel exploit is out of scope for this
-layer: workloads that demand that boundary should run the entire agent
-service in a VM or behind a microVM runtime such as Firecracker or gVisor.
+The local container providers share the host kernel. A kernel exploit is out
+of scope for that layer: workloads that demand a VM boundary can select the
+E2B Cloud provider, or run the agent service behind Firecracker or gVisor.
 The sandbox also does not solve prompt injection — a model can still be
 tricked into *calling* the tool — it just guarantees that whatever the tool
 executes cannot reach the host.

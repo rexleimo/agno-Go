@@ -34,7 +34,7 @@ type Executor interface {
 }
 ```
 
-`NewExecutor` 探测容器 runtime,**找不到就 fail closed**——绝不静默降级到宿主执行:
+默认 `auto` 模式下,`NewExecutor` 探测本地容器 runtime,**找不到就 fail closed**——绝不静默降级到宿主执行或会产生费用的 Cloud 服务:
 
 ```
 podman(首选,支持 rootless)→ docker → 报错
@@ -43,6 +43,22 @@ podman(首选,支持 rootless)→ docker → 报错
 - **podman** 优先:无守护进程、支持 rootless、一次性容器正好契合沙盒"用完即抛"的语义。
 - **docker** 在宿主已有时可用。
 - `local` 执行器仅供开发,必须通过 `NewLocalExecutor` 显式构造;生产代码不应使用。
+
+### E2B Cloud
+
+E2B 是显式启用的远程 provider,适合不想运维容器 runtime、但需要一次性 Linux VM 的团队。当前 E2B 官方只维护 JavaScript/Python SDK,没有稳定 Go SDK;HNO 因此基于其公开 REST/Connect API 实现薄适配层。
+
+```go
+executor, err := run.NewExecutor(run.Config{
+    Backend: "e2b", // auto 绝不会自动启动会收费的 Cloud sandbox
+    E2B: &run.E2BConfig{
+        TemplateID: "your-pinned-e2b-template",
+        // APIKey: os.Getenv("E2B_API_KEY"), // 已设置环境变量时可省略
+    },
+})
+```
+
+该 provider 需要 `E2B_API_KEY`(或 `E2BConfig.APIKey`)和 template ID。每次调用创建一个关闭公网、启用安全访问的新 sandbox,上传临时代码文件、执行后销毁。初版刻意拒绝 `Workspace` 挂载;E2B volume 和文件上传需要独立的 capability 设计后再开放。
 
 ## 快速开始
 
@@ -63,7 +79,7 @@ result, err := executor.Run(ctx, run.Spec{
 })
 ```
 
-负载总是通过 **stdin** 传入,绝不进入进程参数列表,代码不会泄露到 `ps` 输出或容器元数据。
+本地容器 provider 通过 **stdin** 传入负载,绝不进入进程参数列表。E2B 则先上传临时 sandbox 文件再执行。两者都不会把代码泄露到 `ps` 输出或命令元数据。
 
 ## Spec
 
@@ -108,9 +124,8 @@ result, err := executor.Run(ctx, run.Spec{
 
 ## 部署前提
 
-- 宿主机有 `podman`(首选)或 `docker`。
-- rootless podman 需要非特权用户命名空间可用:`unshare -Ur true` 应成功。
-- 构建包含所需 runtime 的沙盒镜像,固定到确定性标签(绝不用 `latest`)。
+- 本地 provider:宿主机有 `podman`(首选)或 `docker`;rootless podman 需要 `unshare -Ur true` 成功。构建包含所需 runtime、固定确定性标签(绝不用 `latest`)的沙盒镜像。
+- E2B provider:E2B Cloud API key 与固定 template ID。E2B 在其 Linux VM 基础设施中运行 sandbox,不要求宿主 root 或 Docker。
 
 ## 安全模型
 
@@ -121,8 +136,10 @@ result, err := executor.Run(ctx, run.Spec{
 - **最小特权:** 丢弃全部 capabilities、禁止新特权、只读根文件系统。
 - **审计:** 结果记录 runtime、时长、退出码、输出大小;完整不可信输出绝不超限记入日志。
 
+E2B provider 额外请求 `secure: true` 与 `allow_internet_access: false`。template 负责 VM 级资源上限;进程包装器会在执行 runtime 前再用 `ulimit` 应用请求的内存和 PID 上限。
+
 ## 局限
 
-- 内核漏洞:容器隔离共享宿主内核。对不可信的内核级负载,请部署在 VM 或 microVM runtime 之后。
+- 内核漏洞:本地容器隔离共享宿主内核。对不可信的内核级负载,请选择 E2B Cloud 的 VM provider,或部署在自有 VM/microVM runtime 之后。
 - 编译-运行工作流(Go/Rust/C)需要基于文件的模板,不在初版模板集内。
 - 暂无联网模板;数据需预置进镜像或 workspace。

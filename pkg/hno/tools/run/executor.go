@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os/exec"
 	"strings"
 	"time"
@@ -34,15 +35,29 @@ const (
 // Runtime templates. The entrypoint receives the payload on stdin, so no
 // payload bytes ever appear in the process argument list.
 var runtimeTemplates = map[string]runtimeTemplate{
-	"python": {Entrypoint: []string{"python3", "-"}},
-	"node":   {Entrypoint: []string{"node", "-"}},
-	"shell":  {Entrypoint: []string{"bash", "-s"}},
+	"python": {
+		Entrypoint:     []string{"python3", "-"},
+		FileEntrypoint: []string{"python3"},
+		FileExtension:  ".py",
+	},
+	"node": {
+		Entrypoint:     []string{"node", "-"},
+		FileEntrypoint: []string{"node"},
+		FileExtension:  ".js",
+	},
+	"shell": {
+		Entrypoint:     []string{"bash", "-s"},
+		FileEntrypoint: []string{"bash"},
+		FileExtension:  ".sh",
+	},
 }
 
 // runtimeTemplate describes how one language is launched inside the sandbox
 // image.
 type runtimeTemplate struct {
-	Entrypoint []string
+	Entrypoint     []string
+	FileEntrypoint []string
+	FileExtension  string
 }
 
 // Spec describes one sandboxed execution. Zero-value fields fall back to
@@ -92,12 +107,27 @@ type Executor interface {
 
 // Config configures provider selection for NewExecutor.
 type Config struct {
-	// Backend forces a provider: "podman", "docker", or "auto" (default).
+	// Backend forces a provider: "podman", "docker", "e2b", or "auto"
+	// (default). Auto only probes local container runtimes; it never starts a
+	// billable E2B Cloud sandbox implicitly.
 	Backend string
 	// Image overrides the sandbox image. Defaults to "agent-runner:1".
 	Image string
 	// Binaries is an optional probe override used by tests.
 	Binaries map[string]string
+	// E2B configures the explicit E2B Cloud backend.
+	E2B *E2BConfig
+}
+
+// E2BConfig configures the E2B Cloud provider. APIKey may be omitted only
+// when E2B_API_KEY is set in the process environment. TemplateID is required
+// because it defines the VM image and resource policy for each sandbox.
+type E2BConfig struct {
+	APIKey         string
+	TemplateID     string
+	APIBaseURL     string
+	SandboxBaseURL string
+	HTTPClient     *http.Client
 }
 
 // ErrNoProvider is returned when no sandbox runtime binary is available.
@@ -130,6 +160,12 @@ func NewExecutor(config Config) (Executor, error) {
 
 	backends := []string{"podman", "docker"}
 	if config.Backend != "" && config.Backend != "auto" {
+		if config.Backend == "e2b" {
+			if config.E2B == nil {
+				return nil, fmt.Errorf("e2b configuration is required")
+			}
+			return NewE2BExecutor(*config.E2B)
+		}
 		found := false
 		for _, name := range backends {
 			if config.Backend == name {

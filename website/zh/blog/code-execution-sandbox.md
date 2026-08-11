@@ -57,7 +57,7 @@ Agent 会写代码。真正的问题在于:这些代码在哪里跑。
 - `--memory` + 相等的 `--memory-swap` — 无 swap 逃逸;
 - 只读根文件系统 + 小块 tmpfs — 什么都不持久化。
 
-负载通过 **stdin** 进入沙盒,绝不进入参数列表,代码不会泄露到 `ps` 输出或容器元数据。
+本地容器负载通过 **stdin** 进入沙盒,绝不进入参数列表。E2B 上传临时 sandbox 文件。两条路径都不会把代码泄露到 `ps` 输出或命令元数据。
 
 ## 语言无关:靠模板
 
@@ -73,6 +73,12 @@ Agent 会写代码。真正的问题在于:这些代码在哪里跑。
 
 已投入 Docker 的团队同样能用:CLI 表面兼容,同一套代码路径。
 
+## 无法运行容器时:E2B Cloud
+
+有些团队没有 root 权限、不能安装 Docker/Podman,或者希望执行平面完全离开应用服务器。HNO 为此提供**显式** E2B Cloud provider:创建一个全新的安全 E2B Linux VM,请求 `allow_internet_access: false`,上传临时代码文件,以内存/PID 上限运行,最后销毁 VM。
+
+选择必须显式:`Backend: "e2b"` 加 API key 和固定 template ID。默认 `auto` 模式不会因为本地缺二进制就消耗 Cloud 额度。E2B 当前维护 JavaScript/Python SDK,没有稳定 Go SDK;因此适配器直接使用其公开 REST/Connect 协议,并有 HTTP 生命周期测试覆盖。
+
 ## 测试证明了什么
 
 集成测试套件(由环境变量门控)运行那些**本就不该成功**的负载:
@@ -86,7 +92,7 @@ Agent 会写代码。真正的问题在于:这些代码在哪里跑。
 
 ## 沙盒不是什么
 
-容器共享宿主内核。内核漏洞超出了这一层的能力范围:需要那层边界的负载,应把整个 agent 服务放进 VM 或 microVM runtime(如 Firecracker、gVisor)之后。沙盒也不解决提示注入——模型仍可能被骗去*调用*工具——它只保证工具执行的内容够不到宿主机。
+本地容器 provider 共享宿主内核。内核漏洞超出了这一层的能力范围:需要 VM 边界的负载可选择 E2B Cloud provider,或把整个 agent 服务放进 Firecracker/gVisor 之后。沙盒也不解决提示注入——模型仍可能被骗去*调用*工具——它只保证工具执行的内容够不到宿主机。
 
 ## 快速开始
 
