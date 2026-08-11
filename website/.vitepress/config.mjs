@@ -63,6 +63,7 @@ export default defineConfig({
                 { text: 'Embeddings', link: '/guide/embeddings' },
                 { text: 'Tools', link: '/guide/tools' },
                 { text: 'Sandboxed File I/O', link: '/guide/sandboxed-file-io' },
+                { text: 'Code Execution Sandbox', link: '/guide/code-execution-sandbox' },
                 { text: 'Memory', link: '/guide/memory' },
                 { text: 'Session State', link: '/guide/session-state' },
                 { text: 'Session Service', link: '/guide/session-service' },
@@ -126,6 +127,7 @@ export default defineConfig({
               items: [
                 { text: 'Latest article', link: '/blog/' },
                 { text: 'Sandboxed file I/O', link: '/blog/sandboxed-file-io' },
+                { text: 'Disposable code sandboxes', link: '/blog/code-execution-sandbox' },
                 { text: 'AI Agent runtime benchmark', link: '/blog/ai-agent-runtime-benchmark' }
               ]
             }
@@ -181,6 +183,7 @@ export default defineConfig({
                 { text: 'Embeddings 嵌入', link: '/zh/guide/embeddings' },
                 { text: 'Tools 工具', link: '/zh/guide/tools' },
                 { text: '沙盒化文件 I/O', link: '/zh/guide/sandboxed-file-io' },
+                { text: '代码执行沙盒', link: '/zh/guide/code-execution-sandbox' },
                 { text: 'Memory 记忆', link: '/zh/guide/memory' },
                 { text: '会话状态', link: '/zh/guide/session-state' },
                 { text: 'Go 会话服务', link: '/zh/guide/session-service' },
@@ -244,6 +247,7 @@ export default defineConfig({
               items: [
                 { text: '最新文章', link: '/zh/blog/' },
                 { text: '沙盒化文件 I/O', link: '/zh/blog/sandboxed-file-io' },
+                { text: '一次性代码执行沙盒', link: '/zh/blog/code-execution-sandbox' },
                 { text: 'AI Agent 框架性能基准', link: '/zh/blog/ai-agent-runtime-benchmark' }
               ]
             }
@@ -514,6 +518,7 @@ export default defineConfig({
             { text: 'Embeddings', link: '/guide/embeddings' },
             { text: 'Tools', link: '/guide/tools' },
             { text: 'Sandboxed File I/O', link: '/guide/sandboxed-file-io' },
+            { text: 'Code Execution Sandbox', link: '/guide/code-execution-sandbox' },
             { text: 'Memory', link: '/guide/memory' },
             { text: 'Session State', link: '/guide/session-state' },
             { text: 'MCP Integration', link: '/guide/mcp' }
@@ -573,6 +578,7 @@ export default defineConfig({
           items: [
             { text: 'Latest article', link: '/blog/' },
             { text: 'Sandboxed file I/O', link: '/blog/sandboxed-file-io' },
+            { text: 'Disposable code sandboxes', link: '/blog/code-execution-sandbox' },
             { text: 'AI Agent runtime benchmark', link: '/blog/ai-agent-runtime-benchmark' }
           ]
         }
