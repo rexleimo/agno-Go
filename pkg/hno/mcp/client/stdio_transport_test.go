@@ -2,11 +2,38 @@ package client
 
 import (
 	"context"
+	"io"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/rexleimo/agno-go/pkg/hno/mcp/protocol"
 )
+
+// stdioEchoCommand returns a platform-independent echo process: the test
+// binary re-executes itself and mirrors stdin to stdout. Unix `cat` does not
+// exist on Windows, so tests that start a real process cannot rely on it.
+func stdioEchoCommand() (string, []string) {
+	return os.Args[0], []string{"-test.run=TestStdioEchoHelperProcess", "--", "-stdio-echo"}
+}
+
+// TestStdioEchoHelperProcess is not a real test. When re-executed with the
+// -stdio-echo marker it mirrors stdin to stdout and exits, standing in for
+// `cat` on any platform.
+func TestStdioEchoHelperProcess(t *testing.T) {
+	marked := false
+	for _, arg := range os.Args {
+		if arg == "-stdio-echo" {
+			marked = true
+			break
+		}
+	}
+	if !marked {
+		return
+	}
+	_, _ = io.Copy(os.Stdout, os.Stdin)
+	os.Exit(0)
+}
 
 func TestNewStdioTransport(t *testing.T) {
 	tests := []struct {
@@ -73,8 +100,10 @@ func TestNewStdioTransport(t *testing.T) {
 func TestStdioTransport_StartStop(t *testing.T) {
 	// Use a simple command that will run and respond
 	// 使用一个简单的将运行并响应的命令
+	command, args := stdioEchoCommand()
 	transport, err := NewStdioTransport(StdioConfig{
-		Command:         "cat", // cat will echo back what we send
+		Command:         command, // echoes stdin back to stdout
+		Args:            args,
 		ValidateCommand: false, // Disable validation for testing
 	})
 	if err != nil {
@@ -95,9 +124,9 @@ func TestStdioTransport_StartStop(t *testing.T) {
 
 	// Stop transport
 	if err := transport.Stop(); err != nil {
-		// cat might exit with error when stdin is closed, that's ok
-		// cat 在 stdin 关闭时可能会以错误退出，这没关系
-		t.Logf("Stop returned error (expected for cat): %v", err)
+		// the echo helper might exit with error when stdin is closed, that's ok
+		// 回显辅助进程在 stdin 关闭时可能会以错误退出，这没关系
+		t.Logf("Stop returned error (expected for echo helper): %v", err)
 	}
 
 	if transport.IsRunning() {
@@ -148,8 +177,10 @@ func TestStdioTransport_SendNotification_NotRunning(t *testing.T) {
 }
 
 func TestStdioTransport_DoubleStart(t *testing.T) {
+	command, args := stdioEchoCommand()
 	transport, err := NewStdioTransport(StdioConfig{
-		Command:         "cat",
+		Command:         command,
+		Args:            args,
 		ValidateCommand: false,
 	})
 	if err != nil {
@@ -207,8 +238,10 @@ func TestStdioTransport_SendReceive(t *testing.T) {
 }
 
 func TestStdioTransport_ContextCancellation(t *testing.T) {
+	command, args := stdioEchoCommand()
 	transport, err := NewStdioTransport(StdioConfig{
-		Command:         "cat",
+		Command:         command,
+		Args:            args,
 		ValidateCommand: false,
 	})
 	if err != nil {
