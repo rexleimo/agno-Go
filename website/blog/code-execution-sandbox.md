@@ -111,10 +111,12 @@ an **explicit** E2B Cloud provider. It creates a fresh secure E2B Linux VM,
 requests `allow_internet_access: false`, uploads the payload as a temporary
 file, runs it with memory and PID ceilings, then deletes the VM.
 
-The choice is deliberately explicit: `Backend: "e2b"` plus an API key and a
-pinned template ID. The default `auto` mode will not spend Cloud quota because
-than a stable Go SDK, so the adapter uses E2B's documented REST and Connect
-protocol directly and is covered with an HTTP lifecycle test.
+The choice is deliberately explicit: `Backend: "e2b"` plus an API key, a
+pinned template ID, and a `ResourceShell` executable in that template that
+supports `ulimit -v/-u`. The default `auto` mode will not spend Cloud quota
+because a local binary is missing. E2B currently has JavaScript and Python
+SDKs rather than a stable Go SDK, so the adapter uses E2B's documented REST
+and Connect protocol directly and is covered with an HTTP lifecycle test.
 
 ## What the tests prove
 

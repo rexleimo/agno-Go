@@ -22,9 +22,11 @@ func TestNewE2BExecutorValidation(t *testing.T) {
 	}{
 		{name: "missing key", config: E2BConfig{TemplateID: "template"}, wantErr: "api key"},
 		{name: "missing template", config: E2BConfig{APIKey: "key"}, wantErr: "template ID"},
-		{name: "bad api URL", config: E2BConfig{APIKey: "key", TemplateID: "template", APIBaseURL: "://bad"}, wantErr: "api base URL"},
-		{name: "bad sandbox URL", config: E2BConfig{APIKey: "key", TemplateID: "template", SandboxBaseURL: "ftp://example.test"}, wantErr: "sandbox base URL"},
-		{name: "valid", config: E2BConfig{APIKey: "key", TemplateID: "template"}},
+		{name: "missing resource shell", config: E2BConfig{APIKey: "key", TemplateID: "template"}, wantErr: "resource shell"},
+		{name: "bad api URL", config: E2BConfig{APIKey: "key", TemplateID: "template", ResourceShell: "bash", APIBaseURL: "://bad"}, wantErr: "api base URL"},
+		{name: "bad sandbox URL", config: E2BConfig{APIKey: "key", TemplateID: "template", ResourceShell: "bash", SandboxBaseURL: "ftp://example.test"}, wantErr: "sandbox base URL"},
+		{name: "shell has arguments", config: E2BConfig{APIKey: "key", TemplateID: "template", ResourceShell: "bash -c"}, wantErr: "without arguments"},
+		{name: "valid", config: E2BConfig{APIKey: "key", TemplateID: "template", ResourceShell: "bash"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -48,7 +50,7 @@ func TestNewE2BExecutorValidation(t *testing.T) {
 func TestNewExecutorE2BIsExplicit(t *testing.T) {
 	executor, err := NewExecutor(Config{
 		Backend: "e2b",
-		E2B:     &E2BConfig{APIKey: "key", TemplateID: "template"},
+		E2B:     &E2BConfig{APIKey: "key", TemplateID: "template", ResourceShell: "bash"},
 	})
 	if err != nil {
 		t.Fatalf("NewExecutor() error = %v", err)
@@ -148,6 +150,7 @@ func TestE2BRunLifecycle(t *testing.T) {
 	executor, err := NewE2BExecutor(E2BConfig{
 		APIKey:         "test-key",
 		TemplateID:     "hno-template",
+		ResourceShell:  "bash",
 		APIBaseURL:     server.URL,
 		SandboxBaseURL: server.URL,
 		HTTPClient:     server.Client(),
@@ -175,7 +178,7 @@ func TestE2BRunLifecycle(t *testing.T) {
 }
 
 func TestE2BRunRejectsWorkspace(t *testing.T) {
-	executor, err := NewE2BExecutor(E2BConfig{APIKey: "key", TemplateID: "template"})
+	executor, err := NewE2BExecutor(E2BConfig{APIKey: "key", TemplateID: "template", ResourceShell: "bash"})
 	if err != nil {
 		t.Fatalf("NewE2BExecutor() error = %v", err)
 	}
@@ -205,6 +208,7 @@ func TestE2BRunCleansSandboxWhenSecureTokenMissing(t *testing.T) {
 	executor, err := NewE2BExecutor(E2BConfig{
 		APIKey:         "key",
 		TemplateID:     "template",
+		ResourceShell:  "bash",
 		APIBaseURL:     server.URL,
 		SandboxBaseURL: server.URL,
 		HTTPClient:     server.Client(),
@@ -218,6 +222,45 @@ func TestE2BRunCleansSandboxWhenSecureTokenMissing(t *testing.T) {
 	}
 	if !deleted {
 		t.Fatal("Run() did not delete sandbox after missing access token")
+	}
+}
+
+func TestE2BRunCleansSandboxAfterPartialCreateResponse(t *testing.T) {
+	deleted := false
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.Method + " " + request.URL.Path {
+		case http.MethodPost + " /sandboxes":
+			writer.Header().Set("Content-Type", "application/json")
+			writer.WriteHeader(http.StatusCreated)
+			// The ID is valid but the access token has an invalid type. The
+			// provider must still delete the already-created sandbox.
+			_, _ = writer.Write([]byte(`{"sandboxID":"partially-decoded","envdAccessToken":123}`))
+		case http.MethodDelete + " /sandboxes/partially-decoded":
+			deleted = true
+			writer.WriteHeader(http.StatusNoContent)
+		default:
+			t.Fatalf("unexpected request: %s %s", request.Method, request.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	executor, err := NewE2BExecutor(E2BConfig{
+		APIKey:         "key",
+		TemplateID:     "template",
+		ResourceShell:  "bash",
+		APIBaseURL:     server.URL,
+		SandboxBaseURL: server.URL,
+		HTTPClient:     server.Client(),
+	})
+	if err != nil {
+		t.Fatalf("NewE2BExecutor() error = %v", err)
+	}
+	_, err = executor.Run(context.Background(), Spec{Runtime: "python", Code: "print(1)"})
+	if err == nil || !strings.Contains(err.Error(), "decode e2b sandbox") {
+		t.Fatalf("Run() error = %v, want decode error", err)
+	}
+	if !deleted {
+		t.Fatal("Run() did not delete sandbox after partial create response")
 	}
 }
 

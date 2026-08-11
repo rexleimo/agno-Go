@@ -40,6 +40,7 @@ type e2bExecutor struct {
 	templateID     string
 	apiBaseURL     string
 	sandboxBaseURL string
+	resourceShell  string
 	httpClient     *http.Client
 	timeout        time.Duration
 	memoryLimit    int64
@@ -61,6 +62,9 @@ func NewE2BExecutor(config E2BConfig) (Executor, error) {
 	if strings.TrimSpace(config.TemplateID) == "" {
 		return nil, fmt.Errorf("e2b template ID is required")
 	}
+	if err := validateResourceShell(config.ResourceShell); err != nil {
+		return nil, err
+	}
 	apiBaseURL, err := validBaseURL(config.APIBaseURL, defaultE2BAPIBaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("e2b api base URL: %w", err)
@@ -78,6 +82,7 @@ func NewE2BExecutor(config E2BConfig) (Executor, error) {
 		templateID:     config.TemplateID,
 		apiBaseURL:     apiBaseURL,
 		sandboxBaseURL: sandboxBaseURL,
+		resourceShell:  config.ResourceShell,
 		httpClient:     client,
 		timeout:        DefaultTimeout,
 		memoryLimit:    DefaultMemoryLimit,
@@ -205,7 +210,13 @@ func (e *e2bExecutor) createSandbox(ctx context.Context, spec Spec) (e2bSandbox,
 	}
 	var sandbox e2bSandbox
 	if err := json.NewDecoder(response.Body).Decode(&sandbox); err != nil {
-		return e2bSandbox{}, fmt.Errorf("decode e2b sandbox: %w", err)
+		decodeErr := fmt.Errorf("decode e2b sandbox: %w", err)
+		if sandbox.ID == "" {
+			return e2bSandbox{}, fmt.Errorf("%w; sandbox ID unavailable for cleanup", decodeErr)
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), e2bCleanupTimeout)
+		defer cancel()
+		return e2bSandbox{}, errors.Join(decodeErr, e.deleteSandbox(cleanupCtx, sandbox.ID))
 	}
 	if sandbox.ID == "" {
 		return e2bSandbox{}, fmt.Errorf("e2b sandbox response missing sandbox ID")
@@ -259,7 +270,7 @@ func (e *e2bExecutor) startProcess(ctx context.Context, sandbox e2bSandbox, temp
 		Process: struct {
 			Cmd  string   `json:"cmd"`
 			Args []string `json:"args"`
-		}{Cmd: "bash", Args: arguments},
+		}{Cmd: e.resourceShell, Args: arguments},
 		Stdin: false,
 	})
 	if err != nil {
@@ -383,6 +394,16 @@ func validBaseURL(value, fallback string) (string, error) {
 		return "", fmt.Errorf("must use http or https")
 	}
 	return strings.TrimRight(value, "/"), nil
+}
+
+func validateResourceShell(shell string) error {
+	if strings.TrimSpace(shell) == "" {
+		return fmt.Errorf("e2b resource shell is required")
+	}
+	if strings.ContainsAny(shell, " \t\r\n\x00") {
+		return fmt.Errorf("e2b resource shell must be one executable path without arguments")
+	}
+	return nil
 }
 
 func environmentMap(entries []string) (map[string]string, error) {

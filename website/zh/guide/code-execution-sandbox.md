@@ -52,13 +52,26 @@ E2B 是显式启用的远程 provider,适合不想运维容器 runtime、但需�
 executor, err := run.NewExecutor(run.Config{
     Backend: "e2b", // auto 绝不会自动启动会收费的 Cloud sandbox
     E2B: &run.E2BConfig{
-        TemplateID: "your-pinned-e2b-template",
+        TemplateID:    "your-pinned-e2b-template",
+        ResourceShell: "bash", // 此 template 内的可执行文件;需支持 ulimit -v/-u
         // APIKey: os.Getenv("E2B_API_KEY"), // 已设置环境变量时可省略
     },
 })
 ```
 
 该 provider 需要 `E2B_API_KEY`(或 `E2BConfig.APIKey`)和 template ID。每次调用创建一个关闭公网、启用安全访问的新 sandbox,上传临时代码文件、执行后销毁。初版刻意拒绝 `Workspace` 挂载;E2B volume 和文件上传需要独立的 capability 设计后再开放。
+
+### Agent 工具
+
+将 executor 包装为 `CodeExecutionToolkit`,再放入 HNO agent 接受的 `toolkit.Toolkit` 列表。它暴露 `run_code(runtime, code, timeout_seconds?)`。缺 executor 会成为配置错误,绝不回退到宿主执行。程序失败时,工具仍返回受限 stdout、stderr、退出码和错误文本,便于 agent 修正下一轮尝试。
+
+```go
+executor, err := run.NewExecutor(config)
+if err != nil { return err }
+codeTools := run.NewToolkit(executor)
+defer codeTools.Close()
+// 将 codeTools 加入 agent 的 toolkit 列表。
+```
 
 ## 快速开始
 
@@ -125,7 +138,7 @@ result, err := executor.Run(ctx, run.Spec{
 ## 部署前提
 
 - 本地 provider:宿主机有 `podman`(首选)或 `docker`;rootless podman 需要 `unshare -Ur true` 成功。构建包含所需 runtime、固定确定性标签(绝不用 `latest`)的沙盒镜像。
-- E2B provider:E2B Cloud API key 与固定 template ID。E2B 在其 Linux VM 基础设施中运行 sandbox,不要求宿主 root 或 Docker。
+- E2B provider:E2B Cloud API key 与固定 template ID。E2B 在其 Linux VM 基础设施中运行 sandbox,不要求宿主 root 或 Docker。其 `ResourceShell` 可执行文件必须存在于 template 中,且支持 `ulimit -v` 和 `ulimit -u`。
 
 ## 安全模型
 

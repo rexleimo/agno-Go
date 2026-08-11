@@ -123,8 +123,12 @@ type Config struct {
 // when E2B_API_KEY is set in the process environment. TemplateID is required
 // because it defines the VM image and resource policy for each sandbox.
 type E2BConfig struct {
-	APIKey         string
-	TemplateID     string
+	APIKey     string
+	TemplateID string
+	// ResourceShell is an executable in the E2B template that supports
+	// ulimit -v and -u. It is required so templates do not implicitly depend
+	// on Bash.
+	ResourceShell  string
 	APIBaseURL     string
 	SandboxBaseURL string
 	HTTPClient     *http.Client

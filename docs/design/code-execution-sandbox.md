@@ -145,7 +145,9 @@ core stays language-agnostic.
   `allow_internet_access: false`, uploads code as a temporary file, uses a
   short-lived sandbox access token for the process API, and deletes the
   sandbox after every run. E2B template configuration owns VM-level limits;
-  the adapter adds per-process `ulimit` memory and PID ceilings.
+  the adapter adds per-process `ulimit` memory and PID ceilings through the
+  explicitly configured `ResourceShell`; templates do not implicitly require
+  Bash.
 
 ## Deployment prerequisites
 

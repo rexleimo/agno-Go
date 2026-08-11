@@ -71,7 +71,8 @@ Go SDK.
 executor, err := run.NewExecutor(run.Config{
     Backend: "e2b", // auto never starts a billable Cloud sandbox
     E2B: &run.E2BConfig{
-        TemplateID: "your-pinned-e2b-template",
+        TemplateID:    "your-pinned-e2b-template",
+        ResourceShell: "bash", // executable in this template; supports ulimit -v/-u
         // APIKey: os.Getenv("E2B_API_KEY"), // optional when env is set
     },
 })
@@ -82,6 +83,23 @@ ID. It creates a fresh secure sandbox with internet disabled, uploads code as
 a temporary file, executes it, then deletes the sandbox. `Workspace` mounts
 are intentionally rejected in the first version; E2B volumes and file upload
 need an explicit capability design before exposure.
+
+### Agent tool
+
+Wrap the executor in `CodeExecutionToolkit` and pass it wherever an HNO agent
+accepts a `toolkit.Toolkit`. It exposes `run_code(runtime, code,
+timeout_seconds?)`. A missing executor is a configuration error; it never
+falls back to host execution. Failed programs return their bounded stdout,
+stderr, exit code, and error text as a structured tool result so the agent can
+correct the next attempt.
+
+```go
+executor, err := run.NewExecutor(config)
+if err != nil { return err }
+codeTools := run.NewToolkit(executor)
+defer codeTools.Close()
+// Add codeTools to the agent's toolkit list.
+```
 
 ## Quick start
 
@@ -160,7 +178,8 @@ compiled runtimes and system tools belong there, not in the sandbox core.
   runtime versions (never `latest`).
 - E2B provider: an E2B Cloud API key and a pinned template ID. E2B runs the
   sandbox in its Linux VM infrastructure; no host root or Docker install is
-  required.
+  required. Its `ResourceShell` executable must exist in the template and
+  support `ulimit -v` and `ulimit -u`.
 
 ## Security model
 

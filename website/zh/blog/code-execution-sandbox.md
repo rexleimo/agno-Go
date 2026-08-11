@@ -77,7 +77,7 @@ Agent 会写代码。真正的问题在于:这些代码在哪里跑。
 
 有些团队没有 root 权限、不能安装 Docker/Podman,或者希望执行平面完全离开应用服务器。HNO 为此提供**显式** E2B Cloud provider:创建一个全新的安全 E2B Linux VM,请求 `allow_internet_access: false`,上传临时代码文件,以内存/PID 上限运行,最后销毁 VM。
 
-选择必须显式:`Backend: "e2b"` 加 API key 和固定 template ID。默认 `auto` 模式不会因为本地缺二进制就消耗 Cloud 额度。E2B 当前维护 JavaScript/Python SDK,没有稳定 Go SDK;因此适配器直接使用其公开 REST/Connect 协议,并有 HTTP 生命周期测试覆盖。
+选择必须显式:`Backend: "e2b"` 加 API key、固定 template ID,以及 template 内支持 `ulimit -v/-u` 的 `ResourceShell` 可执行文件。默认 `auto` 模式不会因为本地缺二进制就消耗 Cloud 额度。E2B 当前维护 JavaScript/Python SDK,没有稳定 Go SDK;因此适配器直接使用其公开 REST/Connect 协议,并有 HTTP 生命周期测试覆盖。
 
 ## 测试证明了什么
 
