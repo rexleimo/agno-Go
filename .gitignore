@@ -45,3 +45,15 @@ website/.vitepress/cache/
 
 # 竞品源码分析缓存（本地研究用，不进仓库）
 docs/research/_src/
+
+# Local agent state and temporary execution artifacts
+.aios/
+.contextdb-enable
+.hermes/
+.tmp/
+NUL
+
+# Python and benchmark run artifacts
+benchmarks/framework_comparison/__pycache__/
+benchmarks/framework_comparison/results/remote_agnes_2_5_flash/
+benchmarks/framework_comparison/results/**/*.stderr
